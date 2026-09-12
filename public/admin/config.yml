@@ -1,5 +1,6 @@
 backend:
-  name: git-gateway
+  name: github
+  repo: Anas0473/my-book-library
   branch: main
 
 media_folder: "public/uploads"
