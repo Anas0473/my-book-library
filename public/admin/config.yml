@@ -1,0 +1,26 @@
+backend:
+  name: git-gateway
+  branch: main
+
+media_folder: "public/uploads"
+public_folder: "/uploads"
+
+collections:
+  - name: "books"
+    label: "Books"
+    folder: "src/content/blog"
+    create: true
+    slug: "{{slug}}"
+    fields:
+      - { label: "Title", name: "title", widget: "string" }
+      - { label: "Author(s)", name: "author", widget: "string" }
+      - { label: "ISBN", name: "isbn", widget: "string", required: false }
+      - { label: "Publishing Date", name: "pubDate", widget: "datetime" }
+      - { 
+          label: "Status", 
+          name: "status", 
+          widget: "select", 
+          options: ["Read", "Plan to Read"] 
+        }
+      - { label: "Cover Image", name: "heroImage", widget: "image", required: false }
+      - { label: "Notes / Review", name: "body", widget: "markdown", required: false }
