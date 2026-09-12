@@ -1,49 +1,187 @@
 ---
-import BaseHead from '../components/BaseHead.astro';
-import Footer from '../components/Footer.astro';
-import Header from '../components/Header.astro';
-import { SITE_DESCRIPTION, SITE_TITLE } from '../consts';
+import { getCollection } from 'astro:content';
+
+const allBooks = await getCollection('blog');
+
+const reading = allBooks.filter((b) => b.data.status === 'Reading');
+const planToRead = allBooks.filter((b) => b.data.status === 'Plan to Read');
+const read = allBooks.filter((b) => b.data.status === 'Read');
 ---
 
-<!doctype html>
 <html lang="en">
-	<head>
-		<BaseHead title={SITE_TITLE} description={SITE_DESCRIPTION} />
-	</head>
-	<body>
-		<Header />
-		<main>
-			<h1>🧑‍🚀 Hello, Astronaut!</h1>
-			<p>
-				Welcome to the official <a href="https://astro.build/">Astro</a> blog starter template. This template
-				serves as a lightweight, minimally-styled starting point for anyone looking to build a personal
-				website, blog, or portfolio with Astro.
-			</p>
-			<p>
-				This template comes with a few integrations already configured in your
-				<code>astro.config.mjs</code> file. You can customize your setup with
-				<a href="https://astro.build/integrations">Astro Integrations</a> to add tools like Tailwind,
-				React, or Vue to your project.
-			</p>
-			<p>Here are a few ideas on how to get started with the template:</p>
-			<ul>
-				<li>Edit this page in <code>src/pages/index.astro</code></li>
-				<li>Edit the site header items in <code>src/components/Header.astro</code></li>
-				<li>Add your name to the footer in <code>src/components/Footer.astro</code></li>
-				<li>Check out the included blog posts in <code>src/content/blog/</code></li>
-				<li>Customize the blog post page layout in <code>src/layouts/BlogPost.astro</code></li>
-			</ul>
-			<p>
-				Have fun! If you get stuck, remember to
-				<a href="https://docs.astro.build/">read the docs</a>
-				or <a href="https://astro.build/chat">join us on Discord</a> to ask questions.
-			</p>
-			<p>
-				Looking for a blog template with a bit more personality? Check out
-				<a href="https://github.com/Charca/astro-blog-template">astro-blog-template</a>
-				by <a href="https://twitter.com/Charca">Maxi Ferreira</a>.
-			</p>
-		</main>
-		<Footer />
-	</body>
+  <head>
+    <meta charset="utf-8" />
+    <title>My Reading List</title>
+    <style>
+      body {
+        margin: 0;
+        font-family: system-ui, -apple-system, sans-serif;
+        background: #ffffff;
+        color: #1e293b;
+        padding: 2rem 4rem;
+      }
+      header h1 {
+        font-size: 2rem;
+        font-weight: 700;
+        margin-bottom: 2rem;
+        color: #0f172a;
+      }
+      .container {
+        display: flex;
+        gap: 3rem;
+      }
+      sidebar {
+        width: 180px;
+        flex-shrink: 0;
+      }
+      sidebar h3 {
+        font-size: 0.75rem;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        color: #64748b;
+        margin-bottom: 0.75rem;
+      }
+      .category-btn {
+        display: block;
+        width: 100%;
+        text-align: left;
+        padding: 0.5rem 0.8rem;
+        margin-bottom: 0.25rem;
+        background: none;
+        border: none;
+        border-radius: 6px;
+        font-size: 0.95rem;
+        color: #334155;
+        cursor: pointer;
+        font-weight: 500;
+      }
+      .category-btn.active {
+        background: #0070f3;
+        color: #ffffff;
+      }
+      main {
+        flex: 1;
+      }
+      .category-panel {
+        display: none;
+      }
+      .category-panel.active {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+        gap: 1.5rem;
+      }
+      .card {
+        border: 1px solid #e2e8f0;
+        border-radius: 8px;
+        padding: 0.8rem;
+        text-decoration: none;
+        color: inherit;
+        background: #fff;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+      }
+      .cover-placeholder {
+        width: 100%;
+        height: 220px;
+        background: #f8fafc;
+        border: 1px dashed #cbd5e1;
+        border-radius: 6px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: #94a3b8;
+        font-weight: 600;
+        font-size: 0.85rem;
+        text-align: center;
+        margin-bottom: 0.75rem;
+      }
+      .cover-img {
+        width: 100%;
+        height: 220px;
+        object-fit: cover;
+        border-radius: 6px;
+        margin-bottom: 0.75rem;
+      }
+      .card h4 {
+        margin: 0 0 0.4rem 0;
+        font-size: 0.95rem;
+        font-weight: 700;
+      }
+      .meta-line {
+        margin: 0;
+        font-size: 0.75rem;
+        color: #64748b;
+        line-height: 1.3;
+      }
+      .meta-line strong {
+        color: #334155;
+      }
+      .empty-msg {
+        color: #94a3b8;
+        font-size: 0.9rem;
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <h1>My Reading List</h1>
+    </header>
+
+    <div class="container">
+      <sidebar>
+        <h3>Categories</h3>
+        <button class="category-btn active" data-target="reading">Reading ({reading.length})</button>
+        <button class="category-btn" data-target="plan-to-read">Plan to Read ({planToRead.length})</button>
+        <button class="category-btn" data-target="read">Read ({read.length})</button>
+      </sidebar>
+
+      <main>
+        {
+          [
+            { id: 'reading', books: reading, empty: 'No books currently being read.' },
+            { id: 'plan-to-read', books: planToRead, empty: 'No books planned yet.' },
+            { id: 'read', books: read, empty: 'No completed books yet.' }
+          ].map(({ id, books, empty }) => (
+            <div id={id} class={`category-panel ${id === 'reading' ? 'active' : ''}`}>
+              {books.map((book) => (
+                <a href={`/blog/${book.id}/`} class="card">
+                  {book.data.heroImage ? (
+  <img 
+    src={book.data.heroImage} 
+    class="cover-img" 
+    alt={book.data.title} 
+    referrerpolicy="no-referrer"
+  />
+) : (
+  <div class="cover-placeholder">NO IMAGE<br/>AVAILABLE</div>
+)}
+                  <h4>{book.data.title}</h4>
+                  {book.data.author && <p class="meta-line"><strong>Author(s):</strong> {book.data.author}</p>}
+                  {book.data.isbn && <p class="meta-line"><strong>ISBN:</strong> {book.data.isbn}</p>}
+                  {book.data.pubDate && <p class="meta-line"><strong>Year:</strong> {book.data.pubDate}</p>}
+                </a>
+              ))}
+              {books.length === 0 && <p class="empty-msg">{empty}</p>}
+            </div>
+          ))
+        }
+      </main>
+    </div>
+
+    <script>
+      const buttons = document.querySelectorAll('.category-btn');
+      const panels = document.querySelectorAll('.category-panel');
+
+      buttons.forEach((btn) => {
+        btn.addEventListener('click', () => {
+          const target = btn.getAttribute('data-target');
+
+          buttons.forEach((b) => b.classList.remove('active'));
+          panels.forEach((p) => p.classList.remove('active'));
+
+          btn.classList.add('active');
+          document.getElementById(target!)?.classList.add('active');
+        });
+      });
+    </script>
+  </body>
 </html>

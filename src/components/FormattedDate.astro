@@ -1,17 +1,38 @@
 ---
 interface Props {
-	date: Date;
+	date: Date | string;
 }
 
 const { date } = Astro.props;
----
 
-<time datetime={date.toISOString()}>
-	{
-		date.toLocaleDateString('en-us', {
+let displayDate = '';
+let isoString = '';
+
+if (date instanceof Date) {
+	isoString = date.toISOString();
+	displayDate = date.toLocaleDateString('en-us', {
+		year: 'numeric',
+		month: 'short',
+		day: 'numeric',
+	});
+} else if (typeof date === 'string') {
+	const parsed = new Date(date);
+	// Check if string can be parsed into a valid Date object
+	if (!isNaN(parsed.getTime())) {
+		isoString = parsed.toISOString();
+		displayDate = parsed.toLocaleDateString('en-us', {
 			year: 'numeric',
 			month: 'short',
 			day: 'numeric',
-		})
+		});
+	} else {
+		// Fallback for custom or year-only strings like "2003"
+		isoString = date;
+		displayDate = date;
 	}
+}
+---
+
+<time datetime={isoString}>
+	{displayDate}
 </time>
