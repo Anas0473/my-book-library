@@ -1,11 +1,11 @@
 ---
-import { getCollection } from 'astro:content';
+import { getCollection } from "astro:content";
 
-const allBooks = await getCollection('blog');
+const allBooks = await getCollection("blog");
 
-const reading = allBooks.filter((b) => b.data.status === 'Reading');
-const planToRead = allBooks.filter((b) => b.data.status === 'Plan to Read');
-const read = allBooks.filter((b) => b.data.status === 'Read');
+const reading = allBooks.filter((b) => b.data.status === "Reading");
+const planToRead = allBooks.filter((b) => b.data.status === "Plan to Read");
+const read = allBooks.filter((b) => b.data.status === "Read");
 ---
 
 <html lang="en">
@@ -15,7 +15,10 @@ const read = allBooks.filter((b) => b.data.status === 'Read');
     <style>
       body {
         margin: 0;
-        font-family: system-ui, -apple-system, sans-serif;
+        font-family:
+          system-ui,
+          -apple-system,
+          sans-serif;
         background: #ffffff;
         color: #1e293b;
         padding: 2rem 4rem;
@@ -73,7 +76,8 @@ const read = allBooks.filter((b) => b.data.status === 'Read');
         gap: 1rem;
         margin-bottom: 1.5rem;
       }
-      .search-input, .sort-select {
+      .search-input,
+      .sort-select {
         padding: 0.5rem 0.8rem;
         border: 1px solid #cbd5e1;
         border-radius: 6px;
@@ -84,7 +88,8 @@ const read = allBooks.filter((b) => b.data.status === 'Read');
       .search-input {
         flex: 1;
       }
-      .search-input:focus, .sort-select:focus {
+      .search-input:focus,
+      .sort-select:focus {
         border-color: #0070f3;
       }
       .cards-grid {
@@ -99,7 +104,7 @@ const read = allBooks.filter((b) => b.data.status === 'Read');
         text-decoration: none;
         color: inherit;
         background: #fff;
-        box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
       }
       .cover-placeholder {
         width: 100%;
@@ -118,8 +123,9 @@ const read = allBooks.filter((b) => b.data.status === 'Read');
       }
       .cover-img {
         width: 100%;
-        height: 220px;
-        object-fit: cover;
+        height: 260px; /* Gives taller cover art a bit more room */
+        object-fit: contain;
+        background: transparent; /* Matches soft gray container background */
         border-radius: 6px;
         margin-bottom: 0.75rem;
       }
@@ -151,24 +157,41 @@ const read = allBooks.filter((b) => b.data.status === 'Read');
     <div class="container">
       <sidebar>
         <h3>Categories</h3>
-        <button class="category-btn active" data-target="reading">Reading ({reading.length})</button>
-        <button class="category-btn" data-target="plan-to-read">Plan to Read ({planToRead.length})</button>
-        <button class="category-btn" data-target="read">Read ({read.length})</button>
+        <button class="category-btn active" data-target="reading"
+          >Reading ({reading.length})</button
+        >
+        <button class="category-btn" data-target="plan-to-read"
+          >Plan to Read ({planToRead.length})</button
+        >
+        <button class="category-btn" data-target="read"
+          >Read ({read.length})</button
+        >
       </sidebar>
 
       <main>
         {
           [
-            { id: 'reading', books: reading, empty: 'No books currently being read.' },
-            { id: 'plan-to-read', books: planToRead, empty: 'No books planned yet.' },
-            { id: 'read', books: read, empty: 'No completed books yet.' }
+            {
+              id: "reading",
+              books: reading,
+              empty: "No books currently being read.",
+            },
+            {
+              id: "plan-to-read",
+              books: planToRead,
+              empty: "No books planned yet.",
+            },
+            { id: "read", books: read, empty: "No completed books yet." },
           ].map(({ id, books, empty }) => (
-            <div id={id} class={`category-panel ${id === 'reading' ? 'active' : ''}`}>
+            <div
+              id={id}
+              class={`category-panel ${id === "reading" ? "active" : ""}`}
+            >
               <div class="controls">
-                <input 
-                  type="text" 
-                  class="search-input" 
-                  placeholder="Search by title or author..." 
+                <input
+                  type="text"
+                  class="search-input"
+                  placeholder="Search by title or author..."
                 />
                 <select class="sort-select">
                   <option value="title-asc">Title: A to Z</option>
@@ -180,33 +203,51 @@ const read = allBooks.filter((b) => b.data.status === 'Read');
 
               <div class="cards-grid">
                 {books.map((book) => (
-                  <a 
-                    href={`/blog/${book.id}/`} 
+                  <a
+                    href={`/blog/${book.id}/`}
                     class="card"
                     data-title={book.data.title.toLowerCase()}
-                    data-author={(book.data.author || '').toLowerCase()}
+                    data-author={(book.data.author || "").toLowerCase()}
                     data-year={parseInt(String(book.data.pubDate)) || 0}
                   >
                     {book.data.heroImage ? (
-                      <img 
-                        src={book.data.heroImage} 
-                        class="cover-img" 
-                        alt={book.data.title} 
+                      <img
+                        src={book.data.heroImage}
+                        class="cover-img"
+                        alt={book.data.title}
                         referrerpolicy="no-referrer"
                       />
                     ) : (
-                      <div class="cover-placeholder">NO IMAGE<br/>AVAILABLE</div>
+                      <div class="cover-placeholder">
+                        NO IMAGE
+                        <br />
+                        AVAILABLE
+                      </div>
                     )}
                     <h4>{book.data.title}</h4>
-                    {book.data.author && <p class="meta-line"><strong>Author(s):</strong> {book.data.author}</p>}
-                    {book.data.isbn && <p class="meta-line"><strong>ISBN:</strong> {book.data.isbn}</p>}
-                    {book.data.pubDate && <p class="meta-line"><strong>Year:</strong> {book.data.pubDate}</p>}
+                    {book.data.author && (
+                      <p class="meta-line">
+                        <strong>Author(s):</strong> {book.data.author}
+                      </p>
+                    )}
+                    {book.data.isbn && (
+                      <p class="meta-line">
+                        <strong>ISBN:</strong> {book.data.isbn}
+                      </p>
+                    )}
+                    {book.data.pubDate && (
+                      <p class="meta-line">
+                        <strong>Year:</strong> {book.data.pubDate}
+                      </p>
+                    )}
                   </a>
                 ))}
               </div>
-              
+
               {books.length === 0 && <p class="empty-msg">{empty}</p>}
-              <p class="empty-msg no-match-msg" style="display: none;">No matching books found.</p>
+              <p class="empty-msg no-match-msg" style="display: none;">
+                No matching books found.
+              </p>
             </div>
           ))
         }
@@ -215,67 +256,72 @@ const read = allBooks.filter((b) => b.data.status === 'Read');
 
     <script>
       // Tab switcher
-      const buttons = document.querySelectorAll('.category-btn');
-      const panels = document.querySelectorAll('.category-panel');
+      const buttons = document.querySelectorAll(".category-btn");
+      const panels = document.querySelectorAll(".category-panel");
 
       buttons.forEach((btn) => {
-        btn.addEventListener('click', () => {
-          const target = btn.getAttribute('data-target');
+        btn.addEventListener("click", () => {
+          const target = btn.getAttribute("data-target");
 
-          buttons.forEach((b) => b.classList.remove('active'));
-          panels.forEach((p) => p.classList.remove('active'));
+          buttons.forEach((b) => b.classList.remove("active"));
+          panels.forEach((p) => p.classList.remove("active"));
 
-          btn.classList.add('active');
-          document.getElementById(target!)?.classList.add('active');
+          btn.classList.add("active");
+          document.getElementById(target!)?.classList.add("active");
         });
       });
 
       // Filter & Sort Logic per panel
       panels.forEach((panel) => {
-        const searchInput = panel.querySelector('.search-input') as HTMLInputElement;
-        const sortSelect = panel.querySelector('.sort-select') as HTMLSelectElement;
-        const grid = panel.querySelector('.cards-grid') as HTMLElement;
-        const noMatchMsg = panel.querySelector('.no-match-msg') as HTMLElement;
+        const searchInput = panel.querySelector(
+          ".search-input",
+        ) as HTMLInputElement;
+        const sortSelect = panel.querySelector(
+          ".sort-select",
+        ) as HTMLSelectElement;
+        const grid = panel.querySelector(".cards-grid") as HTMLElement;
+        const noMatchMsg = panel.querySelector(".no-match-msg") as HTMLElement;
 
         if (!searchInput || !sortSelect || !grid) return;
 
         function updatePanel() {
           const query = searchInput.value.trim().toLowerCase();
           const sortVal = sortSelect.value;
-          const cards = Array.from(grid.querySelectorAll<HTMLElement>('.card'));
+          const cards = Array.from(grid.querySelectorAll<HTMLElement>(".card"));
 
           let visibleCount = 0;
 
           // 1. Filter
           cards.forEach((card) => {
-            const title = card.dataset.title || '';
-            const author = card.dataset.author || '';
+            const title = card.dataset.title || "";
+            const author = card.dataset.author || "";
             const matches = title.includes(query) || author.includes(query);
 
             if (matches) {
-              card.style.display = 'block';
+              card.style.display = "block";
               visibleCount++;
             } else {
-              card.style.display = 'none';
+              card.style.display = "none";
             }
           });
 
           // Show/Hide "No matching books" message
           if (noMatchMsg) {
-            noMatchMsg.style.display = (visibleCount === 0 && cards.length > 0) ? 'block' : 'none';
+            noMatchMsg.style.display =
+              visibleCount === 0 && cards.length > 0 ? "block" : "none";
           }
 
           // 2. Sort
           cards.sort((a, b) => {
-            const titleA = a.dataset.title || '';
-            const titleB = b.dataset.title || '';
-            const yearA = parseInt(a.dataset.year || '0', 10);
-            const yearB = parseInt(b.dataset.year || '0', 10);
+            const titleA = a.dataset.title || "";
+            const titleB = b.dataset.title || "";
+            const yearA = parseInt(a.dataset.year || "0", 10);
+            const yearB = parseInt(b.dataset.year || "0", 10);
 
-            if (sortVal === 'title-asc') return titleA.localeCompare(titleB);
-            if (sortVal === 'title-desc') return titleB.localeCompare(titleA);
-            if (sortVal === 'year-desc') return yearB - yearA;
-            if (sortVal === 'year-asc') return yearA - yearB;
+            if (sortVal === "title-asc") return titleA.localeCompare(titleB);
+            if (sortVal === "title-desc") return titleB.localeCompare(titleA);
+            if (sortVal === "year-desc") return yearB - yearA;
+            if (sortVal === "year-asc") return yearA - yearB;
             return 0;
           });
 
@@ -283,8 +329,8 @@ const read = allBooks.filter((b) => b.data.status === 'Read');
           cards.forEach((card) => grid.appendChild(card));
         }
 
-        searchInput.addEventListener('input', updatePanel);
-        sortSelect.addEventListener('change', updatePanel);
+        searchInput.addEventListener("input", updatePanel);
+        sortSelect.addEventListener("change", updatePanel);
       });
     </script>
   </body>
