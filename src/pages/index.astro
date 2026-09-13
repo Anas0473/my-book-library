@@ -66,6 +66,28 @@ const read = allBooks.filter((b) => b.data.status === 'Read');
         display: none;
       }
       .category-panel.active {
+        display: block;
+      }
+      .controls {
+        display: flex;
+        gap: 1rem;
+        margin-bottom: 1.5rem;
+      }
+      .search-input, .sort-select {
+        padding: 0.5rem 0.8rem;
+        border: 1px solid #cbd5e1;
+        border-radius: 6px;
+        font-size: 0.9rem;
+        color: #334155;
+        outline: none;
+      }
+      .search-input {
+        flex: 1;
+      }
+      .search-input:focus, .sort-select:focus {
+        border-color: #0070f3;
+      }
+      .cards-grid {
         display: grid;
         grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
         gap: 1.5rem;
@@ -142,25 +164,49 @@ const read = allBooks.filter((b) => b.data.status === 'Read');
             { id: 'read', books: read, empty: 'No completed books yet.' }
           ].map(({ id, books, empty }) => (
             <div id={id} class={`category-panel ${id === 'reading' ? 'active' : ''}`}>
-              {books.map((book) => (
-                <a href={`/blog/${book.id}/`} class="card">
-                  {book.data.heroImage ? (
-  <img 
-    src={book.data.heroImage} 
-    class="cover-img" 
-    alt={book.data.title} 
-    referrerpolicy="no-referrer"
-  />
-) : (
-  <div class="cover-placeholder">NO IMAGE<br/>AVAILABLE</div>
-)}
-                  <h4>{book.data.title}</h4>
-                  {book.data.author && <p class="meta-line"><strong>Author(s):</strong> {book.data.author}</p>}
-                  {book.data.isbn && <p class="meta-line"><strong>ISBN:</strong> {book.data.isbn}</p>}
-                  {book.data.pubDate && <p class="meta-line"><strong>Year:</strong> {book.data.pubDate}</p>}
-                </a>
-              ))}
+              <div class="controls">
+                <input 
+                  type="text" 
+                  class="search-input" 
+                  placeholder="Search by title or author..." 
+                />
+                <select class="sort-select">
+                  <option value="title-asc">Title: A to Z</option>
+                  <option value="title-desc">Title: Z to A</option>
+                  <option value="year-desc">Year: Newest First</option>
+                  <option value="year-asc">Year: Oldest First</option>
+                </select>
+              </div>
+
+              <div class="cards-grid">
+                {books.map((book) => (
+                  <a 
+                    href={`/blog/${book.id}/`} 
+                    class="card"
+                    data-title={book.data.title.toLowerCase()}
+                    data-author={(book.data.author || '').toLowerCase()}
+                    data-year={parseInt(String(book.data.pubDate)) || 0}
+                  >
+                    {book.data.heroImage ? (
+                      <img 
+                        src={book.data.heroImage} 
+                        class="cover-img" 
+                        alt={book.data.title} 
+                        referrerpolicy="no-referrer"
+                      />
+                    ) : (
+                      <div class="cover-placeholder">NO IMAGE<br/>AVAILABLE</div>
+                    )}
+                    <h4>{book.data.title}</h4>
+                    {book.data.author && <p class="meta-line"><strong>Author(s):</strong> {book.data.author}</p>}
+                    {book.data.isbn && <p class="meta-line"><strong>ISBN:</strong> {book.data.isbn}</p>}
+                    {book.data.pubDate && <p class="meta-line"><strong>Year:</strong> {book.data.pubDate}</p>}
+                  </a>
+                ))}
+              </div>
+              
               {books.length === 0 && <p class="empty-msg">{empty}</p>}
+              <p class="empty-msg no-match-msg" style="display: none;">No matching books found.</p>
             </div>
           ))
         }
@@ -168,6 +214,7 @@ const read = allBooks.filter((b) => b.data.status === 'Read');
     </div>
 
     <script>
+      // Tab switcher
       const buttons = document.querySelectorAll('.category-btn');
       const panels = document.querySelectorAll('.category-panel');
 
@@ -181,6 +228,63 @@ const read = allBooks.filter((b) => b.data.status === 'Read');
           btn.classList.add('active');
           document.getElementById(target!)?.classList.add('active');
         });
+      });
+
+      // Filter & Sort Logic per panel
+      panels.forEach((panel) => {
+        const searchInput = panel.querySelector('.search-input') as HTMLInputElement;
+        const sortSelect = panel.querySelector('.sort-select') as HTMLSelectElement;
+        const grid = panel.querySelector('.cards-grid') as HTMLElement;
+        const noMatchMsg = panel.querySelector('.no-match-msg') as HTMLElement;
+
+        if (!searchInput || !sortSelect || !grid) return;
+
+        function updatePanel() {
+          const query = searchInput.value.trim().toLowerCase();
+          const sortVal = sortSelect.value;
+          const cards = Array.from(grid.querySelectorAll<HTMLElement>('.card'));
+
+          let visibleCount = 0;
+
+          // 1. Filter
+          cards.forEach((card) => {
+            const title = card.dataset.title || '';
+            const author = card.dataset.author || '';
+            const matches = title.includes(query) || author.includes(query);
+
+            if (matches) {
+              card.style.display = 'block';
+              visibleCount++;
+            } else {
+              card.style.display = 'none';
+            }
+          });
+
+          // Show/Hide "No matching books" message
+          if (noMatchMsg) {
+            noMatchMsg.style.display = (visibleCount === 0 && cards.length > 0) ? 'block' : 'none';
+          }
+
+          // 2. Sort
+          cards.sort((a, b) => {
+            const titleA = a.dataset.title || '';
+            const titleB = b.dataset.title || '';
+            const yearA = parseInt(a.dataset.year || '0', 10);
+            const yearB = parseInt(b.dataset.year || '0', 10);
+
+            if (sortVal === 'title-asc') return titleA.localeCompare(titleB);
+            if (sortVal === 'title-desc') return titleB.localeCompare(titleA);
+            if (sortVal === 'year-desc') return yearB - yearA;
+            if (sortVal === 'year-asc') return yearA - yearB;
+            return 0;
+          });
+
+          // Re-append sorted elements
+          cards.forEach((card) => grid.appendChild(card));
+        }
+
+        searchInput.addEventListener('input', updatePanel);
+        sortSelect.addEventListener('change', updatePanel);
       });
     </script>
   </body>
