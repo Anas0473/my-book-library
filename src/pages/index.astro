@@ -1,25 +1,22 @@
 ---
 import { getCollection } from "astro:content";
+import BookSearch from "../components/BookSearch.astro";
 
 const allBooks = await getCollection("blog");
 
-// Natural sort helper function for Astro server-side rendering
 const naturalSort = (a: any, b: any) =>
   a.data.title.localeCompare(b.data.title, undefined, {
     numeric: true,
     sensitivity: "base",
   });
 
-// Filter and pre-sort books for initial render
 const reading = allBooks
   .filter((b) => b.data.status === "Reading")
   .sort(naturalSort);
 const planToRead = allBooks
   .filter((b) => b.data.status === "Plan to Read")
   .sort(naturalSort);
-const read = allBooks
-  .filter((b) => b.data.status === "Read")
-  .sort(naturalSort);
+const read = allBooks.filter((b) => b.data.status === "Read").sort(naturalSort);
 ---
 
 <html lang="en">
@@ -76,6 +73,15 @@ const read = allBooks
         background: #0070f3;
         color: #ffffff;
       }
+      .category-btn.search-tab {
+        margin-bottom: 1rem;
+        border: 1px dashed #0070f3;
+        color: #0070f3;
+      }
+      .category-btn.search-tab.active {
+        border-style: solid;
+        color: #ffffff;
+      }
       main {
         flex: 1;
       }
@@ -108,8 +114,8 @@ const read = allBooks
       }
       .cards-grid {
         display: grid;
-        grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-        gap: 1.5rem;
+        grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+        gap: 1rem;
       }
       .card {
         border: 1px solid #e2e8f0;
@@ -118,44 +124,50 @@ const read = allBooks
         text-decoration: none;
         color: inherit;
         background: #fff;
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
         box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
       }
       .cover-placeholder {
         width: 100%;
-        height: 220px;
+        height: 200px;
         background: #f8fafc;
         border: 1px dashed #cbd5e1;
-        border-radius: 6px;
+        border-radius: 4px;
         display: flex;
         align-items: center;
         justify-content: center;
         color: #94a3b8;
         font-weight: 600;
-        font-size: 0.85rem;
+        font-size: 0.75rem;
         text-align: center;
-        margin-bottom: 0.75rem;
+        margin-bottom: 0.5rem;
       }
       .cover-img {
         width: 100%;
-        height: 260px;
+        height: 200px;
         object-fit: contain;
         background: transparent;
-        border-radius: 6px;
-        margin-bottom: 0.75rem;
+        border-radius: 4px;
+        margin-bottom: 0.5rem;
       }
       .card h4 {
-        margin: 0 0 0.4rem 0;
-        font-size: 0.95rem;
+        margin: 0 0 0.25rem 0;
+        font-size: 0.9rem;
         font-weight: 700;
-      }
-      .meta-line {
-        margin: 0;
-        font-size: 0.75rem;
-        color: #64748b;
+        color: #0f172a;
         line-height: 1.3;
       }
-      .meta-line strong {
-        color: #334155;
+      .author-text {
+        margin: 0 0 0.25rem 0;
+        font-size: 0.75rem;
+        color: #64748b;
+      }
+      .pub-date-text {
+        margin: 0;
+        font-size: 0.7rem;
+        color: #94a3b8;
       }
       .empty-msg {
         color: #94a3b8;
@@ -170,8 +182,13 @@ const read = allBooks
 
     <div class="container">
       <sidebar>
-        <h3>Categories</h3>
-        <button class="category-btn active" data-target="reading"
+        <h3>Database</h3>
+        <button class="category-btn search-tab active" data-target="search-db"
+          >🔍 Search Books</button
+        >
+
+        <h3>My Lists</h3>
+        <button class="category-btn" data-target="reading"
           >Reading ({reading.length})</button
         >
         <button class="category-btn" data-target="plan-to-read"
@@ -183,6 +200,12 @@ const read = allBooks
       </sidebar>
 
       <main>
+        <!-- Dedicated Search Page Panel -->
+        <div id="search-db" class="category-panel active">
+          <BookSearch />
+        </div>
+
+        <!-- Personal Collection Panels -->
         {
           [
             {
@@ -197,15 +220,12 @@ const read = allBooks
             },
             { id: "read", books: read, empty: "No completed books yet." },
           ].map(({ id, books, empty }) => (
-            <div
-              id={id}
-              class={`category-panel ${id === "reading" ? "active" : ""}`}
-            >
+            <div id={id} class="category-panel">
               <div class="controls">
                 <input
                   type="text"
                   class="search-input"
-                  placeholder="Search by title or author..."
+                  placeholder="Filter your list by title or author..."
                 />
                 <select class="sort-select">
                   <option value="title-asc">Title: A to Z</option>
@@ -224,36 +244,31 @@ const read = allBooks
                     data-author={(book.data.author || "").toLowerCase()}
                     data-year={parseInt(String(book.data.pubDate)) || 0}
                   >
-                    {book.data.heroImage ? (
-                      <img
-                        src={book.data.heroImage}
-                        class="cover-img"
-                        alt={book.data.title}
-                        referrerpolicy="no-referrer"
-                      />
-                    ) : (
-                      <div class="cover-placeholder">
-                        NO IMAGE
-                        <br />
-                        AVAILABLE
-                      </div>
-                    )}
-                    <h4>{book.data.title}</h4>
-                    {book.data.author && (
-                      <p class="meta-line">
-                        <strong>Author(s):</strong> {book.data.author}
-                      </p>
-                    )}
-                    {book.data.isbn && (
-                      <p class="meta-line">
-                        <strong>ISBN:</strong> {book.data.isbn}
-                      </p>
-                    )}
-                    {book.data.pubDate && (
-                      <p class="meta-line">
-                        <strong>Year:</strong> {book.data.pubDate}
-                      </p>
-                    )}
+                    <div>
+                      {book.data.heroImage ? (
+                        <img
+                          src={book.data.heroImage}
+                          class="cover-img"
+                          alt={book.data.title}
+                          referrerpolicy="no-referrer"
+                        />
+                      ) : (
+                        <div class="cover-placeholder">
+                          NO IMAGE
+                          <br />
+                          AVAILABLE
+                        </div>
+                      )}
+                      <h4>{book.data.title}</h4>
+                      {book.data.author && (
+                        <p class="author-text">{book.data.author}</p>
+                      )}
+                      {book.data.pubDate && (
+                        <p class="pub-date-text">
+                          Published: {book.data.pubDate}
+                        </p>
+                      )}
+                    </div>
                   </a>
                 ))}
               </div>
@@ -269,7 +284,6 @@ const read = allBooks
     </div>
 
     <script>
-      // Tab switcher
       const buttons = document.querySelectorAll(".category-btn");
       const panels = document.querySelectorAll(".category-panel");
 
@@ -285,7 +299,6 @@ const read = allBooks
         });
       });
 
-      // Filter & Sort Logic per panel
       panels.forEach((panel) => {
         const searchInput = panel.querySelector(
           ".search-input",
@@ -305,27 +318,24 @@ const read = allBooks
 
           let visibleCount = 0;
 
-          // 1. Filter
           cards.forEach((card) => {
             const title = card.dataset.title || "";
             const author = card.dataset.author || "";
             const matches = title.includes(query) || author.includes(query);
 
             if (matches) {
-              card.style.display = "block";
+              card.style.display = "flex";
               visibleCount++;
             } else {
               card.style.display = "none";
             }
           });
 
-          // Show/Hide "No matching books" message
           if (noMatchMsg) {
             noMatchMsg.style.display =
               visibleCount === 0 && cards.length > 0 ? "block" : "none";
           }
 
-          // 2. Sort with Natural Numeric Sorting
           cards.sort((a, b) => {
             const titleA = a.dataset.title || "";
             const titleB = b.dataset.title || "";
@@ -349,14 +359,11 @@ const read = allBooks
             return 0;
           });
 
-          // Re-append sorted elements to the DOM
           cards.forEach((card) => grid.appendChild(card));
         }
 
         searchInput.addEventListener("input", updatePanel);
         sortSelect.addEventListener("change", updatePanel);
-
-        // Run client-side update immediately on load
         updatePanel();
       });
     </script>

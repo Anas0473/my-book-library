@@ -1,0 +1,121 @@
+---
+---
+
+<div class="search-container">
+  <input
+    type="text"
+    id="global-book-search"
+    placeholder="Search books"
+  />
+  <div id="search-results" class="results-grid"></div>
+</div>
+
+<style>
+  .search-container {
+    margin-bottom: 2rem;
+  }
+  #global-book-search {
+    width: 100%;
+    padding: 0.8rem 1rem;
+    font-size: 1rem;
+    border: 1px solid #cbd5e1;
+    border-radius: 8px;
+    outline: none;
+    box-sizing: border-box;
+  }
+  #global-book-search:focus {
+    border-color: #0070f3;
+  }
+  .results-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+    gap: 1rem;
+    margin-top: 1rem;
+  }
+  :global(.search-card) {
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    padding: 0.8rem;
+    background: #fff;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+  }
+  :global(.search-card img) {
+    width: 100%;
+    height: 200px;
+    object-fit: contain;
+    border-radius: 4px;
+    margin-bottom: 0.5rem;
+  }
+  :global(.search-card h5) {
+    margin: 0 0 0.25rem 0;
+    font-size: 0.9rem;
+  }
+  :global(.search-card p) {
+    margin: 0 0 0.25rem 0;
+    font-size: 0.75rem;
+    color: #64748b;
+  }
+  :global(.search-card p.pub-date) {
+    margin-bottom: 0.5rem;
+    font-size: 0.7rem;
+    color: #94a3b8;
+  }
+  :global(.add-btn) {
+    background: #0070f3;
+    color: white;
+    border: none;
+    padding: 0.4rem;
+    border-radius: 4px;
+    cursor: pointer;
+    font-weight: 600;
+    font-size: 0.8rem;
+  }
+  :global(.add-btn:hover) {
+    background: #0051a2;
+  }
+</style>
+
+<script>
+  const searchInput = document.getElementById('global-book-search') as HTMLInputElement;
+  const resultsContainer = document.getElementById('search-results') as HTMLElement;
+  let debounceTimer: NodeJS.Timeout;
+
+  searchInput?.addEventListener('input', () => {
+    clearTimeout(debounceTimer);
+    const query = searchInput.value.trim();
+
+    if (query.length < 3) {
+      resultsContainer.innerHTML = '';
+      return;
+    }
+
+    debounceTimer = setTimeout(async () => {
+      resultsContainer.innerHTML = '<p>Searching...</p>';
+      
+      const res = await fetch(`/api/search-books.json?q=${encodeURIComponent(query)}`);
+      const books = await res.json();
+
+      if (books.length === 0) {
+        resultsContainer.innerHTML = '<p>No books found.</p>';
+        return;
+      }
+
+      resultsContainer.innerHTML = books.map((book: any) => `
+        <div class="search-card">
+          <div>
+            ${book.heroImage 
+              ? `<img src="${book.heroImage}" alt="${book.title}" />` 
+              : '<div style="height:200px; background:#f1f5f9; display:flex; align-items:center; justify-content:center; color:#94a3b8; font-size:0.75rem; margin-bottom:0.5rem; border-radius:4px;">NO IMAGE</div>'
+            }
+            <h5>${book.title}</h5>
+            <p>${book.author || 'Unknown Author'}</p>
+            <p class="pub-date">${book.pubDate ? `Published: ${book.pubDate}` : 'Publication date unknown'}</p>
+          </div>
+          <button class="add-btn">+ Add to List</button>
+        </div>
+      `).join('');
+    }, 400);
+  });
+</script>
