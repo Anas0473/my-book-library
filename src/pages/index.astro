@@ -3,9 +3,23 @@ import { getCollection } from "astro:content";
 
 const allBooks = await getCollection("blog");
 
-const reading = allBooks.filter((b) => b.data.status === "Reading");
-const planToRead = allBooks.filter((b) => b.data.status === "Plan to Read");
-const read = allBooks.filter((b) => b.data.status === "Read");
+// Natural sort helper function for Astro server-side rendering
+const naturalSort = (a: any, b: any) =>
+  a.data.title.localeCompare(b.data.title, undefined, {
+    numeric: true,
+    sensitivity: "base",
+  });
+
+// Filter and pre-sort books for initial render
+const reading = allBooks
+  .filter((b) => b.data.status === "Reading")
+  .sort(naturalSort);
+const planToRead = allBooks
+  .filter((b) => b.data.status === "Plan to Read")
+  .sort(naturalSort);
+const read = allBooks
+  .filter((b) => b.data.status === "Read")
+  .sort(naturalSort);
 ---
 
 <html lang="en">
@@ -123,9 +137,9 @@ const read = allBooks.filter((b) => b.data.status === "Read");
       }
       .cover-img {
         width: 100%;
-        height: 260px; /* Gives taller cover art a bit more room */
+        height: 260px;
         object-fit: contain;
-        background: transparent; /* Matches soft gray container background */
+        background: transparent;
         border-radius: 6px;
         margin-bottom: 0.75rem;
       }
@@ -311,26 +325,39 @@ const read = allBooks.filter((b) => b.data.status === "Read");
               visibleCount === 0 && cards.length > 0 ? "block" : "none";
           }
 
-          // 2. Sort
+          // 2. Sort with Natural Numeric Sorting
           cards.sort((a, b) => {
             const titleA = a.dataset.title || "";
             const titleB = b.dataset.title || "";
             const yearA = parseInt(a.dataset.year || "0", 10);
             const yearB = parseInt(b.dataset.year || "0", 10);
 
-            if (sortVal === "title-asc") return titleA.localeCompare(titleB);
-            if (sortVal === "title-desc") return titleB.localeCompare(titleA);
+            if (sortVal === "title-asc") {
+              return titleA.localeCompare(titleB, undefined, {
+                numeric: true,
+                sensitivity: "base",
+              });
+            }
+            if (sortVal === "title-desc") {
+              return titleB.localeCompare(titleA, undefined, {
+                numeric: true,
+                sensitivity: "base",
+              });
+            }
             if (sortVal === "year-desc") return yearB - yearA;
             if (sortVal === "year-asc") return yearA - yearB;
             return 0;
           });
 
-          // Re-append sorted elements
+          // Re-append sorted elements to the DOM
           cards.forEach((card) => grid.appendChild(card));
         }
 
         searchInput.addEventListener("input", updatePanel);
         sortSelect.addEventListener("change", updatePanel);
+
+        // Run client-side update immediately on load
+        updatePanel();
       });
     </script>
   </body>
