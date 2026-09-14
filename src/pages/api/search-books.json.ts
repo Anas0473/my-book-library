@@ -2,16 +2,23 @@ import type { APIRoute } from 'astro';
 
 export const GET: APIRoute = async ({ url }) => {
   const query = url.searchParams.get('q');
+  const page = Math.max(1, parseInt(url.searchParams.get('page') || '1', 10));
+  const limit = 16;
+  const offset = (page - 1) * limit;
+
+  const jsonHeaders = { 'Content-Type': 'application/json' };
 
   if (!query) {
-    return new Response(JSON.stringify([]), { status: 200 });
+    return new Response(
+      JSON.stringify({ books: [], totalResults: 0, page: 1, totalPages: 0 }),
+      { status: 200, headers: jsonHeaders }
+    );
   }
 
   try {
-    // Increased limit to 16 to complete 2 full grid rows
     const apiUrl = `https://openlibrary.org/search.json?q=${encodeURIComponent(
       query
-    )}&fields=title,author_name,first_publish_year,cover_i,isbn,key&limit=16`;
+    )}&fields=title,author_name,first_publish_year,cover_i,isbn,key&limit=${limit}&offset=${offset}`;
 
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 8000);
@@ -20,10 +27,15 @@ export const GET: APIRoute = async ({ url }) => {
     clearTimeout(timeout);
 
     if (!res.ok) {
-      return new Response(JSON.stringify([]), { status: 200 });
+      return new Response(
+        JSON.stringify({ books: [], totalResults: 0, page, totalPages: 0 }),
+        { status: 200, headers: jsonHeaders }
+      );
     }
 
     const data = await res.json();
+    const totalResults = data.numFound || 0;
+    const totalPages = Math.ceil(totalResults / limit);
 
     const formattedBooks = (data.docs || []).map((doc: any) => ({
       key: doc.key,
@@ -36,17 +48,28 @@ export const GET: APIRoute = async ({ url }) => {
         : null,
     }));
 
-    // Sort the 16 items alphabetically by title (A to Z)
+    // Optional: Sort the current page items alphabetically
     formattedBooks.sort((a: any, b: any) =>
       a.title.localeCompare(b.title, undefined, { numeric: true, sensitivity: 'base' })
     );
 
-    return new Response(JSON.stringify(formattedBooks), {
-      status: 200,
-      headers: { 'Content-Type': 'application/json' },
-    });
+    return new Response(
+      JSON.stringify({
+        books: formattedBooks,
+        totalResults,
+        page,
+        totalPages,
+      }),
+      {
+        status: 200,
+        headers: jsonHeaders,
+      }
+    );
   } catch (error) {
     console.error('API Fetch error:', error);
-    return new Response(JSON.stringify([]), { status: 200 });
+    return new Response(
+      JSON.stringify({ books: [], totalResults: 0, page, totalPages: 0 }),
+      { status: 200, headers: jsonHeaders }
+    );
   }
 };

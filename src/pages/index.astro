@@ -32,7 +32,29 @@ const read = allBooks.filter((b) => b.data.status === "Read").sort(naturalSort);
           sans-serif;
         background: #ffffff;
         color: #1e293b;
-        padding: 2rem 4rem;
+        padding: 1.4rem 3rem 1.5rem 3rem; /* Shifted top padding up from 1rem to 1.4rem */
+      }
+      header h1 {
+        font-size: 1.85rem;
+        font-weight: 700;
+        margin-top: 0;
+        margin-bottom: 1.25rem; /* Slightly enlarged margin from 1rem to 1.25rem */
+        color: #0f172a;
+      }
+      .container {
+        display: flex;
+        gap: 2.5rem;
+      }
+      header h1 {
+        font-size: 1.75rem; /* Slightly tighter heading size */
+        font-weight: 700;
+        margin-top: 0;
+        margin-bottom: 1rem; /* Reduced gap under title from 2rem to 1rem */
+        color: #0f172a;
+      }
+      .container {
+        display: flex;
+        gap: 2.5rem; /* Slightly tighter gap between sidebar and main grid */
       }
       header h1 {
         font-size: 2rem;
