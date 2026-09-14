@@ -7,12 +7,14 @@
     id="global-book-search"
     placeholder="Search books"
   />
+  <div id="search-summary" class="search-summary"></div>
   <div id="search-results" class="results-grid"></div>
+  <div id="pagination-controls" class="pagination"></div>
 </div>
 
 <style>
   .search-container {
-    margin-bottom: 2rem;
+    margin-bottom: 1.5rem;
   }
   #global-book-search {
     width: 100%;
@@ -26,11 +28,44 @@
   #global-book-search:focus {
     border-color: #0070f3;
   }
+  .search-summary {
+    margin-top: 0.5rem;
+    font-size: 0.85rem;
+    color: #64748b;
+  }
   .results-grid {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
     gap: 1rem;
+    margin-top: 0.75rem;
+  }
+  .pagination {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 1rem;
     margin-top: 1rem;
+  }
+  :global(.pagination button) {
+    padding: 0.4rem 0.9rem;
+    border: 1px solid #cbd5e1;
+    background: #fff;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 0.85rem;
+    font-weight: 500;
+  }
+  :global(.pagination button:disabled) {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+  :global(.pagination button:hover:not(:disabled)) {
+    background: #f8fafc;
+    border-color: #94a3b8;
+  }
+  :global(.pagination span) {
+    font-size: 0.85rem;
+    color: #475569;
   }
   :global(.search-card) {
     border: 1px solid #e2e8f0;
@@ -80,27 +115,35 @@
 <script>
   const searchInput = document.getElementById('global-book-search') as HTMLInputElement;
   const resultsContainer = document.getElementById('search-results') as HTMLElement;
+  const summaryContainer = document.getElementById('search-summary') as HTMLElement;
+  const paginationContainer = document.getElementById('pagination-controls') as HTMLElement;
+  
   let debounceTimer: NodeJS.Timeout;
+  let currentQuery = '';
+  let currentPage = 1;
 
-  searchInput?.addEventListener('input', () => {
-    clearTimeout(debounceTimer);
-    const query = searchInput.value.trim();
+  async function performSearch(query: string, page: number = 1) {
+    currentQuery = query;
+    currentPage = page;
 
-    if (query.length < 3) {
-      resultsContainer.innerHTML = '';
-      return;
-    }
+    resultsContainer.innerHTML = '<p>Searching...</p>';
+    summaryContainer.innerHTML = '';
+    paginationContainer.innerHTML = '';
 
-    debounceTimer = setTimeout(async () => {
-      resultsContainer.innerHTML = '<p>Searching...</p>';
-      
-      const res = await fetch(`/api/search-books.json?q=${encodeURIComponent(query)}`);
-      const books = await res.json();
+    try {
+      const res = await fetch(`/api/search-books.json?q=${encodeURIComponent(query)}&page=${page}`);
+      const data = await res.json();
 
-      if (books.length === 0) {
+      const { books = [], totalResults = 0, totalPages = 0 } = data;
+
+      if (!books || books.length === 0) {
         resultsContainer.innerHTML = '<p>No books found.</p>';
         return;
       }
+
+      const startItem = (page - 1) * 16 + 1;
+      const endItem = Math.min(page * 16, totalResults);
+      summaryContainer.innerHTML = `Showing ${startItem}–${endItem} of ${totalResults} results`;
 
       resultsContainer.innerHTML = books.map((book: any) => `
         <div class="search-card">
@@ -116,6 +159,40 @@
           <button class="add-btn">+ Add to List</button>
         </div>
       `).join('');
+
+      if (totalPages > 1) {
+        paginationContainer.innerHTML = `
+          <button id="prev-page" ${page <= 1 ? 'disabled' : ''}>← Previous</button>
+          <span>Page ${page} of ${totalPages}</span>
+          <button id="next-page" ${page >= totalPages ? 'disabled' : ''}>Next →</button>
+        `;
+
+        document.getElementById('prev-page')?.addEventListener('click', () => {
+          if (currentPage > 1) performSearch(currentQuery, currentPage - 1);
+        });
+
+        document.getElementById('next-page')?.addEventListener('click', () => {
+          if (currentPage < totalPages) performSearch(currentQuery, currentPage + 1);
+        });
+      }
+    } catch (err) {
+      resultsContainer.innerHTML = '<p>An error occurred while fetching books.</p>';
+    }
+  }
+
+  searchInput?.addEventListener('input', () => {
+    clearTimeout(debounceTimer);
+    const query = searchInput.value.trim();
+
+    if (query.length < 3) {
+      resultsContainer.innerHTML = '';
+      summaryContainer.innerHTML = '';
+      paginationContainer.innerHTML = '';
+      return;
+    }
+
+    debounceTimer = setTimeout(() => {
+      performSearch(query, 1);
     }, 400);
   });
 </script>
