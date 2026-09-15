@@ -17,7 +17,7 @@ export const GET: APIRoute = async ({ url }) => {
   }
 
   try {
-    const apiUrl = `https://openlibrary.org/search.json?q=${encodeURIComponent(
+    const apiUrl = `https://openlibrary.org/search.json?title=${encodeURIComponent(
       query
     )}&fields=title,author_name,first_publish_year,cover_i,isbn,key&limit=${limit}&offset=${offset}`;
 
@@ -48,11 +48,6 @@ export const GET: APIRoute = async ({ url }) => {
         ? `https://covers.openlibrary.org/b/id/${doc.cover_i}-M.jpg`
         : null,
     }));
-
-    // Optional: Sort the current page items alphabetically
-    formattedBooks.sort((a: any, b: any) =>
-      a.title.localeCompare(b.title, undefined, { numeric: true, sensitivity: 'base' })
-    );
 
     return new Response(
       JSON.stringify({
