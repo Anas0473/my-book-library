@@ -171,16 +171,11 @@
   let debounceTimer: NodeJS.Timeout;
   let currentQuery = '';
   let currentPage = 1;
-  const mobileBreakpoint = window.matchMedia('(max-width: 700px)');
-
-  function getPageSize() {
-    return mobileBreakpoint.matches ? 15 : 16;
-  }
+  const pageSize = 16;
 
   async function performSearch(query: string, page: number = 1) {
     currentQuery = query;
     currentPage = page;
-    const pageSize = getPageSize();
 
     resultsContainer.innerHTML = '<p>Searching...</p>';
     summaryContainer.innerHTML = '';
@@ -252,7 +247,4 @@
     }, 400);
   });
 
-  mobileBreakpoint.addEventListener('change', () => {
-    if (currentQuery) performSearch(currentQuery, 1);
-  });
 </script>
