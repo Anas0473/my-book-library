@@ -199,32 +199,66 @@ const read = allBooks.filter((b) => b.data.status === "Read").sort(naturalSort);
 
       @media (max-width: 700px) {
         body {
-          padding: 1rem 0.75rem;
+          padding: 1rem 0.75rem 5rem;
         }
         header h1 {
           font-size: 1.5rem;
           margin-bottom: 1.25rem;
         }
         .container {
-          gap: 0.75rem;
-          align-items: flex-start;
+          display: block;
         }
         sidebar {
-          width: 76px;
-        }
-        sidebar h3 {
-          font-size: 0.55rem;
-          letter-spacing: 0;
-          margin-bottom: 0.5rem;
-        }
-        .category-btn {
-          padding: 0.35rem 0.25rem;
-          font-size: 0.65rem;
-          line-height: 1.2;
+          display: none;
         }
         main {
-          min-width: 0;
+          width: 100%;
         }
+        .mobile-nav {
+          position: fixed;
+          right: 0;
+          bottom: 0;
+          left: 0;
+          z-index: 10;
+          display: grid;
+          grid-template-columns: repeat(3, 1fr);
+          gap: 0.25rem;
+          padding: 0.5rem;
+          border-top: 1px solid #e2e8f0;
+          background: rgba(255, 255, 255, 0.96);
+          box-shadow: 0 -4px 12px rgba(15, 23, 42, 0.08);
+        }
+        .controls {
+          flex-direction: column;
+          gap: 0.5rem;
+          margin-bottom: 1rem;
+        }
+        .sort-select {
+          width: 100%;
+        }
+        .cards-grid {
+          grid-template-columns: 1fr;
+          gap: 0.75rem;
+        }
+        .mobile-nav-button {
+          min-height: 2.75rem;
+          padding: 0.35rem 0.2rem;
+          border: 0;
+          border-radius: 6px;
+          background: transparent;
+          color: #64748b;
+          font-size: 0.72rem;
+          cursor: pointer;
+        }
+        .mobile-nav-button.active {
+          background: #0070f3;
+          color: #ffffff;
+          font-weight: 600;
+        }
+      }
+
+      .mobile-nav {
+        display: none;
       }
     </style>
   </head>
@@ -337,8 +371,16 @@ const read = allBooks.filter((b) => b.data.status === "Read").sort(naturalSort);
       </main>
     </div>
 
+    <nav class="mobile-nav" aria-label="Reading lists">
+      <button class="mobile-nav-button" data-target="reading">Reading ({reading.length})</button>
+      <button class="mobile-nav-button" data-target="plan-to-read">Plan to Read ({planToRead.length})</button>
+      <button class="mobile-nav-button" data-target="read">Read ({read.length})</button>
+    </nav>
+
     <script>
-      const buttons = document.querySelectorAll(".category-btn");
+      const buttons = document.querySelectorAll(
+        ".category-btn, .mobile-nav-button",
+      );
       const panels = document.querySelectorAll(".category-panel");
 
       function activatePanel(target: string) {
