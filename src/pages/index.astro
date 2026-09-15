@@ -395,6 +395,17 @@ const read = allBooks.filter((b) => b.data.status === "Read").sort(naturalSort);
         );
       }
 
+      function persistPanel(target: string) {
+        const params = new URLSearchParams(window.location.search);
+        params.set("panel", target);
+        const query = params.toString();
+        window.history.replaceState(
+          null,
+          "",
+          `${window.location.pathname}${query ? `?${query}` : ""}`,
+        );
+      }
+
       const pageParams = new URLSearchParams(window.location.search);
       const initialPanel = pageParams.get("panel");
       if (initialPanel && document.getElementById(initialPanel)) {
@@ -405,7 +416,10 @@ const read = allBooks.filter((b) => b.data.status === "Read").sort(naturalSort);
         btn.addEventListener("click", () => {
           const target = btn.getAttribute("data-target");
 
-          if (target) activatePanel(target);
+          if (target) {
+            activatePanel(target);
+            persistPanel(target);
+          }
         });
       });
 
