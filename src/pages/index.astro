@@ -262,6 +262,7 @@ const read = allBooks.filter((b) => b.data.status === "Read").sort(naturalSort);
                   <a
                     href={`/blog/${book.id}/`}
                     class="card"
+                    data-book-link
                     data-title={book.data.title.toLowerCase()}
                     data-author={(book.data.author || "").toLowerCase()}
                     data-year={parseInt(String(book.data.pubDate)) || 0}
@@ -309,17 +310,61 @@ const read = allBooks.filter((b) => b.data.status === "Read").sort(naturalSort);
       const buttons = document.querySelectorAll(".category-btn");
       const panels = document.querySelectorAll(".category-panel");
 
+      function activatePanel(target: string) {
+        buttons.forEach((button) =>
+          button.classList.toggle(
+            "active",
+            button.getAttribute("data-target") === target,
+          ),
+        );
+        panels.forEach((panel) =>
+          panel.classList.toggle("active", panel.id === target),
+        );
+      }
+
+      const pageParams = new URLSearchParams(window.location.search);
+      const initialPanel = pageParams.get("panel");
+      if (initialPanel && document.getElementById(initialPanel)) {
+        activatePanel(initialPanel);
+      }
+
       buttons.forEach((btn) => {
         btn.addEventListener("click", () => {
           const target = btn.getAttribute("data-target");
 
-          buttons.forEach((b) => b.classList.remove("active"));
-          panels.forEach((p) => p.classList.remove("active"));
-
-          btn.classList.add("active");
-          document.getElementById(target!)?.classList.add("active");
+          if (target) activatePanel(target);
         });
       });
+
+      document.querySelectorAll<HTMLAnchorElement>("[data-book-link]").forEach(
+        (link) => {
+          link.addEventListener("click", () => {
+            const activePanel = document.querySelector<HTMLElement>(
+              ".category-panel.active",
+            );
+            const filterInput = activePanel?.querySelector<HTMLInputElement>(
+              ".search-input",
+            );
+            const sortSelect = activePanel?.querySelector<HTMLSelectElement>(
+              ".sort-select",
+            );
+            const detailParams = new URLSearchParams();
+
+            if (activePanel?.id) {
+              detailParams.set("returnPanel", activePanel.id);
+            }
+            if (filterInput?.value) {
+              detailParams.set("returnFilter", filterInput.value);
+            }
+            if (sortSelect?.value && sortSelect.value !== "title-asc") {
+              detailParams.set("returnSort", sortSelect.value);
+            }
+            detailParams.set("returnScroll", String(window.scrollY));
+
+            link.href = `${link.href.split("?")[0]}?${detailParams}`;
+          });
+        },
+      );
 
       panels.forEach((panel) => {
         const searchInput = panel.querySelector(
@@ -332,6 +377,11 @@ const read = allBooks.filter((b) => b.data.status === "Read").sort(naturalSort);
         const noMatchMsg = panel.querySelector(".no-match-msg") as HTMLElement;
 
         if (!searchInput || !sortSelect || !grid) return;
+
+        if (panel.id === pageParams.get("panel")) {
+          searchInput.value = pageParams.get("filter") || "";
+          sortSelect.value = pageParams.get("sort") || "title-asc";
+        }
 
         function updatePanel() {
           const query = searchInput.value.trim().toLowerCase();
@@ -388,6 +438,11 @@ const read = allBooks.filter((b) => b.data.status === "Read").sort(naturalSort);
         sortSelect.addEventListener("change", updatePanel);
         updatePanel();
       });
+
+      const returnScroll = Number.parseInt(pageParams.get("scroll") || "", 10);
+      if (Number.isFinite(returnScroll)) {
+        requestAnimationFrame(() => window.scrollTo(0, returnScroll));
+      }
     </script>
   </body>
 </html>

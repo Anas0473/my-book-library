@@ -8,6 +8,18 @@ type Props = CollectionEntry<"blog">["data"];
 
 const { title, description, pubDate, updatedDate, heroImage, author, isbn } =
   Astro.props;
+const returnParams = new URLSearchParams();
+const returnPanel = Astro.url.searchParams.get("returnPanel");
+const returnFilter = Astro.url.searchParams.get("returnFilter");
+const returnSort = Astro.url.searchParams.get("returnSort");
+const returnScroll = Astro.url.searchParams.get("returnScroll");
+
+if (returnPanel) returnParams.set("panel", returnPanel);
+if (returnFilter) returnParams.set("filter", returnFilter);
+if (returnSort) returnParams.set("sort", returnSort);
+if (returnScroll) returnParams.set("scroll", returnScroll);
+
+const backHref = returnParams.toString() ? `/?${returnParams}` : "/";
 ---
 
 <html lang="en">
@@ -120,7 +132,7 @@ const { title, description, pubDate, updatedDate, heroImage, author, isbn } =
   </head>
 
   <body>
-    <Header />
+    <Header backHref={backHref} />
     <main>
       <article>
         <div class="hero-image">
