@@ -1,10 +1,16 @@
 ---
 import { SITE_TITLE } from '../consts';
+
+interface Props {
+	backHref?: string;
+}
+
+const { backHref = '/' } = Astro.props;
 ---
 
 <header>
 	<nav>
-		<h2><a href="/">{SITE_TITLE}</a></h2>
+		<h2><a href={backHref}>← Back</a></h2>
 	</nav>
 </header>
 <style>
