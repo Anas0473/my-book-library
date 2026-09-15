@@ -3,7 +3,8 @@ import type { APIRoute } from 'astro';
 export const GET: APIRoute = async ({ url }) => {
   const query = url.searchParams.get('q');
   const page = Math.max(1, parseInt(url.searchParams.get('page') || '1', 10));
-  const limit = 16;
+  const requestedLimit = parseInt(url.searchParams.get('limit') || '16', 10);
+  const limit = requestedLimit === 15 ? 15 : 16;
   const offset = (page - 1) * limit;
 
   const jsonHeaders = { 'Content-Type': 'application/json' };
