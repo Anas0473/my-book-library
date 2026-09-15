@@ -121,17 +121,23 @@
   let debounceTimer: NodeJS.Timeout;
   let currentQuery = '';
   let currentPage = 1;
+  const mobileBreakpoint = window.matchMedia('(max-width: 700px)');
+
+  function getPageSize() {
+    return mobileBreakpoint.matches ? 15 : 16;
+  }
 
   async function performSearch(query: string, page: number = 1) {
     currentQuery = query;
     currentPage = page;
+    const pageSize = getPageSize();
 
     resultsContainer.innerHTML = '<p>Searching...</p>';
     summaryContainer.innerHTML = '';
     paginationContainer.innerHTML = '';
 
     try {
-      const res = await fetch(`/api/search-books.json?q=${encodeURIComponent(query)}&page=${page}`);
+      const res = await fetch(`/api/search-books.json?q=${encodeURIComponent(query)}&page=${page}&limit=${pageSize}`);
       const data = await res.json();
 
       const { books = [], totalResults = 0, totalPages = 0 } = data;
@@ -141,8 +147,8 @@
         return;
       }
 
-      const startItem = (page - 1) * 16 + 1;
-      const endItem = Math.min(page * 16, totalResults);
+      const startItem = (page - 1) * pageSize + 1;
+      const endItem = Math.min(page * pageSize, totalResults);
       summaryContainer.innerHTML = `Showing ${startItem}–${endItem} of ${totalResults} results`;
 
       resultsContainer.innerHTML = books.map((book: any) => `
@@ -194,5 +200,9 @@
     debounceTimer = setTimeout(() => {
       performSearch(query, 1);
     }, 400);
+  });
+
+  mobileBreakpoint.addEventListener('change', () => {
+    if (currentQuery) performSearch(currentQuery, 1);
   });
 </script>
