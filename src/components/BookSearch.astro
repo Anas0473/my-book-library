@@ -110,6 +110,44 @@
   :global(.add-btn:hover) {
     background: #0051a2;
   }
+
+  @media (max-width: 700px) {
+    .results-grid {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 0.35rem;
+    }
+    :global(.search-card) {
+      min-width: 0;
+      padding: 0.35rem;
+    }
+    :global(.search-card img) {
+      height: 110px;
+    }
+    :global(.search-card h5) {
+      font-size: 0.58rem;
+      line-height: 1.15;
+    }
+    :global(.search-card p) {
+      font-size: 0.5rem;
+    }
+    :global(.search-card p.pub-date) {
+      font-size: 0.45rem;
+    }
+    :global(.add-btn) {
+      padding: 0.3rem 0.1rem;
+      font-size: 0.55rem;
+    }
+    .pagination {
+      gap: 0.3rem;
+    }
+    :global(.pagination button),
+    :global(.pagination span) {
+      font-size: 0.6rem;
+    }
+    :global(.pagination button) {
+      padding: 0.3rem 0.45rem;
+    }
+  }
 </style>
 
 <script>
