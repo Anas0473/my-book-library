@@ -15,54 +15,65 @@ const { title, description, pubDate, updatedDate, heroImage, author, isbn } =
     <BaseHead title={title} description={description} />
     <style>
       main {
-        width: calc(100% - 2em);
-        max-width: 100%;
-        margin: 0;
+        width: auto;
+        max-width: 1100px;
+        margin: 0 auto;
+        padding: 3rem 1.5rem 4rem;
+      }
+      article {
+        display: grid;
+        grid-template-columns: minmax(220px, 320px) minmax(0, 680px);
+        gap: clamp(2rem, 6vw, 5rem);
+        align-items: start;
+        justify-content: center;
       }
       .hero-image {
         width: 100%;
         display: flex;
         justify-content: center;
-        margin-bottom: 2rem;
+        position: sticky;
+        top: 2rem;
       }
 
       .hero-image img {
         display: block;
         width: auto;
-        max-width: 320px; /* Limits overall cover size */
+        max-width: 100%;
         max-height: 480px;
         height: auto;
         object-fit: contain;
         border-radius: 8px;
-        box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12); /* Shadow wraps tightly around the image */
+        box-shadow: 0 8px 24px rgba(15, 23, 42, 0.16);
       }
       .prose {
-        width: 720px;
-        max-width: calc(100% - 2em);
-        margin: auto;
-        padding: 1em;
+        width: auto;
+        max-width: 680px;
+        padding: 0;
         color: rgb(var(--gray-dark));
       }
       .title {
-        margin-bottom: 1em;
-        padding: 1em 0;
-        text-align: center;
-        line-height: 1.4;
+        margin: 0 0 1.5rem;
+        padding: 0.5rem 0 1.5rem;
+        text-align: left;
+        line-height: 1.25;
+        border-bottom: 1px solid rgb(var(--gray-light));
       }
       .title h1 {
-        margin: 0.2em 0 0.5em 0;
+        margin: 0 0 1.25rem;
+        font-size: 2.5rem;
+        letter-spacing: 0;
       }
       .meta-info {
-        margin-top: 0.25rem;
-        font-size: 0.95rem;
+        margin: 0;
+        font-size: 1rem;
         color: #64748b;
         display: flex;
         flex-direction: column;
-        gap: 0.15rem;
-        align-items: center;
+        gap: 0.4rem;
+        align-items: flex-start;
       }
       .meta-info strong {
-        color: #64748b;
+        color: rgb(var(--gray-dark));
       }
       .meta-info p,
       .meta-info .date {
@@ -75,6 +86,35 @@ const { title, description, pubDate, updatedDate, heroImage, author, isbn } =
       .last-updated-on {
         font-style: italic;
         margin-top: 0.25rem;
+      }
+
+      @media (max-width: 720px) {
+        main {
+          padding: 2rem 1rem 3rem;
+        }
+        article {
+          display: block;
+        }
+        .hero-image {
+          position: static;
+          margin-bottom: 2.5rem;
+        }
+        .hero-image img {
+          max-width: min(280px, 85vw);
+          max-height: 420px;
+        }
+        .prose {
+          max-width: none;
+        }
+        .title {
+          text-align: center;
+        }
+        .title h1 {
+          font-size: 2rem;
+        }
+        .meta-info {
+          align-items: center;
+        }
       }
     </style>
   </head>
@@ -131,7 +171,6 @@ const { title, description, pubDate, updatedDate, heroImage, author, isbn } =
                 )
               }
             </div>
-            <hr />
           </div>
           <slot />
         </div>
