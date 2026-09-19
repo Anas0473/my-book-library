@@ -92,8 +92,25 @@ const read = allBooks.filter((b) => b.data.status === "Read").sort(naturalSort);
         cursor: pointer;
         font-weight: 500;
       }
+      .category-count {
+        display: inline-block;
+        min-width: 1.25rem;
+        margin-left: 0.35rem;
+        padding: 0.1rem 0.35rem;
+        border-radius: 999px;
+        background: #e2e8f0;
+        color: #475569;
+        font-size: 0.75rem;
+        line-height: 1.2;
+        text-align: center;
+      }
       .category-btn.active {
         background: #0070f3;
+        color: #ffffff;
+      }
+      .category-btn.active .category-count,
+      .mobile-nav-button.active .category-count {
+        background: rgba(255, 255, 255, 0.2);
         color: #ffffff;
       }
       .category-btn.search-tab {
@@ -250,6 +267,9 @@ const read = allBooks.filter((b) => b.data.status === "Read").sort(naturalSort);
           font-size: 0.72rem;
           cursor: pointer;
         }
+        .mobile-nav-button .category-count {
+          font-size: 0.68rem;
+        }
         .mobile-nav-button.active {
           background: #0070f3;
           color: #ffffff;
@@ -276,13 +296,13 @@ const read = allBooks.filter((b) => b.data.status === "Read").sort(naturalSort);
 
         <h3>My Lists</h3>
         <button class="category-btn" data-target="reading"
-          >Reading ({reading.length})</button
+          >Reading <span class="category-count">{reading.length}</span></button
         >
         <button class="category-btn" data-target="plan-to-read"
-          >Plan to Read ({planToRead.length})</button
+          >Plan to Read <span class="category-count">{planToRead.length}</span></button
         >
         <button class="category-btn" data-target="read"
-          >Read ({read.length})</button
+          >Read <span class="category-count">{read.length}</span></button
         >
       </sidebar>
 
@@ -372,9 +392,9 @@ const read = allBooks.filter((b) => b.data.status === "Read").sort(naturalSort);
     </div>
 
     <nav class="mobile-nav" aria-label="Reading lists">
-      <button class="mobile-nav-button" data-target="reading">Reading ({reading.length})</button>
-      <button class="mobile-nav-button" data-target="plan-to-read">Plan to Read ({planToRead.length})</button>
-      <button class="mobile-nav-button" data-target="read">Read ({read.length})</button>
+      <button class="mobile-nav-button" data-target="reading">Reading <span class="category-count">{reading.length}</span></button>
+      <button class="mobile-nav-button" data-target="plan-to-read">Plan to Read <span class="category-count">{planToRead.length}</span></button>
+      <button class="mobile-nav-button" data-target="read">Read <span class="category-count">{read.length}</span></button>
     </nav>
 
     <script>
