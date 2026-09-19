@@ -204,6 +204,7 @@
               : '<div style="height:200px; background:#f1f5f9; display:flex; align-items:center; justify-content:center; color:#94a3b8; font-size:0.75rem; margin-bottom:0.5rem; border-radius:4px;">NO IMAGE</div>'
             }
             <h5>${book.title}</h5>
+            ${book.subtitle ? `<p class="subtitle">${book.subtitle}</p>` : ''}
             <p>${book.author || 'Unknown Author'}</p>
             <p class="pub-date">${book.pubDate ? `Published: ${book.pubDate}` : 'Publication date unknown'}</p>
           </div>

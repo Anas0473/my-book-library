@@ -19,7 +19,7 @@ export const GET: APIRoute = async ({ url }) => {
   try {
     const apiUrl = `https://openlibrary.org/search.json?title=${encodeURIComponent(
       query
-    )}&fields=title,author_name,first_publish_year,cover_i,isbn,key&limit=${limit}&offset=${offset}`;
+    )}&fields=title,subtitle,author_name,first_publish_year,cover_i,isbn,key&limit=${limit}&offset=${offset}`;
 
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 8000);
@@ -41,6 +41,7 @@ export const GET: APIRoute = async ({ url }) => {
     const formattedBooks = (data.docs || []).map((doc: any) => ({
       key: doc.key,
       title: doc.title,
+      subtitle: doc.subtitle || null,
       author: doc.author_name ? doc.author_name.join(', ') : 'Unknown Author',
       pubDate: doc.first_publish_year || 'Unknown',
       isbn: doc.isbn ? doc.isbn[0] : null,
