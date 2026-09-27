@@ -17,9 +17,13 @@ export const GET: APIRoute = async ({ url }) => {
   }
 
   try {
-    const apiUrl = `https://openlibrary.org/search.json?title=${encodeURIComponent(
-      query
-    )}&fields=title,subtitle,author_name,first_publish_year,cover_i,isbn,key&limit=${limit}&offset=${offset}`;
+    const searchParams = new URLSearchParams({
+      [query.trim().split(/\s+/).length > 1 ? 'q' : 'title']: query,
+      fields: 'title,subtitle,author_name,first_publish_year,cover_i,isbn,key',
+      limit: String(limit),
+      offset: String(offset),
+    });
+    const apiUrl = `https://openlibrary.org/search.json?${searchParams}`;
 
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 8000);
