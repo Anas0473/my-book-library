@@ -169,6 +169,65 @@ const read = allBooks.filter((b) => b.data.status === "Read").sort(naturalSort);
         justify-content: space-between;
         box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
       }
+      :global(.local-book-card) {
+        min-width: 0;
+        border: 1px solid #e2e8f0;
+        border-radius: 8px;
+        padding: 0.8rem;
+        color: inherit;
+        background: #fff;
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+      }
+      :global(.local-book-card .cover-placeholder) {
+        width: 100%;
+        height: 200px;
+        background: #f8fafc;
+        border: 1px dashed #cbd5e1;
+        border-radius: 4px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: #94a3b8;
+        font-weight: 600;
+        font-size: 0.75rem;
+        text-align: center;
+        margin-bottom: 0.5rem;
+      }
+      :global(.local-book-card .cover-img) {
+        width: 100%;
+        height: 200px;
+        object-fit: contain;
+        background: transparent;
+        border-radius: 4px;
+        margin-bottom: 0.5rem;
+      }
+      :global(.local-book-card h4) {
+        margin: 0 0 0.25rem;
+        font-size: 0.9rem;
+        font-weight: 700;
+        color: #0f172a;
+        line-height: 1.3;
+      }
+      :global(.local-book-card .subtitle-text),
+      .subtitle-text {
+        margin: 0 0 0.25rem;
+        font-size: 0.78rem;
+        color: #475569;
+        line-height: 1.3;
+      }
+      :global(.local-book-card .author-text) {
+        margin: 0 0 0.25rem;
+        font-size: 0.75rem;
+        color: #64748b;
+      }
+      :global(.local-book-card .pub-date-text) {
+        margin: 0;
+        font-size: 0.7rem;
+        color: #94a3b8;
+      }
       .cover-placeholder {
         width: 100%;
         height: 200px;
@@ -212,6 +271,17 @@ const read = allBooks.filter((b) => b.data.status === "Read").sort(naturalSort);
       .empty-msg {
         color: #94a3b8;
         font-size: 0.9rem;
+      }
+      .shelf-indicator {
+        display: block;
+        margin-top: 0.75rem;
+        padding: 0.4rem 0.55rem;
+        border-radius: 4px;
+        background: #39745b;
+        color: #fff;
+        font-size: 0.75rem;
+        font-weight: 600;
+        text-align: center;
       }
 
       @media (max-width: 700px) {
@@ -295,11 +365,11 @@ const read = allBooks.filter((b) => b.data.status === "Read").sort(naturalSort);
         >
 
         <h3>My Lists</h3>
-        <button class="category-btn" data-target="reading"
-          >Reading <span class="category-count">{reading.length}</span></button
-        >
         <button class="category-btn" data-target="plan-to-read"
           >Plan to Read <span class="category-count">{planToRead.length}</span></button
+        >
+        <button class="category-btn" data-target="reading"
+          >Reading <span class="category-count">{reading.length}</span></button
         >
         <button class="category-btn" data-target="read"
           >Read <span class="category-count">{read.length}</span></button
@@ -309,21 +379,28 @@ const read = allBooks.filter((b) => b.data.status === "Read").sort(naturalSort);
       <main>
         <!-- Dedicated Search Page Panel -->
         <div id="search-db" class="category-panel active">
-          <BookSearch />
+          <BookSearch
+            libraryBooks={allBooks.map(({ data }) => ({
+              title: data.title,
+              author: data.author,
+              isbn: data.isbn,
+              status: data.status,
+            }))}
+          />
         </div>
 
         <!-- Personal Collection Panels -->
         {
           [
             {
-              id: "reading",
-              books: reading,
-              empty: "No books currently being read.",
-            },
-            {
               id: "plan-to-read",
               books: planToRead,
               empty: "No books planned yet.",
+            },
+            {
+              id: "reading",
+              books: reading,
+              empty: "No books currently being read.",
             },
             { id: "read", books: read, empty: "No completed books yet." },
           ].map(({ id, books, empty }) => (
@@ -348,6 +425,9 @@ const read = allBooks.filter((b) => b.data.status === "Read").sort(naturalSort);
                     href={`/blog/${book.id}/`}
                     class="card"
                     data-book-link
+                    data-content-book
+                    data-status={book.data.status || ""}
+                    data-isbn={book.data.isbn || ""}
                     data-title={book.data.title.toLowerCase()}
                     data-author={(book.data.author || "").toLowerCase()}
                     data-year={parseInt(String(book.data.pubDate)) || 0}
@@ -368,6 +448,9 @@ const read = allBooks.filter((b) => b.data.status === "Read").sort(naturalSort);
                         </div>
                       )}
                       <h4>{book.data.title}</h4>
+                      {book.data.subtitle && (
+                        <p class="subtitle-text">{book.data.subtitle}</p>
+                      )}
                       {book.data.author && (
                         <p class="author-text">{book.data.author}</p>
                       )}
@@ -376,6 +459,13 @@ const read = allBooks.filter((b) => b.data.status === "Read").sort(naturalSort);
                           Published: {book.data.pubDate}
                         </p>
                       )}
+                      <span class="shelf-indicator">
+                        ✓ {book.data.status === "Plan to Read"
+                          ? "Want to Read"
+                          : book.data.status === "Reading"
+                            ? "Currently Reading"
+                            : "Read"}
+                      </span>
                     </div>
                   </a>
                 ))}
@@ -392,8 +482,8 @@ const read = allBooks.filter((b) => b.data.status === "Read").sort(naturalSort);
     </div>
 
     <nav class="mobile-nav" aria-label="Reading lists">
-      <button class="mobile-nav-button" data-target="reading">Reading <span class="category-count">{reading.length}</span></button>
       <button class="mobile-nav-button" data-target="plan-to-read">Plan to Read <span class="category-count">{planToRead.length}</span></button>
+      <button class="mobile-nav-button" data-target="reading">Reading <span class="category-count">{reading.length}</span></button>
       <button class="mobile-nav-button" data-target="read">Read <span class="category-count">{read.length}</span></button>
     </nav>
 
@@ -402,6 +492,257 @@ const read = allBooks.filter((b) => b.data.status === "Read").sort(naturalSort);
         ".category-btn, .mobile-nav-button",
       );
       const panels = document.querySelectorAll(".category-panel");
+      const savedBooksKey = "my-book-library:books";
+      const legacySavedBooksKey = "my-book-library:plan-to-read";
+      const shelfDefinitions = [
+        { id: "plan-to-read", status: "Plan to Read", label: "Want to Read" },
+        { id: "reading", status: "Reading", label: "Currently Reading" },
+        { id: "read", status: "Read", label: "Read" },
+      ];
+      const serverShelfCounts = new Map<string, number>();
+      const panelRefreshers = new Map<string, () => void>();
+
+      shelfDefinitions.forEach(({ id }) => {
+        serverShelfCounts.set(
+          id,
+          Number(document.querySelector(`[data-target="${id}"] .category-count`)?.textContent || "0"),
+        );
+      });
+
+      function isShelfStatus(status: string) {
+        return shelfDefinitions.some((shelf) => shelf.status === status);
+      }
+
+      try {
+        const storedBooks = localStorage.getItem(savedBooksKey);
+        if (storedBooks !== null) {
+          const parsedBooks = JSON.parse(storedBooks);
+          var localBooks: any[] = Array.isArray(parsedBooks) ? parsedBooks : [];
+        } else {
+          const legacyBooks = JSON.parse(localStorage.getItem(legacySavedBooksKey) || "[]");
+          var localBooks: any[] = Array.isArray(legacyBooks)
+            ? legacyBooks.map((book: any) => ({ ...book, status: book.status || "Plan to Read" }))
+            : [];
+          localStorage.setItem(savedBooksKey, JSON.stringify(localBooks));
+          localStorage.removeItem(legacySavedBooksKey);
+        }
+      } catch {
+        var localBooks: any[] = [];
+      }
+
+      function getBookIdentity(book: any) {
+        return book.key || book.isbn || `${book.title}:${book.author}`;
+      }
+
+      function isSameBook(first: any, second: any) {
+        if (first.key && second.key && first.key === second.key) return true;
+
+        const normalize = (value: string) => String(value || "")
+          .normalize("NFKD")
+          .replace(/[\u0300-\u036f]/g, "")
+          .toLowerCase()
+          .replace(/[^a-z0-9]/g, "");
+        const firstIsbn = normalize(first.isbn);
+        const secondIsbn = normalize(second.isbn);
+
+        if (firstIsbn && secondIsbn && firstIsbn === secondIsbn) return true;
+
+        const firstTitle = normalize(first.title);
+        const secondTitle = normalize(second.title);
+        const firstAuthors = String(first.author || "")
+          .split(/,|&|\band\b/i)
+          .map(normalize)
+          .filter(Boolean);
+        const secondAuthors = String(second.author || "")
+          .split(/,|&|\band\b/i)
+          .map(normalize)
+          .filter(Boolean);
+
+        return Boolean(
+          firstTitle &&
+          firstTitle === secondTitle &&
+          firstAuthors.some((author) => secondAuthors.includes(author)),
+        );
+      }
+
+      function removeMatchingContentBooks(book: any) {
+        document.querySelectorAll<HTMLElement>("[data-content-book]").forEach((card) => {
+          const contentBook = {
+            title: card.dataset.title,
+            author: card.dataset.author,
+            isbn: card.dataset.isbn,
+          };
+          if (!isSameBook(book, contentBook)) return;
+
+          const oldShelf = shelfDefinitions.find((shelf) => shelf.status === card.dataset.status);
+          if (oldShelf) {
+            serverShelfCounts.set(
+              oldShelf.id,
+              Math.max(0, (serverShelfCounts.get(oldShelf.id) || 0) - 1),
+            );
+          }
+          card.remove();
+        });
+      }
+
+      function createShelfControl(book: any) {
+        const control = document.createElement("div");
+        control.className = "shelf-control";
+
+        const currentShelf = shelfDefinitions.find((shelf) => shelf.status === book.status)
+          || shelfDefinitions[0];
+        const primaryButton = document.createElement("button");
+        primaryButton.type = "button";
+        primaryButton.className = "shelf-primary";
+        primaryButton.textContent = `✓ ${currentShelf.label}`;
+        primaryButton.addEventListener("click", () => toggleShelfMenu());
+
+        const toggleButton = document.createElement("button");
+        toggleButton.type = "button";
+        toggleButton.className = "shelf-toggle";
+        toggleButton.setAttribute("aria-label", "Choose a reading list");
+        toggleButton.setAttribute("aria-haspopup", "menu");
+        toggleButton.setAttribute("aria-expanded", "false");
+        toggleButton.textContent = "▾";
+
+        const menu = document.createElement("div");
+        menu.className = "shelf-menu";
+        menu.setAttribute("role", "menu");
+        menu.hidden = true;
+
+        function toggleShelfMenu() {
+          const shouldOpen = menu.hidden;
+          document.querySelectorAll<HTMLElement>(".shelf-menu").forEach((openMenu) => {
+            openMenu.hidden = true;
+          });
+          document.querySelectorAll<HTMLButtonElement>(".shelf-toggle").forEach((toggle) => {
+            toggle.setAttribute("aria-expanded", "false");
+          });
+          menu.hidden = !shouldOpen;
+          toggleButton.setAttribute("aria-expanded", String(shouldOpen));
+        }
+
+        toggleButton.addEventListener("click", toggleShelfMenu);
+        shelfDefinitions.forEach((shelf) => {
+          const option = document.createElement("button");
+          option.type = "button";
+          option.setAttribute("role", "menuitem");
+          option.dataset.status = shelf.status;
+          option.textContent = shelf.label;
+          if (shelf.status === book.status) option.setAttribute("aria-current", "true");
+          option.addEventListener("click", () => {
+            window.dispatchEvent(new CustomEvent("library:book-shelf-changed", {
+              detail: { ...book, status: shelf.status },
+            }));
+          });
+          menu.appendChild(option);
+        });
+
+        const divider = document.createElement("div");
+        divider.className = "shelf-menu-divider";
+        divider.setAttribute("role", "separator");
+
+        const removeOption = document.createElement("button");
+        removeOption.type = "button";
+        removeOption.setAttribute("role", "menuitem");
+        removeOption.dataset.action = "remove";
+        removeOption.textContent = "Remove from My Lists";
+        removeOption.addEventListener("click", () => {
+          if (!window.confirm(`Remove "${book.title}" from your reading lists?`)) return;
+          window.dispatchEvent(new CustomEvent("library:book-removed", { detail: book }));
+        });
+
+        menu.append(divider, removeOption);
+
+        control.append(primaryButton, toggleButton, menu);
+        return control;
+      }
+
+      function renderLocalBook(book: any) {
+        if (!book?.title || !isShelfStatus(book.status)) return;
+        const shelf = shelfDefinitions.find((item) => item.status === book.status)!;
+        const panel = document.getElementById(shelf.id);
+        const grid = panel?.querySelector<HTMLElement>(".cards-grid");
+        if (!grid) return;
+
+        const card = document.createElement("article");
+        card.className = "card local-book-card";
+        card.dataset.localBookKey = String(getBookIdentity(book));
+        card.dataset.bookKey = String(book.key || "");
+        card.dataset.isbn = String(book.isbn || "");
+        card.dataset.title = String(book.title).toLowerCase();
+        card.dataset.author = String(book.author || "").toLowerCase();
+        card.dataset.year = String(parseInt(String(book.pubDate), 10) || 0);
+
+        const details = document.createElement("div");
+        if (book.heroImage) {
+          const image = document.createElement("img");
+          image.src = book.heroImage;
+          image.alt = book.title;
+          image.className = "cover-img";
+          image.referrerPolicy = "no-referrer";
+          details.appendChild(image);
+        } else {
+          const placeholder = document.createElement("div");
+          placeholder.className = "cover-placeholder";
+          placeholder.textContent = "NO IMAGE AVAILABLE";
+          details.appendChild(placeholder);
+        }
+
+        const title = document.createElement("h4");
+        title.textContent = book.title;
+        details.appendChild(title);
+
+        if (book.subtitle) {
+          const subtitle = document.createElement("p");
+          subtitle.className = "subtitle-text";
+          subtitle.textContent = book.subtitle;
+          details.appendChild(subtitle);
+        }
+
+        if (book.author) {
+          const author = document.createElement("p");
+          author.className = "author-text";
+          author.textContent = book.author;
+          details.appendChild(author);
+        }
+        if (book.pubDate) {
+          const pubDate = document.createElement("p");
+          pubDate.className = "pub-date-text";
+          pubDate.textContent = `Published: ${book.pubDate}`;
+          details.appendChild(pubDate);
+        }
+
+        card.appendChild(details);
+        card.appendChild(createShelfControl(book));
+        grid.appendChild(card);
+      }
+
+      localBooks.forEach((book) => {
+        removeMatchingContentBooks(book);
+        renderLocalBook(book);
+      });
+
+      function updateShelfCounts() {
+        shelfDefinitions.forEach(({ id, status }) => {
+          const localCount = localBooks.filter((book) => book.status === status).length;
+          document
+            .querySelectorAll<HTMLElement>(`[data-target="${id}"] .category-count`)
+            .forEach((count) => {
+              count.textContent = String((serverShelfCounts.get(id) || 0) + localCount);
+            });
+
+          const panel = document.getElementById(id);
+          const emptyMessage = panel?.querySelector<HTMLElement>(".empty-msg:not(.no-match-msg)");
+          if (emptyMessage) {
+            emptyMessage.style.display = (serverShelfCounts.get(id) || 0) + localCount > 0
+              ? "none"
+              : "";
+          }
+        });
+      }
+
+      updateShelfCounts();
 
       function activatePanel(target: string) {
         buttons.forEach((button) =>
@@ -544,6 +885,79 @@ const read = allBooks.filter((b) => b.data.status === "Read").sort(naturalSort);
         searchInput.addEventListener("input", updatePanel);
         sortSelect.addEventListener("change", updatePanel);
         updatePanel();
+        panelRefreshers.set(panel.id, updatePanel);
+      });
+
+      window.addEventListener("library:book-shelf-changed", (event) => {
+        const book = (event as CustomEvent).detail;
+        if (!book?.title || !isShelfStatus(book.status)) return;
+
+        const existingIndex = localBooks.findIndex((item) => isSameBook(item, book));
+        const updatedBook = {
+          ...(existingIndex >= 0 ? localBooks[existingIndex] : {}),
+          ...book,
+        };
+
+        if (existingIndex >= 0) {
+          localBooks[existingIndex] = updatedBook;
+        } else {
+          localBooks.push(updatedBook);
+        }
+
+        localStorage.setItem(savedBooksKey, JSON.stringify(localBooks));
+        removeMatchingContentBooks(updatedBook);
+        document.querySelectorAll<HTMLElement>("[data-local-book-key]").forEach((card) => {
+          const cardBook = {
+            key: card.dataset.bookKey,
+            isbn: card.dataset.isbn,
+            title: card.dataset.title,
+            author: card.dataset.author,
+          };
+          if (isSameBook(updatedBook, cardBook)) card.remove();
+        });
+        renderLocalBook(updatedBook);
+        updateShelfCounts();
+        panelRefreshers.forEach((refreshPanel) => refreshPanel());
+      });
+
+      window.addEventListener("library:book-removed", (event) => {
+        const book = (event as CustomEvent).detail;
+        const existingIndex = localBooks.findIndex((item) => isSameBook(item, book));
+        if (existingIndex < 0) return;
+
+        localBooks.splice(existingIndex, 1);
+        localStorage.setItem(savedBooksKey, JSON.stringify(localBooks));
+        document.querySelectorAll<HTMLElement>("[data-local-book-key]").forEach((card) => {
+          const cardBook = {
+            key: card.dataset.bookKey,
+            isbn: card.dataset.isbn,
+            title: card.dataset.title,
+            author: card.dataset.author,
+          };
+          if (isSameBook(book, cardBook)) card.remove();
+        });
+        updateShelfCounts();
+        panelRefreshers.forEach((refreshPanel) => refreshPanel());
+      });
+
+      document.addEventListener("click", (event) => {
+        if ((event.target as HTMLElement).closest(".shelf-control")) return;
+        document.querySelectorAll<HTMLElement>(".shelf-menu").forEach((menu) => {
+          menu.hidden = true;
+        });
+        document.querySelectorAll<HTMLButtonElement>(".shelf-toggle").forEach((toggle) => {
+          toggle.setAttribute("aria-expanded", "false");
+        });
+      });
+
+      document.addEventListener("keydown", (event) => {
+        if (event.key !== "Escape") return;
+        document.querySelectorAll<HTMLElement>(".shelf-menu").forEach((menu) => {
+          menu.hidden = true;
+        });
+        document.querySelectorAll<HTMLButtonElement>(".shelf-toggle").forEach((toggle) => {
+          toggle.setAttribute("aria-expanded", "false");
+        });
       });
 
       const returnScroll = Number.parseInt(pageParams.get("scroll") || "", 10);
