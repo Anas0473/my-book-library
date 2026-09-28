@@ -1,7 +1,17 @@
 ---
+interface Props {
+  libraryBooks?: Array<{
+    title: string;
+    author?: string;
+    isbn?: string;
+    status?: string;
+  }>;
+}
+
+const { libraryBooks = [] } = Astro.props;
 ---
 
-<div class="search-container">
+<div class="search-container" data-library-books={JSON.stringify(libraryBooks)}>
   <input
     type="text"
     id="global-book-search"
@@ -97,18 +107,74 @@
     font-size: 0.7rem;
     color: #94a3b8;
   }
-  :global(.add-btn) {
-    background: #0070f3;
-    color: white;
-    border: none;
-    padding: 0.4rem;
-    border-radius: 4px;
-    cursor: pointer;
-    font-weight: 600;
-    font-size: 0.8rem;
+  :global(.shelf-control) {
+    display: flex;
+    position: relative;
+    width: 100%;
   }
-  :global(.add-btn:hover) {
-    background: #0051a2;
+  :global(.shelf-control button) {
+    min-height: 2.25rem;
+    border: 1px solid #39745b;
+    background: #39745b;
+    color: #fff;
+    cursor: pointer;
+    font: inherit;
+    font-size: 0.8rem;
+    font-weight: 600;
+  }
+  :global(.shelf-control .shelf-primary) {
+    flex: 1;
+    min-width: 0;
+    padding: 0.4rem 0.1rem;
+    font-size: 0.78rem;
+    white-space: nowrap;
+    border-radius: 5px 0 0 5px;
+  }
+  :global(.shelf-toggle) {
+    width: 1.5rem;
+    flex: 0 0 1.5rem;
+    border-left-color: rgba(255, 255, 255, 0.35) !important;
+    border-radius: 0 5px 5px 0;
+  }
+  :global(.shelf-control button:hover) {
+    background: #2d604a;
+  }
+  :global(.shelf-menu) {
+    position: absolute;
+    top: calc(100% + 3px);
+    right: 0;
+    z-index: 5;
+    width: max(100%, 180px);
+    padding: 0.25rem;
+    border: 1px solid #d6d3c8;
+    border-radius: 5px;
+    background: #fff;
+    box-shadow: 0 4px 12px rgba(15, 23, 42, 0.14);
+  }
+  :global(.shelf-menu[hidden]) {
+    display: none;
+  }
+  :global(.shelf-menu button) {
+    width: 100%;
+    min-height: 2.25rem;
+    padding: 0.45rem 0.6rem;
+    border: 0;
+    border-radius: 3px;
+    background: transparent;
+    color: #334155;
+    text-align: left;
+  }
+  :global(.shelf-menu button:hover),
+  :global(.shelf-menu button[aria-current="true"]) {
+    background: #f1f5f2;
+    color: #244d3b;
+  }
+  :global(.shelf-menu-divider) {
+    margin: 0.25rem 0;
+    border-top: 1px solid #e2e8f0;
+  }
+  :global(.shelf-menu button[data-action="remove"]) {
+    color: #b42318;
   }
 
   @media (max-width: 700px) {
@@ -144,9 +210,7 @@
     :global(.search-card p.pub-date) {
       font-size: 0.62rem;
     }
-    :global(.add-btn) {
-      width: 100%;
-      padding: 0.45rem;
+    :global(.shelf-control button) {
       font-size: 0.72rem;
     }
     .pagination {
@@ -163,15 +227,108 @@
 </style>
 
 <script>
+  const searchContainer = document.querySelector('.search-container') as HTMLElement;
   const searchInput = document.getElementById('global-book-search') as HTMLInputElement;
   const resultsContainer = document.getElementById('search-results') as HTMLElement;
   const summaryContainer = document.getElementById('search-summary') as HTMLElement;
   const paginationContainer = document.getElementById('pagination-controls') as HTMLElement;
+  const libraryBooks = JSON.parse(searchContainer.dataset.libraryBooks || '[]') as any[];
   
   let debounceTimer: NodeJS.Timeout;
   let currentQuery = '';
   let currentPage = 1;
   const pageSize = 16;
+  const savedBooksKey = 'my-book-library:books';
+  const legacySavedBooksKey = 'my-book-library:plan-to-read';
+  const shelfLabels: Record<string, string> = {
+    'Plan to Read': 'Want to Read',
+    Reading: 'Currently Reading',
+    Read: 'Read',
+  };
+  function getSavedBooks() {
+    try {
+      const storedBooks = localStorage.getItem(savedBooksKey);
+      if (storedBooks !== null) {
+        const savedBooks = JSON.parse(storedBooks);
+        return Array.isArray(savedBooks) ? savedBooks : [];
+      }
+
+      const legacyBooks = JSON.parse(localStorage.getItem(legacySavedBooksKey) || '[]');
+      const savedBooks = Array.isArray(legacyBooks)
+        ? legacyBooks.map((book: any) => ({ ...book, status: book.status || 'Plan to Read' }))
+        : [];
+      localStorage.setItem(savedBooksKey, JSON.stringify(savedBooks));
+      localStorage.removeItem(legacySavedBooksKey);
+      return savedBooks;
+    } catch {
+      return [];
+    }
+  }
+
+  function isSameBook(first: any, second: any) {
+    if (first.key && second.key && first.key === second.key) return true;
+
+    const normalize = (value: string) => String(value || '')
+      .normalize('NFKD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .toLowerCase()
+      .replace(/[^a-z0-9]/g, '');
+    const firstIsbn = normalize(first.isbn);
+    const secondIsbn = normalize(second.isbn);
+
+    if (firstIsbn && secondIsbn && firstIsbn === secondIsbn) return true;
+
+    const firstTitle = normalize(first.title);
+    const secondTitle = normalize(second.title);
+    const firstAuthors = String(first.author || '')
+      .split(/,|&|\band\b/i)
+      .map(normalize)
+      .filter(Boolean);
+    const secondAuthors = String(second.author || '')
+      .split(/,|&|\band\b/i)
+      .map(normalize)
+      .filter(Boolean);
+
+    return Boolean(
+      firstTitle &&
+      firstTitle === secondTitle &&
+      firstAuthors.some((author: string) => secondAuthors.includes(author)),
+    );
+  }
+
+  function saveBookToShelf(book: any, status: string) {
+    const savedBook = {
+      key: book.key || book.isbn || `${book.title}:${book.author}`,
+      title: book.title,
+      subtitle: book.subtitle,
+      author: book.author,
+      pubDate: book.pubDate,
+      isbn: book.isbn,
+      heroImage: book.heroImage,
+      status,
+    };
+    const updatedBooks = getSavedBooks();
+    const existingIndex = updatedBooks.findIndex((item: any) => isSameBook(item, savedBook));
+
+    if (existingIndex >= 0) {
+      updatedBooks[existingIndex] = { ...updatedBooks[existingIndex], ...savedBook };
+    } else {
+      updatedBooks.push(savedBook);
+    }
+
+    localStorage.setItem(savedBooksKey, JSON.stringify(updatedBooks));
+    window.dispatchEvent(new CustomEvent('library:book-shelf-changed', { detail: savedBook }));
+    return savedBook;
+  }
+
+  function closeShelfMenus() {
+    resultsContainer.querySelectorAll<HTMLElement>('.shelf-menu').forEach((menu) => {
+      menu.hidden = true;
+    });
+    resultsContainer.querySelectorAll<HTMLButtonElement>('.shelf-toggle').forEach((toggle) => {
+      toggle.setAttribute('aria-expanded', 'false');
+    });
+  }
 
   async function performSearch(query: string, page: number = 1) {
     currentQuery = query;
@@ -208,9 +365,91 @@
             <p>${book.author || 'Unknown Author'}</p>
             <p class="pub-date">${book.pubDate ? `Published: ${book.pubDate}` : 'Publication date unknown'}</p>
           </div>
-          <button class="add-btn">+ Add to List</button>
+          <div class="shelf-control">
+            <button type="button" class="shelf-primary">Want to Read</button>
+            <button type="button" class="shelf-toggle" aria-label="Choose a reading list" aria-haspopup="menu" aria-expanded="false">▾</button>
+            <div class="shelf-menu" role="menu" hidden>
+              <button type="button" role="menuitem" data-status="Plan to Read">Want to Read</button>
+              <button type="button" role="menuitem" data-status="Reading">Currently Reading</button>
+              <button type="button" role="menuitem" data-status="Read">Read</button>
+              <div class="shelf-menu-divider" role="separator"></div>
+              <button type="button" role="menuitem" data-action="remove" hidden>Remove from My Lists</button>
+            </div>
+          </div>
         </div>
       `).join('');
+
+      const savedBooks = getSavedBooks();
+      resultsContainer.querySelectorAll<HTMLElement>('.shelf-control').forEach((control, index) => {
+        const book = books[index];
+        const primaryButton = control.querySelector<HTMLButtonElement>('.shelf-primary')!;
+        const toggleButton = control.querySelector<HTMLButtonElement>('.shelf-toggle')!;
+        const menu = control.querySelector<HTMLElement>('.shelf-menu')!;
+        const removeButton = control.querySelector<HTMLButtonElement>('[data-action="remove"]')!;
+        const savedBook = savedBooks.find((item: any) => isSameBook(item, book));
+        const collectionBook = libraryBooks.find((item: any) =>
+          shelfLabels[item.status] && isSameBook(item, book)
+        );
+        let currentStatus = savedBook?.status || collectionBook?.status || null;
+        let hasSavedShelf = Boolean(savedBook || collectionBook);
+        let hasLocalSavedBook = Boolean(savedBook);
+
+        function updateShelfControl(status: string) {
+          const label = shelfLabels[status] || shelfLabels['Plan to Read'];
+          primaryButton.textContent = `${hasSavedShelf ? '✓ ' : ''}${label}`;
+          removeButton.hidden = !hasLocalSavedBook || Boolean(collectionBook);
+          menu.querySelectorAll<HTMLButtonElement>('[data-status]').forEach((option) => {
+            if (option.dataset.status === status) {
+              option.setAttribute('aria-current', 'true');
+            } else {
+              option.removeAttribute('aria-current');
+            }
+          });
+        }
+
+        updateShelfControl(currentStatus || 'Plan to Read');
+
+        primaryButton.addEventListener('click', () => {
+          const updatedBook = saveBookToShelf(book, currentStatus || 'Plan to Read');
+          currentStatus = updatedBook.status;
+          hasSavedShelf = true;
+          updateShelfControl(updatedBook.status);
+        });
+
+        toggleButton.addEventListener('click', (event) => {
+          event.stopPropagation();
+          const shouldOpen = menu.hidden;
+          closeShelfMenus();
+          menu.hidden = !shouldOpen;
+          toggleButton.setAttribute('aria-expanded', String(shouldOpen));
+        });
+
+        menu.querySelectorAll<HTMLButtonElement>('[data-status]').forEach((option) => {
+          option.addEventListener('click', () => {
+            const updatedBook = saveBookToShelf(book, option.dataset.status || 'Plan to Read');
+            currentStatus = updatedBook.status;
+            hasSavedShelf = true;
+            updateShelfControl(updatedBook.status);
+            menu.hidden = true;
+            toggleButton.setAttribute('aria-expanded', 'false');
+          });
+        });
+
+        removeButton.addEventListener('click', () => {
+          if (!hasLocalSavedBook || collectionBook) return;
+          if (!window.confirm(`Remove "${book.title}" from your reading lists?`)) return;
+
+          const updatedBooks = getSavedBooks().filter((item: any) => !isSameBook(item, book));
+          localStorage.setItem(savedBooksKey, JSON.stringify(updatedBooks));
+          currentStatus = null;
+          hasSavedShelf = false;
+          hasLocalSavedBook = false;
+          updateShelfControl('Plan to Read');
+          menu.hidden = true;
+          toggleButton.setAttribute('aria-expanded', 'false');
+          window.dispatchEvent(new CustomEvent('library:book-removed', { detail: book }));
+        });
+      });
 
       if (totalPages > 1) {
         paginationContainer.innerHTML = `
@@ -246,6 +485,14 @@
     debounceTimer = setTimeout(() => {
       performSearch(query, 1);
     }, 400);
+  });
+
+  document.addEventListener('click', (event) => {
+    if (!(event.target as HTMLElement).closest('.shelf-control')) closeShelfMenus();
+  });
+
+  document.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape') closeShelfMenus();
   });
 
 </script>

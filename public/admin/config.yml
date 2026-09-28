@@ -17,6 +17,7 @@ collections:
     slug: "{{slug}}"
     fields:
       - { label: "Title", name: "title", widget: "string" }
+      - { label: "Subtitle", name: "subtitle", widget: "string", required: false }
       - { label: "Author(s)", name: "author", widget: "string" }
       - { label: "ISBN", name: "isbn", widget: "string", required: false }
       - { label: "Publish Date (Year)", name: "pubDate", widget: "string", required: false }
