@@ -79,8 +79,11 @@ const read = allBooks.filter((b) => b.data.status === "Read").sort(naturalSort);
         margin-bottom: 0.75rem;
       }
       .category-btn {
-        display: block;
+        display: flex;
+        align-items: center;
         width: 100%;
+        min-height: 38px;
+        box-sizing: border-box;
         text-align: left;
         padding: 0.5rem 0.8rem;
         margin-bottom: 0.25rem;
@@ -133,8 +136,63 @@ const read = allBooks.filter((b) => b.data.status === "Read").sort(naturalSort);
       }
       .controls {
         display: flex;
+        align-items: center;
+        flex-wrap: wrap;
         gap: 1rem;
         margin-bottom: 1.5rem;
+      }
+      .batch-controls {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        flex-wrap: wrap;
+        margin: 0;
+      }
+      .batch-controls[hidden],
+      .batch-actions[hidden] {
+        display: none;
+      }
+      .batch-actions {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        flex-wrap: wrap;
+      }
+      .batch-controls button,
+      .batch-controls select {
+        min-height: 2.45rem;
+        padding: 0.5rem 0.8rem;
+        border: 1px solid #cbd5e1;
+        border-radius: 6px;
+        background: #fff;
+        color: #334155;
+        font: inherit;
+        font-size: 0.9rem;
+      }
+      .batch-controls button {
+        cursor: pointer;
+      }
+      .batch-controls button:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+      }
+      .batch-controls .batch-remove {
+        border-color: #f2b8b5;
+        color: #b42318;
+      }
+      .batch-select-all,
+      .batch-move-control {
+        display: flex;
+        align-items: center;
+        gap: 0.35rem;
+        color: #475569;
+        font-size: 0.8rem;
+      }
+      .batch-select-all input,
+      .local-book-select input {
+        width: 1rem;
+        height: 1rem;
+        accent-color: #39745b;
       }
       .search-input,
       .sort-select {
@@ -228,6 +286,24 @@ const read = allBooks.filter((b) => b.data.status === "Read").sort(naturalSort);
         font-size: 0.7rem;
         color: #94a3b8;
       }
+      :global(.local-book-select) {
+        display: none;
+        align-items: center;
+        gap: 0.4rem;
+        margin-bottom: 0.5rem;
+        color: #475569;
+        font-size: 0.75rem;
+      }
+      :global(.selection-mode .local-book-select) {
+        display: flex;
+      }
+      :global(.selection-mode .local-book-card) {
+        cursor: pointer;
+      }
+      :global(.selection-mode .local-book-card:hover) {
+        border-color: #39745b;
+        box-shadow: 0 0 0 2px rgba(57, 116, 91, 0.14);
+      }
       .cover-placeholder {
         width: 100%;
         height: 200px;
@@ -320,6 +396,17 @@ const read = allBooks.filter((b) => b.data.status === "Read").sort(naturalSort);
           gap: 0.5rem;
           margin-bottom: 1rem;
         }
+        .batch-controls,
+        .batch-actions {
+          width: 100%;
+        }
+        .batch-actions {
+          gap: 0.35rem;
+        }
+        .batch-controls button,
+        .batch-controls select {
+          font-size: 0.8rem;
+        }
         .sort-select {
           width: 100%;
         }
@@ -409,8 +496,28 @@ const read = allBooks.filter((b) => b.data.status === "Read").sort(naturalSort);
                 <input
                   type="text"
                   class="search-input"
-                  placeholder="Filter your list by title or author..."
+                  placeholder="Filter your list by title, subtitle, or author..."
                 />
+                <div class="batch-controls" hidden>
+                  <button type="button" class="selection-toggle" aria-pressed="false">Select books</button>
+                  <div class="batch-actions" hidden>
+                    <label class="batch-select-all">
+                      <input type="checkbox" class="select-all-checkbox" />
+                      Select all
+                    </label>
+                    <span class="selection-count">0 selected</span>
+                    <label class="batch-move-control">
+                      Move to
+                      <select class="batch-destination" disabled>
+                        <option value="Plan to Read">Want to Read</option>
+                        <option value="Reading">Currently Reading</option>
+                        <option value="Read">Read</option>
+                      </select>
+                    </label>
+                    <button type="button" class="batch-move" disabled>Move</button>
+                    <button type="button" class="batch-remove" disabled>Delete</button>
+                  </div>
+                </div>
                 <select class="sort-select">
                   <option value="title-asc">Title: A to Z</option>
                   <option value="title-desc">Title: Z to A</option>
@@ -418,7 +525,6 @@ const read = allBooks.filter((b) => b.data.status === "Read").sort(naturalSort);
                   <option value="year-asc">Year: Oldest First</option>
                 </select>
               </div>
-
               <div class="cards-grid">
                 {books.map((book) => (
                   <a
@@ -429,6 +535,7 @@ const read = allBooks.filter((b) => b.data.status === "Read").sort(naturalSort);
                     data-status={book.data.status || ""}
                     data-isbn={book.data.isbn || ""}
                     data-title={book.data.title.toLowerCase()}
+                    data-subtitle={(book.data.subtitle || "").toLowerCase()}
                     data-author={(book.data.author || "").toLowerCase()}
                     data-year={parseInt(String(book.data.pubDate)) || 0}
                   >
@@ -646,9 +753,9 @@ const read = allBooks.filter((b) => b.data.status === "Read").sort(naturalSort);
         removeOption.type = "button";
         removeOption.setAttribute("role", "menuitem");
         removeOption.dataset.action = "remove";
-        removeOption.textContent = "Remove from My Lists";
+        removeOption.textContent = "Delete from My Lists";
         removeOption.addEventListener("click", () => {
-          if (!window.confirm(`Remove "${book.title}" from your reading lists?`)) return;
+          if (!window.confirm(`Delete "${book.title}" from your reading lists?`)) return;
           window.dispatchEvent(new CustomEvent("library:book-removed", { detail: book }));
         });
 
@@ -671,8 +778,18 @@ const read = allBooks.filter((b) => b.data.status === "Read").sort(naturalSort);
         card.dataset.bookKey = String(book.key || "");
         card.dataset.isbn = String(book.isbn || "");
         card.dataset.title = String(book.title).toLowerCase();
+        card.dataset.subtitle = String(book.subtitle || "").toLowerCase();
         card.dataset.author = String(book.author || "").toLowerCase();
         card.dataset.year = String(parseInt(String(book.pubDate), 10) || 0);
+
+        const selectionLabel = document.createElement("label");
+        selectionLabel.className = "local-book-select";
+        const checkbox = document.createElement("input");
+        checkbox.type = "checkbox";
+        checkbox.className = "local-book-checkbox";
+        checkbox.setAttribute("aria-label", `Select ${book.title}`);
+        selectionLabel.append(checkbox, document.createTextNode("Select book"));
+        card.appendChild(selectionLabel);
 
         const details = document.createElement("div");
         if (book.heroImage) {
@@ -739,6 +856,9 @@ const read = allBooks.filter((b) => b.data.status === "Read").sort(naturalSort);
               ? "none"
               : "";
           }
+
+          const batchControls = panel?.querySelector<HTMLElement>(".batch-controls");
+          if (batchControls) batchControls.hidden = localCount === 0;
         });
       }
 
@@ -840,8 +960,9 @@ const read = allBooks.filter((b) => b.data.status === "Read").sort(naturalSort);
 
           cards.forEach((card) => {
             const title = card.dataset.title || "";
+            const subtitle = card.dataset.subtitle || "";
             const author = card.dataset.author || "";
-            const matches = title.includes(query) || author.includes(query);
+            const matches = title.includes(query) || subtitle.includes(query) || author.includes(query);
 
             if (matches) {
               card.style.display = "flex";
@@ -886,6 +1007,118 @@ const read = allBooks.filter((b) => b.data.status === "Read").sort(naturalSort);
         sortSelect.addEventListener("change", updatePanel);
         updatePanel();
         panelRefreshers.set(panel.id, updatePanel);
+
+        const batchControls = panel.querySelector<HTMLElement>(".batch-controls");
+        if (!batchControls) return;
+
+        const selectionToggle = batchControls.querySelector<HTMLButtonElement>(".selection-toggle")!;
+        const batchActions = batchControls.querySelector<HTMLElement>(".batch-actions")!;
+        const selectAll = batchControls.querySelector<HTMLInputElement>(".select-all-checkbox")!;
+        const selectionCount = batchControls.querySelector<HTMLElement>(".selection-count")!;
+        const destination = batchControls.querySelector<HTMLSelectElement>(".batch-destination")!;
+        const moveButton = batchControls.querySelector<HTMLButtonElement>(".batch-move")!;
+        const removeButton = batchControls.querySelector<HTMLButtonElement>(".batch-remove")!;
+
+        function getSelectedBooks() {
+          return Array.from(grid.querySelectorAll<HTMLInputElement>(".local-book-checkbox:checked"))
+            .map((checkbox) => {
+              const card = checkbox.closest<HTMLElement>(".local-book-card");
+              return localBooks.find((book) => card && isSameBook(book, {
+                key: card.dataset.bookKey,
+                isbn: card.dataset.isbn,
+                title: card.dataset.title,
+                author: card.dataset.author,
+              }));
+            })
+            .filter((book): book is any => Boolean(book));
+        }
+
+        function updateSelectionControls() {
+          const visibleCheckboxes = Array.from(
+            grid.querySelectorAll<HTMLInputElement>(".local-book-checkbox"),
+          ).filter((checkbox) => checkbox.closest<HTMLElement>(".card")?.style.display !== "none");
+          const selectedCount = getSelectedBooks().length;
+          const selectedVisibleCount = visibleCheckboxes.filter((checkbox) => checkbox.checked).length;
+          selectionCount.textContent = `${selectedCount} selected`;
+          destination.disabled = selectedCount === 0;
+          moveButton.disabled = selectedCount === 0;
+          removeButton.disabled = selectedCount === 0;
+          selectAll.checked = visibleCheckboxes.length > 0 && selectedVisibleCount === visibleCheckboxes.length;
+          selectAll.indeterminate = selectedVisibleCount > 0 && selectedVisibleCount < visibleCheckboxes.length;
+        }
+
+        function setSelectionMode(enabled: boolean) {
+          panel.classList.toggle("selection-mode", enabled);
+          batchActions.hidden = !enabled;
+          selectionToggle.textContent = enabled ? "Cancel" : "Select books";
+          selectionToggle.setAttribute("aria-pressed", String(enabled));
+
+          if (!enabled) {
+            grid.querySelectorAll<HTMLInputElement>(".local-book-checkbox").forEach((checkbox) => {
+              checkbox.checked = false;
+            });
+          }
+          updateSelectionControls();
+        }
+
+        selectionToggle.addEventListener("click", () => {
+          setSelectionMode(!panel.classList.contains("selection-mode"));
+        });
+
+        searchInput.addEventListener("input", updateSelectionControls);
+
+        selectAll.addEventListener("change", () => {
+          const visibleCheckboxes = Array.from(
+            grid.querySelectorAll<HTMLInputElement>(".local-book-checkbox"),
+          ).filter((checkbox) => checkbox.closest<HTMLElement>(".card")?.style.display !== "none");
+          visibleCheckboxes.forEach((checkbox) => {
+            checkbox.checked = selectAll.checked;
+          });
+          updateSelectionControls();
+        });
+
+        grid.addEventListener("change", (event) => {
+          if ((event.target as HTMLElement).matches(".local-book-checkbox")) {
+            updateSelectionControls();
+          }
+        });
+
+        grid.addEventListener("click", (event) => {
+          if (!panel.classList.contains("selection-mode")) return;
+          const target = event.target as HTMLElement;
+          if (target.closest("button, input, select, label, a, .shelf-control")) return;
+
+          const card = target.closest<HTMLElement>(".local-book-card");
+          const checkbox = card?.querySelector<HTMLInputElement>(".local-book-checkbox");
+          if (!checkbox) return;
+
+          checkbox.checked = !checkbox.checked;
+          updateSelectionControls();
+        });
+
+        moveButton.addEventListener("click", () => {
+          const selectedBooks = getSelectedBooks();
+          if (selectedBooks.length === 0) return;
+
+          const status = destination.value;
+          setSelectionMode(false);
+          selectedBooks.forEach((book) => {
+            window.dispatchEvent(new CustomEvent("library:book-shelf-changed", {
+              detail: { ...book, status },
+            }));
+          });
+        });
+
+        removeButton.addEventListener("click", () => {
+          const selectedBooks = getSelectedBooks();
+          if (selectedBooks.length === 0) return;
+          if (!window.confirm(`Delete ${selectedBooks.length} selected book${selectedBooks.length === 1 ? "" : "s"} from your reading lists?`)) return;
+
+          setSelectionMode(false);
+          selectedBooks.forEach((book) => {
+            window.dispatchEvent(new CustomEvent("library:book-removed", { detail: book }));
+          });
+        });
       });
 
       window.addEventListener("library:book-shelf-changed", (event) => {
@@ -952,12 +1185,31 @@ const read = allBooks.filter((b) => b.data.status === "Read").sort(naturalSort);
 
       document.addEventListener("keydown", (event) => {
         if (event.key !== "Escape") return;
+        document.querySelectorAll<HTMLElement>(".category-panel.selection-mode").forEach((panel) => {
+          panel.querySelector<HTMLButtonElement>(".selection-toggle")?.click();
+        });
         document.querySelectorAll<HTMLElement>(".shelf-menu").forEach((menu) => {
           menu.hidden = true;
         });
         document.querySelectorAll<HTMLButtonElement>(".shelf-toggle").forEach((toggle) => {
           toggle.setAttribute("aria-expanded", "false");
         });
+      });
+
+      document.addEventListener("keydown", (event) => {
+        if (event.key !== "Delete" && event.key !== "Del" && event.code !== "Delete") return;
+
+        const target = event.target as HTMLElement;
+        if (target.closest("input:not([type='checkbox']):not([type='radio']), textarea, select, [contenteditable='true']")) return;
+
+        const activePanel = document.querySelector<HTMLElement>(
+          ".category-panel.active.selection-mode",
+        );
+        const deleteButton = activePanel?.querySelector<HTMLButtonElement>(".batch-remove");
+        if (!deleteButton || deleteButton.disabled) return;
+
+        event.preventDefault();
+        deleteButton.click();
       });
 
       const returnScroll = Number.parseInt(pageParams.get("scroll") || "", 10);

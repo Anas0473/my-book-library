@@ -373,7 +373,7 @@ const { libraryBooks = [] } = Astro.props;
               <button type="button" role="menuitem" data-status="Reading">Currently Reading</button>
               <button type="button" role="menuitem" data-status="Read">Read</button>
               <div class="shelf-menu-divider" role="separator"></div>
-              <button type="button" role="menuitem" data-action="remove" hidden>Remove from My Lists</button>
+              <button type="button" role="menuitem" data-action="remove" hidden>Delete from My Lists</button>
             </div>
           </div>
         </div>
@@ -437,7 +437,7 @@ const { libraryBooks = [] } = Astro.props;
 
         removeButton.addEventListener('click', () => {
           if (!hasLocalSavedBook || collectionBook) return;
-          if (!window.confirm(`Remove "${book.title}" from your reading lists?`)) return;
+          if (!window.confirm(`Delete "${book.title}" from your reading lists?`)) return;
 
           const updatedBooks = getSavedBooks().filter((item: any) => !isSameBook(item, book));
           localStorage.setItem(savedBooksKey, JSON.stringify(updatedBooks));
