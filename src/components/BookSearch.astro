@@ -266,6 +266,12 @@ const { libraryBooks = [] } = Astro.props;
   }
 
   function isSameBook(first: any, second: any) {
+    if (first.editionKey && second.editionKey) {
+      return first.editionKey === second.editionKey;
+    }
+    if (first.workKey && second.workKey && first.workKey === second.workKey) return true;
+    if (first.workKey && first.workKey === second.key) return true;
+    if (second.workKey && second.workKey === first.key) return true;
     if (first.key && second.key && first.key === second.key) return true;
 
     const normalize = (value: string) => String(value || '')
@@ -297,8 +303,12 @@ const { libraryBooks = [] } = Astro.props;
   }
 
   function saveBookToShelf(book: any, status: string) {
-    const savedBook = {
+    let savedBook = {
       key: book.key || book.isbn || `${book.title}:${book.author}`,
+      workKey: book.workKey,
+      editionKey: book.editionKey,
+      editionUrl: book.editionUrl,
+      editionHeroImage: book.editionHeroImage,
       title: book.title,
       subtitle: book.subtitle,
       author: book.author,
@@ -311,7 +321,12 @@ const { libraryBooks = [] } = Astro.props;
     const existingIndex = updatedBooks.findIndex((item: any) => isSameBook(item, savedBook));
 
     if (existingIndex >= 0) {
-      updatedBooks[existingIndex] = { ...updatedBooks[existingIndex], ...savedBook };
+      savedBook = {
+        ...savedBook,
+        ...updatedBooks[existingIndex],
+        status,
+      };
+      updatedBooks[existingIndex] = savedBook;
     } else {
       updatedBooks.push(savedBook);
     }

@@ -125,6 +125,80 @@ const read = allBooks.filter((b) => b.data.status === "Read").sort(naturalSort);
         border-style: solid;
         color: #ffffff;
       }
+      .open-library-sync-status {
+        display: block;
+        box-sizing: border-box;
+        margin: 0.25rem 0 1.5rem;
+        padding: 0 0.8rem;
+        color: #64748b;
+        font-size: 0.72rem;
+        line-height: 1.35;
+      }
+      #open-library-sync-dialog {
+        width: min(28rem, calc(100vw - 2rem));
+        max-width: none;
+        padding: 1.25rem;
+        border: 1px solid #cbd5e1;
+        border-radius: 8px;
+        color: #334155;
+        box-shadow: 0 12px 32px rgba(15, 23, 42, 0.2);
+      }
+      #open-library-sync-dialog::backdrop {
+        background: rgba(15, 23, 42, 0.45);
+      }
+      .open-library-sync-form {
+        display: grid;
+        gap: 0.75rem;
+      }
+      .open-library-sync-form h2 {
+        margin: 0;
+        font-size: 1.25rem;
+      }
+      .open-library-sync-form p {
+        margin: 0;
+        font-size: 0.9rem;
+        line-height: 1.45;
+      }
+      .open-library-sync-form label {
+        font-size: 0.85rem;
+        font-weight: 600;
+      }
+      .open-library-sync-form input {
+        box-sizing: border-box;
+        width: 100%;
+        padding: 0.65rem 0.75rem;
+        border: 1px solid #cbd5e1;
+        border-radius: 6px;
+      }
+      .open-library-sync-message {
+        min-height: 1.25rem;
+        color: #64748b;
+      }
+      .open-library-sync-actions {
+        display: flex;
+        justify-content: flex-end;
+        gap: 0.5rem;
+      }
+      .open-library-sync-actions button {
+        min-height: 2.4rem;
+        padding: 0.45rem 0.75rem;
+        border: 1px solid #cbd5e1;
+        border-radius: 6px;
+        background: #fff;
+        color: #334155;
+        cursor: pointer;
+        font: inherit;
+        font-size: 0.85rem;
+      }
+      .open-library-sync-actions button[type="submit"] {
+        border-color: #39745b;
+        background: #39745b;
+        color: #fff;
+      }
+      .open-library-sync-actions button:disabled {
+        opacity: 0.6;
+        cursor: progress;
+      }
       main {
         flex: 1;
       }
@@ -286,6 +360,13 @@ const read = allBooks.filter((b) => b.data.status === "Read").sort(naturalSort);
         font-size: 0.7rem;
         color: #94a3b8;
       }
+      :global(.local-book-card .edition-link-text) {
+        margin: 0.35rem 0 0.65rem;
+        font-size: 0.7rem;
+      }
+      :global(.local-book-card .edition-link-text a) {
+        color: #39745b;
+      }
       :global(.local-book-select) {
         display: none;
         align-items: center;
@@ -359,6 +440,9 @@ const read = allBooks.filter((b) => b.data.status === "Read").sort(naturalSort);
         font-weight: 600;
         text-align: center;
       }
+      .mobile-nav {
+        display: none;
+      }
 
       @media (max-width: 700px) {
         body {
@@ -384,7 +468,7 @@ const read = allBooks.filter((b) => b.data.status === "Read").sort(naturalSort);
           left: 0;
           z-index: 10;
           display: grid;
-          grid-template-columns: repeat(3, 1fr);
+          grid-template-columns: repeat(4, 1fr);
           gap: 0.25rem;
           padding: 0.5rem;
           border-top: 1px solid #e2e8f0;
@@ -433,10 +517,6 @@ const read = allBooks.filter((b) => b.data.status === "Read").sort(naturalSort);
           font-weight: 600;
         }
       }
-
-      .mobile-nav {
-        display: none;
-      }
     </style>
   </head>
   <body>
@@ -450,6 +530,10 @@ const read = allBooks.filter((b) => b.data.status === "Read").sort(naturalSort);
         <button class="category-btn search-tab active" data-target="search-db"
           >🔍 Search Books</button
         >
+        <button type="button" class="category-btn" id="open-library-sync-button">
+          Connect Open Library
+        </button>
+        <p class="open-library-sync-status" id="open-library-sync-status" role="status" aria-live="polite" hidden></p>
 
         <h3>My Lists</h3>
         <button class="category-btn" data-target="plan-to-read"
@@ -592,7 +676,22 @@ const read = allBooks.filter((b) => b.data.status === "Read").sort(naturalSort);
       <button class="mobile-nav-button" data-target="plan-to-read">Plan to Read <span class="category-count">{planToRead.length}</span></button>
       <button class="mobile-nav-button" data-target="reading">Reading <span class="category-count">{reading.length}</span></button>
       <button class="mobile-nav-button" data-target="read">Read <span class="category-count">{read.length}</span></button>
+      <button type="button" class="mobile-nav-button" id="mobile-open-library-sync-button">Connect</button>
     </nav>
+
+    <dialog id="open-library-sync-dialog" aria-labelledby="open-library-sync-title">
+      <form class="open-library-sync-form" id="open-library-sync-form">
+        <h2 id="open-library-sync-title">Connect Open Library</h2>
+        <p>Enter your Open Library username. Your reading log must be public to sync. No password is needed. Only one account can be synced at a time; switching replaces its synced books, while books added only here stay.</p>
+        <label for="open-library-username">Open Library username</label>
+        <input id="open-library-username" name="username" type="text" autocomplete="username" required />
+        <p class="open-library-sync-message" id="open-library-sync-message" role="status" aria-live="polite"></p>
+        <div class="open-library-sync-actions">
+          <button type="button" id="open-library-sync-cancel">Cancel</button>
+          <button type="submit" id="open-library-sync-submit">Connect and sync</button>
+        </div>
+      </form>
+    </dialog>
 
     <script>
       const buttons = document.querySelectorAll(
@@ -601,6 +700,19 @@ const read = allBooks.filter((b) => b.data.status === "Read").sort(naturalSort);
       const panels = document.querySelectorAll(".category-panel");
       const savedBooksKey = "my-book-library:books";
       const legacySavedBooksKey = "my-book-library:plan-to-read";
+      const openLibraryUsernameKey = "my-book-library:openlibrary-username";
+      const openLibraryLastSyncKey = "my-book-library:openlibrary-last-sync";
+      const openLibraryLastSyncResultKey = "my-book-library:openlibrary-last-sync-result";
+      const openLibrarySyncInterval = 12 * 60 * 60 * 1000;
+      const openLibrarySyncButton = document.getElementById("open-library-sync-button") as HTMLButtonElement;
+      const mobileOpenLibrarySyncButton = document.getElementById("mobile-open-library-sync-button") as HTMLButtonElement;
+      const openLibrarySyncStatus = document.getElementById("open-library-sync-status") as HTMLElement;
+      const openLibrarySyncDialog = document.getElementById("open-library-sync-dialog") as HTMLDialogElement;
+      const openLibrarySyncForm = document.getElementById("open-library-sync-form") as HTMLFormElement;
+      const openLibraryUsernameInput = document.getElementById("open-library-username") as HTMLInputElement;
+      const openLibrarySyncMessage = document.getElementById("open-library-sync-message") as HTMLElement;
+      const openLibrarySyncSubmit = document.getElementById("open-library-sync-submit") as HTMLButtonElement;
+      const openLibrarySyncCancel = document.getElementById("open-library-sync-cancel") as HTMLButtonElement;
       const shelfDefinitions = [
         { id: "plan-to-read", status: "Plan to Read", label: "Want to Read" },
         { id: "reading", status: "Reading", label: "Currently Reading" },
@@ -608,6 +720,11 @@ const read = allBooks.filter((b) => b.data.status === "Read").sort(naturalSort);
       ];
       const serverShelfCounts = new Map<string, number>();
       const panelRefreshers = new Map<string, () => void>();
+
+      const previousSyncWarning = localStorage.getItem(openLibraryLastSyncResultKey) || "";
+      if (/books were not returned by Open Library/.test(previousSyncWarning)) {
+        localStorage.removeItem(openLibraryLastSyncResultKey);
+      }
 
       shelfDefinitions.forEach(({ id }) => {
         serverShelfCounts.set(
@@ -638,10 +755,16 @@ const read = allBooks.filter((b) => b.data.status === "Read").sort(naturalSort);
       }
 
       function getBookIdentity(book: any) {
-        return book.key || book.isbn || `${book.title}:${book.author}`;
+        return book.editionKey || book.key || book.isbn || `${book.title}:${book.author}`;
       }
 
       function isSameBook(first: any, second: any) {
+        if (first.editionKey && second.editionKey) {
+          return first.editionKey === second.editionKey;
+        }
+        if (first.workKey && second.workKey && first.workKey === second.workKey) return true;
+        if (first.workKey && first.workKey === second.key) return true;
+        if (second.workKey && second.workKey === first.key) return true;
         if (first.key && second.key && first.key === second.key) return true;
 
         const normalize = (value: string) => String(value || "")
@@ -776,6 +899,8 @@ const read = allBooks.filter((b) => b.data.status === "Read").sort(naturalSort);
         card.className = "card local-book-card";
         card.dataset.localBookKey = String(getBookIdentity(book));
         card.dataset.bookKey = String(book.key || "");
+        card.dataset.workKey = String(book.workKey || "");
+        card.dataset.editionKey = String(book.editionKey || "");
         card.dataset.isbn = String(book.isbn || "");
         card.dataset.title = String(book.title).toLowerCase();
         card.dataset.subtitle = String(book.subtitle || "").toLowerCase();
@@ -792,12 +917,19 @@ const read = allBooks.filter((b) => b.data.status === "Read").sort(naturalSort);
         card.appendChild(selectionLabel);
 
         const details = document.createElement("div");
-        if (book.heroImage) {
+        const fallbackImage = book.heroImage;
+        const selectedEditionImage = book.editionHeroImage;
+        if (selectedEditionImage || fallbackImage) {
           const image = document.createElement("img");
-          image.src = book.heroImage;
+          image.src = selectedEditionImage || fallbackImage;
           image.alt = book.title;
           image.className = "cover-img";
           image.referrerPolicy = "no-referrer";
+          if (selectedEditionImage && fallbackImage) {
+            image.addEventListener("error", () => {
+              image.src = fallbackImage;
+            }, { once: true });
+          }
           details.appendChild(image);
         } else {
           const placeholder = document.createElement("div");
@@ -828,6 +960,17 @@ const read = allBooks.filter((b) => b.data.status === "Read").sort(naturalSort);
           pubDate.className = "pub-date-text";
           pubDate.textContent = `Published: ${book.pubDate}`;
           details.appendChild(pubDate);
+        }
+        if (book.editionUrl) {
+          const editionLink = document.createElement("p");
+          editionLink.className = "edition-link-text";
+          const link = document.createElement("a");
+          link.href = book.editionUrl;
+          link.target = "_blank";
+          link.rel = "noopener noreferrer";
+          link.textContent = "Open selected edition";
+          editionLink.appendChild(link);
+          details.appendChild(editionLink);
         }
 
         card.appendChild(details);
@@ -863,6 +1006,174 @@ const read = allBooks.filter((b) => b.data.status === "Read").sort(naturalSort);
       }
 
       updateShelfCounts();
+
+      function updateOpenLibrarySyncLabel() {
+        const username = localStorage.getItem(openLibraryUsernameKey);
+        const lastSyncResult = localStorage.getItem(openLibraryLastSyncResultKey);
+        openLibrarySyncButton.textContent = username
+          ? "Sync Open Library"
+          : "Connect Open Library";
+        mobileOpenLibrarySyncButton.textContent = username ? "Sync" : "Connect";
+        mobileOpenLibrarySyncButton.setAttribute(
+          "aria-label",
+          username ? "Sync Open Library" : "Connect Open Library",
+        );
+        openLibrarySyncStatus.hidden = !username;
+        if (username && !openLibrarySyncStatus.textContent) {
+          openLibrarySyncStatus.textContent = `Connected as ${username}${lastSyncResult ? `. ${lastSyncResult}` : ""}`;
+        }
+      }
+
+      async function syncOpenLibrary(username: string) {
+        const previousUsername = localStorage.getItem(openLibraryUsernameKey);
+        if (
+          previousUsername &&
+          previousUsername !== username &&
+          !window.confirm(`Switch from ${previousUsername} to ${username}? Books synced from ${previousUsername} will be replaced. Books added only in this app will stay.`)
+        ) {
+          openLibrarySyncMessage.textContent = "Account switch cancelled.";
+          return;
+        }
+
+        openLibrarySyncButton.disabled = true;
+        mobileOpenLibrarySyncButton.disabled = true;
+        openLibrarySyncSubmit.disabled = true;
+        openLibrarySyncMessage.textContent = "Syncing your public reading log…";
+        openLibrarySyncStatus.hidden = false;
+        openLibrarySyncStatus.textContent = "Syncing Open Library…";
+
+        try {
+          const response = await fetch(
+            `/api/openlibrary-reading-log.json?username=${encodeURIComponent(username)}`,
+          );
+          const data = await response.json();
+          if (!response.ok) throw new Error(data.error || "Could not sync Open Library.");
+
+          const syncedBooks = Array.isArray(data.books) ? data.books : [];
+          const incompleteShelves = Array.isArray(data.incompleteShelves)
+            ? data.incompleteShelves
+            : [];
+          const incompleteStatuses = new Set(
+            incompleteShelves.map((shelf: any) => shelf.status),
+          );
+          const previousSyncedBooks = localBooks.filter(
+            (book) => book.openLibrarySyncUsername === username,
+          );
+          const nextBooks = localBooks.filter((book) => {
+            if (!book.openLibrarySyncUsername) return true;
+            if (book.openLibrarySyncUsername !== username) return false;
+            return incompleteStatuses.has(book.status);
+          });
+
+          function matchesSyncedBook(existingBook: any, syncedBook: any) {
+            if (existingBook.editionKey && syncedBook.editionKey) {
+              return existingBook.editionKey === syncedBook.editionKey;
+            }
+            if (existingBook.openLibrarySyncUsername || syncedBook.openLibrarySyncUsername) {
+              const existingWorkKey = existingBook.workKey || existingBook.key;
+              const syncedWorkKey = syncedBook.workKey || syncedBook.key;
+              if (existingWorkKey && syncedWorkKey) return existingWorkKey === syncedWorkKey;
+            }
+            return isSameBook(existingBook, syncedBook);
+          }
+
+          syncedBooks.forEach((book: any) => {
+            const previousSyncedBook = previousSyncedBooks.find((savedBook) =>
+              matchesSyncedBook(savedBook, { ...book, openLibrarySyncUsername: username }),
+            );
+            const syncedBook = {
+              ...previousSyncedBook,
+              ...book,
+              openLibrarySyncUsername: username,
+            };
+            const existingIndex = nextBooks.findIndex((savedBook) =>
+              matchesSyncedBook(savedBook, syncedBook),
+            );
+
+            if (existingIndex >= 0) {
+              nextBooks[existingIndex] = {
+                ...nextBooks[existingIndex],
+                ...syncedBook,
+              };
+            } else {
+              nextBooks.push(syncedBook);
+            }
+          });
+
+          localBooks = nextBooks;
+          localStorage.setItem(savedBooksKey, JSON.stringify(localBooks));
+          localStorage.setItem(openLibraryUsernameKey, username);
+          localStorage.setItem(openLibraryLastSyncKey, String(Date.now()));
+          const incompleteMessage = incompleteShelves
+            .map((shelf: any) => `Open Library stopped paging the ${shelf.status} shelf; older synced books were kept`)
+            .join(". ");
+          const syncResult = incompleteMessage
+            ? `Synced ${syncedBooks.length} books from ${username}. ${incompleteMessage}.`
+            : `Synced ${syncedBooks.length} books from ${username}.`;
+          localStorage.setItem(openLibraryLastSyncResultKey, incompleteMessage);
+          openLibrarySyncStatus.textContent = syncResult;
+          openLibrarySyncMessage.textContent = incompleteMessage
+            ? syncResult
+            : `Synced ${syncedBooks.length} books.`;
+          updateOpenLibrarySyncLabel();
+          openLibrarySyncStatus.textContent = syncResult;
+          window.setTimeout(() => {
+            openLibrarySyncDialog.close();
+            window.location.reload();
+          }, 900);
+        } catch (error) {
+          const message = error instanceof Error ? error.message : "Could not sync Open Library.";
+          openLibrarySyncMessage.textContent = message;
+          openLibrarySyncStatus.textContent = message;
+        } finally {
+          openLibrarySyncButton.disabled = false;
+          mobileOpenLibrarySyncButton.disabled = false;
+          openLibrarySyncSubmit.disabled = false;
+        }
+      }
+
+      function openOpenLibrarySyncDialog() {
+        const username = localStorage.getItem(openLibraryUsernameKey) || "";
+        openLibraryUsernameInput.value = username;
+        updateOpenLibrarySyncSubmitLabel();
+        openLibrarySyncMessage.textContent = "";
+        openLibrarySyncDialog.showModal();
+        openLibraryUsernameInput.focus();
+      }
+
+      function updateOpenLibrarySyncSubmitLabel() {
+        const connectedUsername = localStorage.getItem(openLibraryUsernameKey);
+        const enteredUsername = openLibraryUsernameInput.value.trim();
+        openLibrarySyncSubmit.textContent = connectedUsername && enteredUsername !== connectedUsername
+          ? "Switch and sync"
+          : connectedUsername
+            ? "Sync now"
+            : "Connect and sync";
+      }
+
+      openLibrarySyncButton.addEventListener("click", openOpenLibrarySyncDialog);
+      mobileOpenLibrarySyncButton.addEventListener("click", openOpenLibrarySyncDialog);
+      openLibraryUsernameInput.addEventListener("input", updateOpenLibrarySyncSubmitLabel);
+
+      openLibrarySyncCancel.addEventListener("click", () => {
+        openLibrarySyncDialog.close();
+      });
+
+      openLibrarySyncForm.addEventListener("submit", (event) => {
+        event.preventDefault();
+        const username = openLibraryUsernameInput.value.trim();
+        if (username) syncOpenLibrary(username);
+      });
+
+      updateOpenLibrarySyncLabel();
+      const savedOpenLibraryUsername = localStorage.getItem(openLibraryUsernameKey);
+      const lastOpenLibrarySync = Number(localStorage.getItem(openLibraryLastSyncKey) || 0);
+      if (
+        savedOpenLibraryUsername &&
+        Date.now() - lastOpenLibrarySync > openLibrarySyncInterval
+      ) {
+        window.setTimeout(() => syncOpenLibrary(savedOpenLibraryUsername), 500);
+      }
 
       function activatePanel(target: string) {
         buttons.forEach((button) =>
@@ -1025,6 +1336,8 @@ const read = allBooks.filter((b) => b.data.status === "Read").sort(naturalSort);
               const card = checkbox.closest<HTMLElement>(".local-book-card");
               return localBooks.find((book) => card && isSameBook(book, {
                 key: card.dataset.bookKey,
+                workKey: card.dataset.workKey,
+                editionKey: card.dataset.editionKey,
                 isbn: card.dataset.isbn,
                 title: card.dataset.title,
                 author: card.dataset.author,
@@ -1142,6 +1455,8 @@ const read = allBooks.filter((b) => b.data.status === "Read").sort(naturalSort);
         document.querySelectorAll<HTMLElement>("[data-local-book-key]").forEach((card) => {
           const cardBook = {
             key: card.dataset.bookKey,
+            workKey: card.dataset.workKey,
+            editionKey: card.dataset.editionKey,
             isbn: card.dataset.isbn,
             title: card.dataset.title,
             author: card.dataset.author,
@@ -1163,6 +1478,8 @@ const read = allBooks.filter((b) => b.data.status === "Read").sort(naturalSort);
         document.querySelectorAll<HTMLElement>("[data-local-book-key]").forEach((card) => {
           const cardBook = {
             key: card.dataset.bookKey,
+            workKey: card.dataset.workKey,
+            editionKey: card.dataset.editionKey,
             isbn: card.dataset.isbn,
             title: card.dataset.title,
             author: card.dataset.author,
