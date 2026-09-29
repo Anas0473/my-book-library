@@ -1,9 +1,7 @@
 import type { APIRoute } from 'astro';
 
-// Finds the specific edition whose title matches the search phrase, since OpenLibrary's
-// work-level search results only expose a single arbitrary default cover/title, which can
-// belong to an unrelated translation/edition of the same work.
-async function findMatchingEdition(workKey: string, normalizedQuery: string) {
+// Finds the best matching edition, preferring editions with covers and then newer dates.
+async function findMatchingEdition(workKey: string, normalizedQuery: string, language?: string) {
   try {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 5000);
@@ -25,9 +23,43 @@ async function findMatchingEdition(workKey: string, normalizedQuery: string) {
     const data = await response.json();
     const entries = (data.entries || []).filter((edition: any) => /^\/books\/OL\d+M$/i.test(edition.key || ''));
     const normalizedTitle = (edition: any) => String(edition.title || '').trim().toLocaleLowerCase();
+    const languageEntries = language
+      ? entries.filter((edition: any) =>
+          (edition.languages || []).some((item: any) =>
+            String(item.key || '').split('/').pop() === language,
+          ),
+        )
+      : entries;
+    const newestWithCover = (candidates: any[]) => {
+      const withCovers = candidates.filter((edition: any) =>
+        Array.isArray(edition.covers) && edition.covers.some((coverId: any) => Number(coverId) > 0),
+      );
+      const editionsToRank = withCovers.length > 0 ? withCovers : candidates;
+      const publicationTime = (edition: any) => {
+        const dates = Array.isArray(edition.publish_date)
+          ? edition.publish_date
+          : [edition.publish_date];
+        const parsedDates = dates
+          .map((date: any) => Date.parse(String(date || '')))
+          .filter(Number.isFinite);
+        if (parsedDates.length > 0) return Math.max(...parsedDates);
+        const year = String(dates[0] || '').match(/\b\d{4}\b/)?.[0];
+        return year ? Date.UTC(Number(year), 0, 1) : 0;
+      };
+      return [...editionsToRank].sort((first: any, second: any) =>
+        publicationTime(second) - publicationTime(first),
+      )[0] || null;
+    };
+    const exactTitleMatches = languageEntries.filter(
+      (edition: any) => normalizedTitle(edition) === normalizedQuery,
+    );
+    const partialTitleMatches = languageEntries.filter(
+      (edition: any) => normalizedTitle(edition).includes(normalizedQuery),
+    );
     return (
-      entries.find((edition: any) => normalizedTitle(edition) === normalizedQuery) ||
-      entries.find((edition: any) => normalizedTitle(edition).includes(normalizedQuery)) ||
+      (language ? newestWithCover(languageEntries) : null) ||
+      newestWithCover(exactTitleMatches) ||
+      newestWithCover(partialTitleMatches) ||
       null
     );
   } catch {
@@ -240,15 +272,15 @@ export const GET: APIRoute = async ({ url }) => {
     // For title-style searches, prefer the specific edition matching the searched phrase
     // over the work's arbitrary default cover/edition (e.g. a translated title's own cover).
     // Limited to a handful of docs to keep general (live-as-you-type) searches responsive.
-    const editionLookupLimit = 5;
-    const matchedEditions = isGeneralQuery
+    const editionLookupLimit = language ? pageDocs.length : 5;
+    const matchedEditions = isGeneralQuery || language
       ? await Promise.all(
           pageDocs.map((doc: any, index: number) => {
             if (index >= editionLookupLimit || !doc.key) return null;
             const docKey = String(doc.key);
-            return fallbackEditionMatches.has(docKey)
+            return !language && fallbackEditionMatches.has(docKey)
               ? fallbackEditionMatches.get(docKey)
-              : findMatchingEdition(docKey.replace(/^\/+/, ''), normalizedPhrase);
+              : findMatchingEdition(docKey.replace(/^\/+/, ''), normalizedPhrase, language);
           }),
         )
       : pageDocs.map(() => null);
@@ -258,12 +290,18 @@ export const GET: APIRoute = async ({ url }) => {
       return {
         key: doc.key,
         workKey: doc.key,
+        editionKey: language && edition?.key ? edition.key : null,
+        editionUrl: language && edition?.key ? `https://openlibrary.org${edition.key}` : null,
+        editionLanguage: language && edition ? language : null,
+        editionHeroImage: language && edition?.covers?.[0]
+          ? `https://covers.openlibrary.org/b/id/${edition.covers[0]}-M.jpg`
+          : null,
         title: edition?.title || doc.title,
         subtitle: edition?.subtitle || doc.subtitle || null,
         author: doc.author_name ? doc.author_name.join(', ') : 'Unknown Author',
         authorKeys: doc.author_key || [],
         editionKeys: edition?.key ? [edition.key.replace(/^\/?books\//i, '')] : (doc.edition_key || []),
-        languages: doc.language || [],
+        languages: language && edition ? [language] : doc.language || [],
         pubDate: edition?.publish_date || doc.first_publish_year || 'Unknown',
         isbn: edition?.isbn_13?.[0] || edition?.isbn_10?.[0] || (doc.isbn ? doc.isbn[0] : null),
         heroImage: edition?.covers?.[0]
