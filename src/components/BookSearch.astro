@@ -206,6 +206,11 @@ const { libraryBooks = [] } = Astro.props;
     margin: 0;
     font-size: 1rem;
   }
+  :global(.edition-summary) {
+    margin: 0 0 0.75rem;
+    color: #64748b;
+    font-size: 0.8rem;
+  }
   :global(.edition-dialog-close) {
     padding: 0.25rem 0.5rem;
     border: 1px solid #cbd5e1;
@@ -506,6 +511,7 @@ const { libraryBooks = [] } = Astro.props;
       editionUrl: book.editionUrl,
       editionHeroImage: book.editionHeroImage,
       editionLanguage: book.editionLanguage,
+      editionCount: book.editionCount || 0,
       title: book.title,
       subtitle: book.subtitle,
       author: book.author,
@@ -696,7 +702,7 @@ const { libraryBooks = [] } = Astro.props;
             <p class="author-text">${authorLinksMarkup(book.author || 'Unknown Author')}</p>
             <p class="pub-date">${book.pubDate ? `Published: ${book.pubDate}` : 'Publication date unknown'}</p>
             <a class="selected-edition-link" href="${editionUrl || '#'}" target="_blank" rel="noopener noreferrer" ${editionUrl ? '' : 'hidden'}>Open selected edition</a>
-            ${book.workKey ? `<button type="button" class="edition-button" data-book-index="${index}">Browse editions</button>` : ''}
+            ${book.workKey ? `<button type="button" class="edition-button" data-book-index="${index}" data-preferred-edition="${escapeHtml(String(matchedSavedBook?.editionKey || book.editionKey || ''))}">Browse editions${book.editionCount ? ` (${book.editionCount})` : ''}</button>` : ''}
           </div>
           <div class="shelf-control">
             <button type="button" class="shelf-primary">Want to Read</button>
@@ -723,9 +729,16 @@ const { libraryBooks = [] } = Astro.props;
         button.textContent = 'Loading editions...';
 
         try {
-          const response = await fetch(`/api/book-editions.json?work=${encodeURIComponent(book.workKey)}`);
+          const params = new URLSearchParams({ work: book.workKey });
+          const preferredEdition = button.dataset.preferredEdition || book.editionKey || '';
+          if (preferredEdition) params.set('preferred_edition', preferredEdition);
+          if (currentLanguage) params.set('language', currentLanguage);
+          const response = await fetch(`/api/book-editions.json?${params}`);
           const data = await response.json();
           const editions = Array.isArray(data.editions) ? data.editions : [];
+          const totalCount = Number(data.totalCount) || editions.length || book.editionCount || 0;
+          book.editionCount = totalCount;
+          button.textContent = `Browse editions${book.editionCount ? ` (${book.editionCount})` : ''}`;
 
           editionDialog.innerHTML = '';
           const header = document.createElement('div');
@@ -739,6 +752,11 @@ const { libraryBooks = [] } = Astro.props;
           closeButton.addEventListener('click', () => editionDialog.close());
           header.append(heading, closeButton);
           editionDialog.appendChild(header);
+
+          const summary = document.createElement('p');
+          summary.className = 'edition-summary';
+          summary.textContent = `Showing ${editions.length} of ${totalCount} editions, with the best matches first.`;
+          editionDialog.appendChild(summary);
 
           const list = document.createElement('div');
           list.className = 'edition-list';
@@ -806,7 +824,7 @@ const { libraryBooks = [] } = Astro.props;
                 selectedLink.href = edition.url;
                 selectedLink.hidden = false;
               }
-              button.textContent = 'Change edition';
+              button.textContent = `Change edition${book.editionCount ? ` (${book.editionCount})` : ''}`;
               editionDialog.close();
             });
             list.appendChild(option);
