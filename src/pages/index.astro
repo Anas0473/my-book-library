@@ -17,6 +17,12 @@ const planToRead = allBooks
   .filter((b) => b.data.status === "Plan to Read")
   .sort(naturalSort);
 const read = allBooks.filter((b) => b.data.status === "Read").sort(naturalSort);
+
+const splitAuthors = (author: string) =>
+  author
+    .split(/\s*(?:,|&|\band\b)\s*/i)
+    .map((name) => name.trim())
+    .filter(Boolean);
 ---
 
 <html lang="en">
@@ -209,19 +215,23 @@ const read = allBooks.filter((b) => b.data.status === "Read").sort(naturalSort);
       }
       main {
         flex: 1;
+        min-width: 0;
+        width: 100%;
       }
       .category-panel {
         display: none;
+        width: 100%;
       }
       .category-panel.active {
         display: block;
       }
       .controls {
-        display: flex;
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) max-content max-content;
         align-items: center;
-        flex-wrap: wrap;
         gap: 1rem;
         margin-bottom: 1.5rem;
+        width: 100%;
       }
       .batch-controls {
         display: flex;
@@ -234,6 +244,10 @@ const read = allBooks.filter((b) => b.data.status === "Read").sort(naturalSort);
       .batch-actions[hidden] {
         display: none;
       }
+      .batch-controls[hidden] {
+        display: flex;
+        visibility: hidden;
+      }
       .batch-actions {
         display: flex;
         align-items: center;
@@ -242,7 +256,7 @@ const read = allBooks.filter((b) => b.data.status === "Read").sort(naturalSort);
       }
       .batch-controls button,
       .batch-controls select {
-        min-height: 2.45rem;
+        height: 3rem;
         padding: 0.5rem 0.8rem;
         border: 1px solid #cbd5e1;
         border-radius: 6px;
@@ -278,6 +292,8 @@ const read = allBooks.filter((b) => b.data.status === "Read").sort(naturalSort);
       }
       .search-input,
       .sort-select {
+        height: 3rem;
+        box-sizing: border-box;
         padding: 0.5rem 0.8rem;
         border: 1px solid #cbd5e1;
         border-radius: 6px;
@@ -288,14 +304,18 @@ const read = allBooks.filter((b) => b.data.status === "Read").sort(naturalSort);
       .search-input {
         flex: 1;
       }
+      .sort-select {
+        width: auto;
+      }
       .search-input:focus,
       .sort-select:focus {
         border-color: #0070f3;
       }
       .cards-grid {
         display: grid;
-        grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+        grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
         gap: 1rem;
+        align-items: start;
       }
       .card {
         border: 1px solid #e2e8f0;
@@ -353,23 +373,23 @@ const read = allBooks.filter((b) => b.data.status === "Read").sort(naturalSort);
       }
       :global(.local-book-card .subtitle-text),
       .subtitle-text {
-        margin: 0 0 0.25rem;
-        font-size: 0.78rem;
+        margin: 0 0 0.4rem;
+        font-size: 0.9rem;
         color: #475569;
-        line-height: 1.3;
+        line-height: 1.35;
       }
       :global(.local-book-card .author-text) {
-        margin: 0 0 0.25rem;
+        margin: 0 0 0.55rem;
         font-size: 0.75rem;
         color: #64748b;
       }
       :global(.local-book-card .pub-date-text) {
-        margin: 0;
+        margin: 0 0 0.75rem;
         font-size: 0.7rem;
         color: #94a3b8;
       }
       :global(.local-book-card .edition-link-text) {
-        margin: 0.35rem 0 0.65rem;
+        margin: 0.15rem 0 0.65rem;
         font-size: 0.7rem;
       }
       :global(.local-book-card .edition-link-text a) {
@@ -433,12 +453,12 @@ const read = allBooks.filter((b) => b.data.status === "Read").sort(naturalSort);
         line-height: 1.3;
       }
       .author-text {
-        margin: 0 0 0.25rem 0;
+        margin: 0 0 0.55rem 0;
         font-size: 0.75rem;
         color: #64748b;
       }
       .pub-date-text {
-        margin: 0;
+        margin: 0 0 0.75rem;
         font-size: 0.7rem;
         color: #94a3b8;
       }
@@ -493,6 +513,7 @@ const read = allBooks.filter((b) => b.data.status === "Read").sort(naturalSort);
           box-shadow: 0 -4px 12px rgba(15, 23, 42, 0.08);
         }
         .controls {
+          display: flex;
           flex-direction: column;
           gap: 0.5rem;
           margin-bottom: 1rem;
@@ -500,6 +521,9 @@ const read = allBooks.filter((b) => b.data.status === "Read").sort(naturalSort);
         .batch-controls,
         .batch-actions {
           width: 100%;
+        }
+        .batch-controls[hidden] {
+          width: auto;
         }
         .batch-controls .search-input {
           box-sizing: border-box;
@@ -579,6 +603,7 @@ const read = allBooks.filter((b) => b.data.status === "Read").sort(naturalSort);
               author: data.author,
               isbn: data.isbn,
               status: data.status,
+              editionKey: (data as any).editionKey,
             }))}
           />
         </div>
@@ -641,6 +666,7 @@ const read = allBooks.filter((b) => b.data.status === "Read").sort(naturalSort);
                     data-content-book
                     data-status={book.data.status || ""}
                     data-isbn={book.data.isbn || ""}
+                    data-edition-key={(book.data as any).editionKey || ""}
                     data-title={book.data.title.toLowerCase()}
                     data-subtitle={(book.data.subtitle || "").toLowerCase()}
                     data-author={(book.data.author || "").toLowerCase()}
@@ -665,9 +691,28 @@ const read = allBooks.filter((b) => b.data.status === "Read").sort(naturalSort);
                       {book.data.subtitle && (
                         <p class="subtitle-text">{book.data.subtitle}</p>
                       )}
-                      {book.data.author && (
-                        <p class="author-text">{book.data.author}</p>
-                      )}
+                      <p class="author-text">
+                        {splitAuthors(book.data.author || "Unknown Author").map((author, index) => (
+                          author.toLowerCase() === "unknown author" ? (
+                            <Fragment>
+                              {index > 0 && ", "}
+                              Unknown Author
+                            </Fragment>
+                          ) : (
+                            <Fragment>
+                              {index > 0 && ", "}
+                              <a
+                                href={`?panel=search-db&query=${encodeURIComponent(author)}&author=1&author_exact=1`}
+                                class="author-search-link"
+                                data-author-query={author}
+                                data-author-exact="true"
+                              >
+                                {author}
+                              </a>
+                            </Fragment>
+                          )
+                        ))}
+                      </p>
                       {book.data.pubDate && (
                         <p class="pub-date-text">
                           Published: {book.data.pubDate}
@@ -680,6 +725,15 @@ const read = allBooks.filter((b) => b.data.status === "Read").sort(naturalSort);
                             ? "Currently Reading"
                             : "Read"}
                       </span>
+                      <button
+                        type="button"
+                        class="edition-button category-edition-button"
+                        data-title={book.data.title}
+                        data-author={book.data.author || ""}
+                        data-edition-key={(book.data as any).editionKey || ""}
+                      >
+                        Browse editions
+                      </button>
                     </div>
                   </a>
                 ))}
@@ -783,8 +837,8 @@ const read = allBooks.filter((b) => b.data.status === "Read").sort(naturalSort);
       }
 
       function isSameBook(first: any, second: any) {
-        if (first.editionKey && second.editionKey) {
-          return first.editionKey === second.editionKey;
+        if (first.editionKey || second.editionKey) {
+          return Boolean(first.editionKey && second.editionKey && first.editionKey === second.editionKey);
         }
         if (first.workKey && second.workKey && first.workKey === second.workKey) return true;
         if (first.workKey && first.workKey === second.key) return true;
@@ -912,6 +966,37 @@ const read = allBooks.filter((b) => b.data.status === "Read").sort(naturalSort);
         return control;
       }
 
+      function appendAuthorLinks(container: HTMLElement, authorValue: string) {
+        const author = document.createElement("span");
+        author.className = "author-text";
+        if (!authorValue || authorValue.trim().toLowerCase() === "unknown author") {
+          author.textContent = "Unknown Author";
+          container.appendChild(author);
+          return;
+        }
+        const authors = String(authorValue || "Unknown Author")
+          .split(/\s*(?:,|&|\band\b)\s*/i)
+          .map((name) => name.trim())
+          .filter(Boolean);
+
+        authors.forEach((name, index) => {
+          if (index > 0) author.appendChild(document.createTextNode(", "));
+          if (name.toLowerCase() === "unknown author") {
+            author.appendChild(document.createTextNode("Unknown Author"));
+            return;
+          }
+          const link = document.createElement("a");
+          link.href = `?panel=search-db&query=${encodeURIComponent(name)}&author=1&author_exact=1`;
+          link.className = "author-search-link";
+          link.dataset.authorQuery = name;
+          link.dataset.authorExact = "true";
+          link.textContent = name;
+          author.appendChild(link);
+        });
+
+        container.appendChild(author);
+      }
+
       function renderLocalBook(book: any) {
         if (!book?.title || !isShelfStatus(book.status)) return;
         const shelf = shelfDefinitions.find((item) => item.status === book.status)!;
@@ -973,12 +1058,7 @@ const read = allBooks.filter((b) => b.data.status === "Read").sort(naturalSort);
           details.appendChild(subtitle);
         }
 
-        if (book.author) {
-          const author = document.createElement("p");
-          author.className = "author-text";
-          author.textContent = book.author;
-          details.appendChild(author);
-        }
+        appendAuthorLinks(details, book.author || "Unknown Author");
         if (book.pubDate) {
           const pubDate = document.createElement("p");
           pubDate.className = "pub-date-text";
@@ -996,6 +1076,15 @@ const read = allBooks.filter((b) => b.data.status === "Read").sort(naturalSort);
           editionLink.appendChild(link);
           details.appendChild(editionLink);
         }
+        const editionButton = document.createElement("button");
+        editionButton.type = "button";
+        editionButton.className = "edition-button category-edition-button";
+        editionButton.dataset.title = book.title;
+        editionButton.dataset.author = book.author || "";
+        editionButton.dataset.work = book.workKey || "";
+        editionButton.dataset.editionKey = book.editionKey || "";
+        editionButton.textContent = "Browse editions";
+        details.appendChild(editionButton);
         if (book.openLibraryRemoved) {
           const removedNotice = document.createElement("span");
           removedNotice.className = "open-library-removed";
@@ -1235,14 +1324,150 @@ const read = allBooks.filter((b) => b.data.status === "Read").sort(naturalSort);
         );
       }
 
-      function persistPanel(target: string) {
+      document.addEventListener("click", (event) => {
+        const target = (event.target as HTMLElement).closest<HTMLAnchorElement>(
+          ".author-search-link",
+        );
+        if (!target) return;
+
+        event.preventDefault();
+        event.stopPropagation();
+        const query = target.dataset.authorQuery?.trim();
+        if (!query) return;
+
+        activatePanel("search-db");
+        const authorKey = target.dataset.authorKey?.trim() || "";
+        const authorExact = target.dataset.authorExact === "true";
+        persistPanel("search-db", query, true, authorKey, authorExact);
+        window.dispatchEvent(
+          new CustomEvent("book-library:author-search", {
+            detail: { query, authorOnly: true, authorKey, authorExact },
+          }),
+        );
+      });
+
+      const categoryEditionDialog = document.createElement("dialog");
+      categoryEditionDialog.className = "edition-dialog";
+      document.body.appendChild(categoryEditionDialog);
+
+      // Guards against a slower, earlier request overwriting a later click's results.
+      let editionRequestId = 0;
+
+      async function openCategoryEditions(button: HTMLButtonElement) {
+        const work = button.dataset.work || "";
+        const title = button.dataset.title || "";
+        const author = button.dataset.author || "";
+        const params = new URLSearchParams();
+        if (work) params.set("work", work);
+        else {
+          params.set("title", title);
+          if (author) params.set("author", author);
+        }
+
+        const requestId = ++editionRequestId;
+        button.disabled = true;
+        try {
+          const response = await fetch(`/api/book-editions.json?${params}`);
+          const data = await response.json();
+          const editions = Array.isArray(data.editions) ? data.editions : [];
+
+          if (requestId !== editionRequestId) return;
+
+          categoryEditionDialog.innerHTML = "";
+          const header = document.createElement("div");
+          header.className = "edition-dialog-header";
+          const heading = document.createElement("h3");
+          heading.textContent = `Editions of ${title}`;
+          const closeButton = document.createElement("button");
+          closeButton.type = "button";
+          closeButton.className = "edition-dialog-close";
+          closeButton.textContent = "Close";
+          closeButton.addEventListener("click", () => categoryEditionDialog.close());
+          header.append(heading, closeButton);
+          categoryEditionDialog.appendChild(header);
+
+          const list = document.createElement("div");
+          list.className = "edition-list";
+          editions.forEach((edition: any) => {
+            const option = document.createElement("button");
+            option.type = "button";
+            option.className = "edition-option";
+            const image = document.createElement("img");
+            image.alt = "";
+            if (edition.coverImage) image.src = edition.coverImage;
+            const details = document.createElement("span");
+            const editionTitle = document.createElement("strong");
+            editionTitle.textContent = edition.title;
+            const metadata = document.createElement("span");
+            metadata.textContent = [edition.language, edition.pubDate, edition.publisher]
+              .filter(Boolean)
+              .join(" · ");
+            details.append(editionTitle, metadata);
+            const saved = localBooks.some((book) => book.editionKey === edition.key);
+            const status = document.createElement("span");
+            status.className = "edition-choice-label";
+            status.textContent = saved ? "✓ Added" : "Open";
+            option.append(image, details, status);
+            option.addEventListener("click", () => window.open(edition.url, "_blank", "noopener"));
+            list.appendChild(option);
+          });
+
+          if (editions.length === 0) {
+            const empty = document.createElement("p");
+            empty.textContent = "No editions found.";
+            list.appendChild(empty);
+          }
+          categoryEditionDialog.appendChild(list);
+          categoryEditionDialog.showModal();
+        } finally {
+          button.disabled = false;
+        }
+      }
+
+      document.addEventListener("click", (event) => {
+        const button = (event.target as HTMLElement).closest<HTMLButtonElement>(
+          ".category-edition-button",
+        );
+        if (!button) return;
+        event.preventDefault();
+        event.stopPropagation();
+        openCategoryEditions(button);
+      });
+
+      function persistPanel(
+        target: string,
+        query?: string,
+        authorOnly = false,
+        authorKey = "",
+        authorExact = false,
+      ) {
         const params = new URLSearchParams(window.location.search);
         params.set("panel", target);
-        const query = params.toString();
+        if (query) {
+          params.set("query", query);
+        } else {
+          params.delete("query");
+        }
+        if (authorOnly) {
+          params.set("author", "1");
+        } else {
+          params.delete("author");
+        }
+        if (authorKey) {
+          params.set("author_key", authorKey);
+        } else {
+          params.delete("author_key");
+        }
+        if (authorExact) {
+          params.set("author_exact", "1");
+        } else {
+          params.delete("author_exact");
+        }
+        const urlQuery = params.toString();
         window.history.replaceState(
           null,
           "",
-          `${window.location.pathname}${query ? `?${query}` : ""}`,
+          `${window.location.pathname}${urlQuery ? `?${urlQuery}` : ""}`,
         );
       }
 
