@@ -403,6 +403,8 @@ const { libraryBooks = [] } = Astro.props;
   let currentPage = 1;
   let currentSort = searchSortSelect.value;
   let currentLanguage = '';
+  // Guards against an earlier, slower keystroke's search response overwriting a newer one.
+  let searchRequestId = 0;
   let currentAuthorOnly = false;
   let currentAuthorKey = '';
   let currentAuthorExact = false;
@@ -580,6 +582,8 @@ const { libraryBooks = [] } = Astro.props;
     summaryContainer.innerHTML = '';
     paginationContainer.innerHTML = '';
 
+    const requestId = ++searchRequestId;
+
     try {
       const authorParam = authorOnly ? '&author=1' : '';
       const authorKeyParam = authorKey ? `&author_key=${encodeURIComponent(authorKey)}` : '';
@@ -588,6 +592,8 @@ const { libraryBooks = [] } = Astro.props;
       const languageParam = language ? `&language=${encodeURIComponent(language)}` : '';
       const res = await fetch(`/api/search-books.json?q=${encodeURIComponent(query)}${authorParam}${authorKeyParam}${authorExactParam}${sortParam}${languageParam}&discover_languages=1&page=${page}&limit=${pageSize}`);
       const data = await res.json();
+
+      if (requestId !== searchRequestId) return;
 
       const { books = [], totalResults = 0, totalPages = 0, languages = [] } = data;
       const savedBooks = getSavedBooks();
@@ -606,11 +612,11 @@ const { libraryBooks = [] } = Astro.props;
       const workResults = books.filter((result: any) =>
         !savedWorkKeys.has(result.workKey || result.key),
       );
-      // Only append saved-book matches on the first page so they aren't repeated on every page.
+      // Prioritize saved editions on the first page so they aren't repeated on every page.
       const extraLocalMatches = page === 1
         ? localMatches.filter((book: any) => !workResults.some((result: any) => isSameBook(result, book)))
         : [];
-      const displayBooks = [...workResults, ...extraLocalMatches];
+      const displayBooks = [...extraLocalMatches, ...workResults];
       // Substitutions are 1-for-1 so they don't change the overall count.
       const displayTotalResults = totalResults;
       const languageNames: Record<string, string> = {
@@ -643,13 +649,21 @@ const { libraryBooks = [] } = Astro.props;
       resultsContainer.innerHTML = displayBooks.map((book: any, index: number) => {
         const matchedSavedBook = savedBooks.find((item: any) => isSameBook(item, book));
         const firstEditionKey = Array.isArray(book.editionKeys) ? book.editionKeys[0] : null;
+        const savedEditionKey = matchedSavedBook?.editionKey || book.editionKey;
+        const savedEditionId = String(savedEditionKey || '').match(/(?:^|\/)(?:books\/)?(OL\d+M)$/i)?.[1];
+        const coverImage = matchedSavedBook?.editionHeroImage
+          || book.editionHeroImage
+          || (savedEditionId
+            ? `https://covers.openlibrary.org/b/olid/${savedEditionId}-M.jpg?default=false`
+            : null)
+          || book.heroImage;
         const editionUrl = matchedSavedBook?.editionUrl
           || (firstEditionKey ? `https://openlibrary.org/books/${firstEditionKey}` : '');
         return `
         <div class="search-card">
           <div>
-            ${book.heroImage 
-              ? `<img src="${book.heroImage}" alt="${book.title}" />` 
+            ${coverImage
+              ? `<img src="${coverImage}" alt="${book.title}" />`
               : '<div style="height:200px; background:#f1f5f9; display:flex; align-items:center; justify-content:center; color:#94a3b8; font-size:0.75rem; margin-bottom:0.5rem; border-radius:4px;">NO IMAGE</div>'
             }
             <h5>${book.title}</h5>
