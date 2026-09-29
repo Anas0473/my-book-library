@@ -131,6 +131,19 @@ const { libraryBooks = [] } = Astro.props;
     border-radius: 4px;
     margin-bottom: 0.5rem;
   }
+  :global(.search-cover-placeholder) {
+    width: 100%;
+    height: 200px;
+    box-sizing: border-box;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 0.5rem;
+    border-radius: 4px;
+    background: #f1f5f9;
+    color: #94a3b8;
+    font-size: 0.75rem;
+  }
   :global(.search-card h5) {
     margin: 0 0 0.45rem 0;
     font-size: 0.9rem;
@@ -396,6 +409,15 @@ const { libraryBooks = [] } = Astro.props;
   const resultsContainer = document.getElementById('search-results') as HTMLElement;
   const summaryContainer = document.getElementById('search-summary') as HTMLElement;
   const paginationContainer = document.getElementById('pagination-controls') as HTMLElement;
+  resultsContainer.addEventListener('error', (event) => {
+    const image = event.target;
+    if (!(image instanceof HTMLImageElement) || !image.matches('.search-card img')) return;
+
+    const placeholder = document.createElement('div');
+    placeholder.className = 'search-cover-placeholder';
+    placeholder.textContent = 'NO IMAGE';
+    image.replaceWith(placeholder);
+  }, true);
   const libraryBooks = JSON.parse(searchContainer.dataset.libraryBooks || '[]') as any[];
   
   let debounceTimer: NodeJS.Timeout;
@@ -480,6 +502,7 @@ const { libraryBooks = [] } = Astro.props;
       editionKey: book.editionKey,
       editionUrl: book.editionUrl,
       editionHeroImage: book.editionHeroImage,
+      editionLanguage: book.editionLanguage,
       title: book.title,
       subtitle: book.subtitle,
       author: book.author,
@@ -602,9 +625,15 @@ const { libraryBooks = [] } = Astro.props;
         const title = String(book.title || '').toLowerCase();
         const subtitle = String(book.subtitle || '').toLowerCase();
         const author = String(book.author || '').toLowerCase();
-        return currentAuthorOnly
+        const matchesLanguage = !currentLanguage
+          || (book.editionLanguage
+            ? book.editionLanguage === currentLanguage
+            : books.some((result: any) =>
+                (result.workKey || result.key) === book.workKey && result.editionKey === book.editionKey,
+              ));
+        return matchesLanguage && (currentAuthorOnly
           ? author.includes(normalizedQuery)
-          : title.includes(normalizedQuery) || subtitle.includes(normalizedQuery) || author.includes(normalizedQuery);
+          : title.includes(normalizedQuery) || subtitle.includes(normalizedQuery) || author.includes(normalizedQuery));
       });
       const savedWorkKeys = new Set(
         localMatches.map((book: any) => book.workKey).filter(Boolean),
@@ -664,7 +693,7 @@ const { libraryBooks = [] } = Astro.props;
           <div>
             ${coverImage
               ? `<img src="${coverImage}" alt="${book.title}" />`
-              : '<div style="height:200px; background:#f1f5f9; display:flex; align-items:center; justify-content:center; color:#94a3b8; font-size:0.75rem; margin-bottom:0.5rem; border-radius:4px;">NO IMAGE</div>'
+              : '<div class="search-cover-placeholder">NO IMAGE</div>'
             }
             <h5>${book.title}</h5>
             ${book.subtitle ? `<p class="subtitle">${book.subtitle}</p>` : ''}
@@ -752,6 +781,7 @@ const { libraryBooks = [] } = Astro.props;
               book.editionKey = edition.key;
               book.editionUrl = edition.url;
               book.editionHeroImage = edition.coverImage;
+              book.editionLanguage = edition.language;
               book.title = edition.title;
               book.subtitle = edition.subtitle;
               book.pubDate = edition.pubDate;
@@ -762,6 +792,14 @@ const { libraryBooks = [] } = Astro.props;
               if (cardImage && edition.coverImage) {
                 cardImage.src = edition.coverImage;
                 cardImage.alt = edition.title;
+              } else if (edition.coverImage) {
+                const placeholder = card.querySelector('.search-cover-placeholder');
+                if (placeholder) {
+                  const selectedImage = document.createElement('img');
+                  selectedImage.src = edition.coverImage;
+                  selectedImage.alt = edition.title;
+                  placeholder.replaceWith(selectedImage);
+                }
               }
               const cardTitle = card.querySelector('h5');
               if (cardTitle) cardTitle.textContent = edition.title;
