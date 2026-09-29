@@ -557,7 +557,7 @@ const { libraryBooks = [] } = Astro.props;
     }[character] || character));
   }
 
-  function authorLinksMarkup(author: string, authorKeys: string[] = []) {
+  function authorLinksMarkup(author: string) {
     const authors = splitAuthors(author);
     if (authors.length === 0 || authors.every((name) => name.toLowerCase() === 'unknown author')) {
       return 'Unknown Author';
@@ -567,17 +567,12 @@ const { libraryBooks = [] } = Astro.props;
       if (name.toLowerCase() === 'unknown author') {
         return `${index > 0 ? ', ' : ''}Unknown Author`;
       }
-      const authorKey = authorKeys[index] || '';
-      const authorParams = authorKey
-        ? `author_key=${encodeURIComponent(authorKey)}`
-        : 'author_exact=1';
       return `
       ${index > 0 ? ', ' : ''}<a
-        href="?panel=search-db&query=${encodeURIComponent(name)}&author=1&${authorParams}"
+        href="?panel=search-db&query=${encodeURIComponent(name)}&author=1&author_exact=1"
         class="author-search-link"
         data-author-query="${escapeHtml(name)}"
-        data-author-key="${escapeHtml(authorKey)}"
-        data-author-exact="${authorKey ? 'false' : 'true'}"
+        data-author-exact="true"
       >${escapeHtml(name)}</a>
     `;
     }).join('');
@@ -648,7 +643,7 @@ const { libraryBooks = [] } = Astro.props;
         : [];
       const displayBooks = [...extraLocalMatches, ...workResults];
       // Substitutions are 1-for-1 so they don't change the overall count.
-      const displayTotalResults = totalResults;
+      const displayTotalResults = Math.max(totalResults, displayBooks.length);
       const languageNames: Record<string, string> = {
         ara: 'Arabic', dan: 'Danish', deu: 'German', eng: 'English',
         fas: 'Persian', fin: 'Finnish', fra: 'French', heb: 'Hebrew',
@@ -693,12 +688,12 @@ const { libraryBooks = [] } = Astro.props;
         <div class="search-card">
           <div>
             ${coverImage
-              ? `<img src="${coverImage}" alt="${book.title}" />`
+              ? `<img src="${coverImage}" alt="${book.title}" loading="${index === 0 ? 'eager' : 'lazy'}" decoding="async"${index === 0 ? ' fetchpriority="high"' : ''} />`
               : '<div class="search-cover-placeholder">NO IMAGE</div>'
             }
             <h5>${book.title}</h5>
             ${book.subtitle ? `<p class="subtitle">${book.subtitle}</p>` : ''}
-            <p class="author-text">${authorLinksMarkup(book.author || 'Unknown Author', book.authorKeys || [])}</p>
+            <p class="author-text">${authorLinksMarkup(book.author || 'Unknown Author')}</p>
             <p class="pub-date">${book.pubDate ? `Published: ${book.pubDate}` : 'Publication date unknown'}</p>
             <a class="selected-edition-link" href="${editionUrl || '#'}" target="_blank" rel="noopener noreferrer" ${editionUrl ? '' : 'hidden'}>Open selected edition</a>
             ${book.workKey ? `<button type="button" class="edition-button" data-book-index="${index}">Browse editions</button>` : ''}

@@ -754,6 +754,8 @@ const splitAuthors = (author: string) =>
                           class="cover-img"
                           alt={book.data.title}
                           referrerpolicy="no-referrer"
+                          loading="lazy"
+                          decoding="async"
                         />
                       ) : (
                         <div class="cover-placeholder">
@@ -1164,6 +1166,8 @@ const splitAuthors = (author: string) =>
           image.alt = book.title;
           image.className = "cover-img";
           image.referrerPolicy = "no-referrer";
+          image.loading = "lazy";
+          image.decoding = "async";
           if (selectedEditionImage && fallbackImage) {
             image.addEventListener("error", () => {
               image.src = fallbackImage;

@@ -1,10 +1,15 @@
 import type { APIRoute } from 'astro';
 
 // Finds the best matching edition, preferring editions with covers and then newer dates.
-async function findMatchingEdition(workKey: string, normalizedQuery: string, language?: string) {
+async function findMatchingEdition(
+  workKey: string,
+  normalizedQuery: string,
+  language?: string,
+  timeoutMs = 5000,
+) {
   try {
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 5000);
+    const timeout = setTimeout(() => controller.abort(), timeoutMs);
     const params = new URLSearchParams({
       limit: '100',
       fields: 'key,title,subtitle,publish_date,publishers,isbn_10,isbn_13,covers,languages',
@@ -65,6 +70,21 @@ async function findMatchingEdition(workKey: string, normalizedQuery: string, lan
   } catch {
     return null;
   }
+}
+
+const languageEditionCache = new Map<string, { expiresAt: number; edition: any | null }>();
+
+async function findEditionInLanguage(workKey: string, language: string) {
+  const cacheKey = `${workKey}:${language}`;
+  const cached = languageEditionCache.get(cacheKey);
+  if (cached && cached.expiresAt > Date.now()) return cached.edition;
+
+  const edition = await findMatchingEdition(workKey, '', language, 2500);
+  languageEditionCache.set(cacheKey, {
+    expiresAt: Date.now() + (edition ? 15 : 2) * 60 * 1000,
+    edition,
+  });
+  return edition;
 }
 
 export const GET: APIRoute = async ({ url }) => {
@@ -239,11 +259,30 @@ export const GET: APIRoute = async ({ url }) => {
           ),
         )
       : relevantDocs;
-    const languageOptions = Array.from(new Set(
-      authorMatchingDocs.flatMap((doc: any) => doc.language || []),
-    )).sort();
+    const languageEditionMatches = new Map<string, any>();
+    if (language) {
+      const untaggedDocs = authorMatchingDocs.filter((doc: any) =>
+        (!doc.language || doc.language.length === 0) && doc.key,
+      );
+      const lookupBatchSize = 30;
+      for (let offset = 0; offset < untaggedDocs.length; offset += lookupBatchSize) {
+        const batch = untaggedDocs.slice(offset, offset + lookupBatchSize);
+        const editions = await Promise.all(batch.map((doc: any) =>
+          findEditionInLanguage(String(doc.key).replace(/^\/+/, ''), language),
+        ));
+        batch.forEach((doc: any, index: number) => {
+          if (editions[index]) languageEditionMatches.set(String(doc.key), editions[index]);
+        });
+      }
+    }
+    const languageOptions = Array.from(new Set([
+      ...authorMatchingDocs.flatMap((doc: any) => doc.language || []),
+      ...(languageEditionMatches.size > 0 && language ? [language] : []),
+    ])).sort();
     const matchingDocs = language
-      ? authorMatchingDocs.filter((doc: any) => (doc.language || []).includes(language))
+      ? authorMatchingDocs.filter((doc: any) =>
+          (doc.language || []).includes(language) || languageEditionMatches.has(String(doc.key)),
+        )
       : authorMatchingDocs;
     const sortedDocs = shouldSort
       ? [...matchingDocs].sort((first: any, second: any) => {
@@ -276,8 +315,9 @@ export const GET: APIRoute = async ({ url }) => {
     const matchedEditions = isGeneralQuery || language
       ? await Promise.all(
           pageDocs.map((doc: any, index: number) => {
-            if (index >= editionLookupLimit || !doc.key) return null;
+            if ((!language && index >= editionLookupLimit) || !doc.key) return null;
             const docKey = String(doc.key);
+            if (language) return findEditionInLanguage(docKey.replace(/^\/+/, ''), language);
             return !language && fallbackEditionMatches.has(docKey)
               ? fallbackEditionMatches.get(docKey)
               : findMatchingEdition(docKey.replace(/^\/+/, ''), normalizedPhrase, language);
