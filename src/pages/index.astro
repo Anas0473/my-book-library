@@ -367,6 +367,15 @@ const read = allBooks.filter((b) => b.data.status === "Read").sort(naturalSort);
       :global(.local-book-card .edition-link-text a) {
         color: #39745b;
       }
+      :global(.local-book-card .open-library-removed) {
+        display: inline-block;
+        margin: 0.35rem 0 0;
+        padding: 0.2rem 0.4rem;
+        border-radius: 4px;
+        background: #f1f5f9;
+        color: #64748b;
+        font-size: 0.68rem;
+      }
       :global(.local-book-select) {
         display: none;
         align-items: center;
@@ -972,6 +981,12 @@ const read = allBooks.filter((b) => b.data.status === "Read").sort(naturalSort);
           editionLink.appendChild(link);
           details.appendChild(editionLink);
         }
+        if (book.openLibraryRemoved) {
+          const removedNotice = document.createElement("span");
+          removedNotice.className = "open-library-removed";
+          removedNotice.textContent = "No longer on Open Library";
+          details.appendChild(removedNotice);
+        }
 
         card.appendChild(details);
         card.appendChild(createShelfControl(book));
@@ -1059,11 +1074,6 @@ const read = allBooks.filter((b) => b.data.status === "Read").sort(naturalSort);
           const previousSyncedBooks = localBooks.filter(
             (book) => book.openLibrarySyncUsername === username,
           );
-          const nextBooks = localBooks.filter((book) => {
-            if (!book.openLibrarySyncUsername) return true;
-            if (book.openLibrarySyncUsername !== username) return false;
-            return incompleteStatuses.has(book.status);
-          });
 
           function matchesSyncedBook(existingBook: any, syncedBook: any) {
             if (existingBook.editionKey && syncedBook.editionKey) {
@@ -1077,6 +1087,19 @@ const read = allBooks.filter((b) => b.data.status === "Read").sort(naturalSort);
             return isSameBook(existingBook, syncedBook);
           }
 
+          const nextBooks = localBooks.flatMap((book) => {
+            if (!book.openLibrarySyncUsername) return [book];
+            if (book.openLibrarySyncUsername !== username) return [];
+            if (incompleteStatuses.has(book.status)) return [book];
+
+            const isStillOnOpenLibrary = syncedBooks.some((syncedBook: any) =>
+              matchesSyncedBook(book, syncedBook),
+            );
+            return isStillOnOpenLibrary
+              ? []
+              : [{ ...book, openLibraryRemoved: true }];
+          });
+
           syncedBooks.forEach((book: any) => {
             const previousSyncedBook = previousSyncedBooks.find((savedBook) =>
               matchesSyncedBook(savedBook, { ...book, openLibrarySyncUsername: username }),
@@ -1085,6 +1108,7 @@ const read = allBooks.filter((b) => b.data.status === "Read").sort(naturalSort);
               ...previousSyncedBook,
               ...book,
               openLibrarySyncUsername: username,
+              openLibraryRemoved: false,
             };
             const existingIndex = nextBooks.findIndex((savedBook) =>
               matchesSyncedBook(savedBook, syncedBook),
@@ -1107,12 +1131,21 @@ const read = allBooks.filter((b) => b.data.status === "Read").sort(naturalSort);
           const incompleteMessage = incompleteShelves
             .map((shelf: any) => `Open Library stopped paging the ${shelf.status} shelf; older synced books were kept`)
             .join(". ");
-          const syncResult = incompleteMessage
-            ? `Synced ${syncedBooks.length} books from ${username}. ${incompleteMessage}.`
+          const archivedCount = nextBooks.filter(
+            (book) => book.openLibrarySyncUsername === username && book.openLibraryRemoved,
+          ).length;
+          const syncWarnings = [
+            archivedCount > 0
+              ? `${archivedCount} books no longer on Open Library were kept here`
+              : "",
+            incompleteMessage,
+          ].filter(Boolean).join(". ");
+          const syncResult = syncWarnings
+            ? `Synced ${syncedBooks.length} books from ${username}. ${syncWarnings}.`
             : `Synced ${syncedBooks.length} books from ${username}.`;
-          localStorage.setItem(openLibraryLastSyncResultKey, incompleteMessage);
+          localStorage.setItem(openLibraryLastSyncResultKey, syncWarnings);
           openLibrarySyncStatus.textContent = syncResult;
-          openLibrarySyncMessage.textContent = incompleteMessage
+          openLibrarySyncMessage.textContent = syncWarnings
             ? syncResult
             : `Synced ${syncedBooks.length} books.`;
           updateOpenLibrarySyncLabel();
