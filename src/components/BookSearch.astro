@@ -79,7 +79,7 @@ const { libraryBooks = [] } = Astro.props;
   .search-summary {
     margin-top: 0.5rem;
     font-size: 0.85rem;
-    color: #64748b;
+    color: var(--page-foreground, #64748b);
   }
   .results-grid {
     display: grid;
@@ -120,6 +120,7 @@ const { libraryBooks = [] } = Astro.props;
     border-radius: 8px;
     padding: 0.8rem;
     background: #fff;
+    color: #1e293b;
     display: flex;
     flex-direction: column;
     justify-content: space-between;

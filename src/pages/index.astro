@@ -84,6 +84,47 @@ const splitAuthors = (author: string) =>
         color: #64748b;
         margin-bottom: 0.75rem;
       }
+      .theme-picker {
+        margin-top: 1.5rem;
+      }
+      .theme-picker h3 {
+        margin-bottom: 0.6rem;
+      }
+      .theme-custom-controls {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        margin-bottom: 0.7rem;
+      }
+      .theme-color-input {
+        width: 2rem;
+        height: 2rem;
+        flex: 0 0 2rem;
+        padding: 2px;
+        border: 1px solid #cbd5e1;
+        border-radius: 6px;
+        background: #fff;
+        cursor: pointer;
+      }
+      .theme-color-input::-webkit-color-swatch-wrapper {
+        padding: 1px;
+      }
+      .theme-color-input::-webkit-color-swatch {
+        border: 0;
+        border-radius: 3px;
+      }
+      .theme-rgb-input {
+        box-sizing: border-box;
+        width: 100%;
+        min-width: 0;
+        height: 2rem;
+        padding: 0.35rem 0.45rem;
+        border: 1px solid #cbd5e1;
+        border-radius: 6px;
+        color: #334155;
+        font: inherit;
+        font-size: 0.75rem;
+      }
       .category-btn {
         display: flex;
         align-items: center;
@@ -480,6 +521,24 @@ const splitAuthors = (author: string) =>
       .mobile-nav {
         display: none;
       }
+      body,
+      header h1,
+      sidebar h3,
+      .category-btn,
+      .open-library-sync-status,
+      .empty-msg {
+        color: var(--page-foreground, #1e293b);
+      }
+      .category-btn.search-tab {
+        border-color: var(--page-foreground, #0070f3);
+      }
+      .category-btn.search-tab:not(.active) {
+        color: var(--page-foreground, #0070f3);
+      }
+      .card,
+      :global(.local-book-card) {
+        color: #1e293b;
+      }
 
       @media (max-width: 700px) {
         body {
@@ -493,7 +552,17 @@ const splitAuthors = (author: string) =>
           display: block;
         }
         sidebar {
+          display: block;
+          margin-bottom: 1rem;
+        }
+        sidebar > :not(.theme-picker) {
           display: none;
+        }
+        .theme-picker {
+          margin-top: 0;
+        }
+        .theme-picker h3 {
+          margin-bottom: 0.4rem;
         }
         main {
           width: 100%;
@@ -592,6 +661,13 @@ const splitAuthors = (author: string) =>
         <button class="category-btn" data-target="read"
           >Read <span class="category-count">{read.length}</span></button
         >
+        <section class="theme-picker" aria-labelledby="theme-picker-title">
+          <h3 id="theme-picker-title">Background</h3>
+          <div class="theme-custom-controls">
+            <input class="theme-color-input" id="theme-color-input" type="color" value="#ffffff" aria-label="Choose a custom background color" />
+            <input class="theme-rgb-input" id="theme-rgb-input" type="text" inputmode="text" placeholder="RGB or #hex" aria-label="RGB values or hex color" autocomplete="off" />
+          </div>
+        </section>
       </sidebar>
 
       <main>
@@ -791,6 +867,61 @@ const splitAuthors = (author: string) =>
       const openLibrarySyncMessage = document.getElementById("open-library-sync-message") as HTMLElement;
       const openLibrarySyncSubmit = document.getElementById("open-library-sync-submit") as HTMLButtonElement;
       const openLibrarySyncCancel = document.getElementById("open-library-sync-cancel") as HTMLButtonElement;
+      const backgroundPreferenceKey = "my-book-library:page-background";
+      const backgroundColorInput = document.getElementById("theme-color-input") as HTMLInputElement;
+      const backgroundRgbInput = document.getElementById("theme-rgb-input") as HTMLInputElement;
+      const savedBackground = localStorage.getItem(backgroundPreferenceKey);
+      const selectedBackground = /^#[0-9a-f]{6}$/i.test(savedBackground || "")
+        ? savedBackground || "#ffffff"
+        : "#ffffff";
+      function setPageForeground(background: string) {
+        const channels = background.match(/[0-9a-f]{2}/gi)?.map((channel) => parseInt(channel, 16) / 255) || [1, 1, 1];
+        const luminance = channels
+          .map((channel) => channel <= 0.04045 ? channel / 12.92 : ((channel + 0.055) / 1.055) ** 2.4)
+          .reduce((sum, channel, index) => sum + channel * [0.2126, 0.7152, 0.0722][index], 0);
+        const darkContrast = (luminance + 0.05) / 0.058;
+        const lightContrast = 1.05 / (luminance + 0.05);
+        document.body.style.setProperty(
+          "--page-foreground",
+          lightContrast > darkContrast ? "#ffffff" : "#0f172a",
+        );
+      }
+
+      function setPageBackground(background: string) {
+        document.body.style.backgroundColor = background;
+        setPageForeground(background);
+        localStorage.setItem(backgroundPreferenceKey, background);
+        backgroundColorInput.value = background;
+        const rgb = background.match(/[0-9a-f]{2}/gi) || [];
+        backgroundRgbInput.value = rgb.map((value) => parseInt(value, 16)).join(", ");
+        backgroundRgbInput.setCustomValidity("");
+      }
+
+      setPageBackground(selectedBackground);
+
+      backgroundColorInput.addEventListener("input", () => {
+        setPageBackground(backgroundColorInput.value);
+      });
+      backgroundRgbInput.addEventListener("change", () => {
+        const inputValue = backgroundRgbInput.value.trim();
+        const hexValue = inputValue.match(/^#?([0-9a-f]{3}|[0-9a-f]{6})$/i)?.[1];
+        const rgbValues = inputValue.match(/^rgb\(\s*(\d{1,3})\s*,\s*(\d{1,3})\s*,\s*(\d{1,3})\s*\)$/i)
+          || inputValue.match(/^(\d{1,3})\s*,\s*(\d{1,3})\s*,\s*(\d{1,3})$/);
+        const channels = rgbValues?.slice(1).map(Number);
+        if (!hexValue && (!channels || channels.some((channel) => channel > 255))) {
+          backgroundRgbInput.setCustomValidity("Enter a hex color or three RGB values from 0 to 255.");
+          backgroundRgbInput.reportValidity();
+          return;
+        }
+        if (hexValue) {
+          const fullHex = hexValue.length === 3
+            ? hexValue.split("").map((channel) => channel + channel).join("")
+            : hexValue;
+          setPageBackground(`#${fullHex.toLowerCase()}`);
+        } else {
+          setPageBackground(`#${channels?.map((channel) => channel.toString(16).padStart(2, "0")).join("")}`);
+        }
+      });
       const shelfDefinitions = [
         { id: "plan-to-read", status: "Plan to Read", label: "Want to Read" },
         { id: "reading", status: "Reading", label: "Currently Reading" },
