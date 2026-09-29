@@ -501,6 +501,12 @@ const read = allBooks.filter((b) => b.data.status === "Read").sort(naturalSort);
         .batch-actions {
           width: 100%;
         }
+        .batch-controls .search-input {
+          box-sizing: border-box;
+          flex: 1 1 100%;
+          min-width: 0;
+          width: 100%;
+        }
         .batch-actions {
           gap: 0.35rem;
         }

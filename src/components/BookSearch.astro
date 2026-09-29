@@ -189,10 +189,14 @@ const { libraryBooks = [] } = Astro.props;
       padding: 0.65rem;
     }
     :global(.search-card > div) {
+      min-width: 0;
       display: grid;
       grid-template-columns: 76px minmax(0, 1fr);
       grid-template-rows: auto auto auto;
       column-gap: 0.75rem;
+    }
+    :global(.search-card .shelf-control) {
+      min-width: 0;
     }
     :global(.search-card img) {
       grid-row: 1 / 4;
@@ -212,6 +216,11 @@ const { libraryBooks = [] } = Astro.props;
     }
     :global(.shelf-control button) {
       font-size: 0.72rem;
+    }
+    :global(.shelf-control .shelf-primary) {
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
     }
     .pagination {
       gap: 0.5rem;
