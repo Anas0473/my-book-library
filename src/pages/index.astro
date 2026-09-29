@@ -808,8 +808,10 @@ const splitAuthors = (author: string) =>
                         data-title={book.data.title}
                         data-author={book.data.author || ""}
                         data-edition-key={(book.data as any).editionKey || ""}
+                        data-edition-count={(book.data as any).editionCount || ""}
+                        data-edition-language={(book.data as any).editionLanguage || ""}
                       >
-                        Browse editions
+                        {`Browse editions${(book.data as any).editionCount ? ` (${(book.data as any).editionCount})` : ""}`}
                       </button>
                     </div>
                   </a>
@@ -1217,7 +1219,9 @@ const splitAuthors = (author: string) =>
         editionButton.dataset.author = book.author || "";
         editionButton.dataset.work = book.workKey || "";
         editionButton.dataset.editionKey = book.editionKey || "";
-        editionButton.textContent = "Browse editions";
+        editionButton.dataset.editionCount = String(Number(book.editionCount) || 0);
+        editionButton.dataset.editionLanguage = book.editionLanguage || "";
+        editionButton.textContent = `Browse editions${book.editionCount ? ` (${book.editionCount})` : ""}`;
         details.appendChild(editionButton);
         if (book.openLibraryRemoved) {
           const removedNotice = document.createElement("span");
@@ -1497,6 +1501,10 @@ const splitAuthors = (author: string) =>
           params.set("title", title);
           if (author) params.set("author", author);
         }
+        const preferredEdition = button.dataset.editionKey || "";
+        const language = button.dataset.editionLanguage || "";
+        if (preferredEdition) params.set("preferred_edition", preferredEdition);
+        if (language) params.set("language", language);
 
         const requestId = ++editionRequestId;
         button.disabled = true;
@@ -1504,6 +1512,11 @@ const splitAuthors = (author: string) =>
           const response = await fetch(`/api/book-editions.json?${params}`);
           const data = await response.json();
           const editions = Array.isArray(data.editions) ? data.editions : [];
+          const editionCount = Number(data.totalCount) || editions.length || Number(button.dataset.editionCount) || 0;
+          if (editionCount > 0) {
+            button.dataset.editionCount = String(editionCount);
+            button.textContent = `Browse editions (${editionCount})`;
+          }
 
           if (requestId !== editionRequestId) return;
 
@@ -1519,6 +1532,11 @@ const splitAuthors = (author: string) =>
           closeButton.addEventListener("click", () => categoryEditionDialog.close());
           header.append(heading, closeButton);
           categoryEditionDialog.appendChild(header);
+
+          const summary = document.createElement("p");
+          summary.className = "edition-summary";
+          summary.textContent = `Showing ${editions.length} of ${editionCount} editions, with the best matches first.`;
+          categoryEditionDialog.appendChild(summary);
 
           const list = document.createElement("div");
           list.className = "edition-list";

@@ -6,6 +6,7 @@ async function findMatchingEdition(
   normalizedQuery: string,
   language?: string,
   timeoutMs = 5000,
+  preferNewest = false,
 ) {
   try {
     const controller = new AbortController();
@@ -55,16 +56,13 @@ async function findMatchingEdition(
         publicationTime(second) - publicationTime(first),
       )[0] || null;
     };
-    const exactTitleMatches = languageEntries.filter(
-      (edition: any) => normalizedTitle(edition) === normalizedQuery,
-    );
-    const partialTitleMatches = languageEntries.filter(
+    const titleMatches = languageEntries.filter(
       (edition: any) => normalizedTitle(edition).includes(normalizedQuery),
     );
+    if (preferNewest) return newestWithCover(titleMatches) || newestWithCover(languageEntries);
     return (
       (language ? newestWithCover(languageEntries) : null) ||
-      newestWithCover(exactTitleMatches) ||
-      newestWithCover(partialTitleMatches) ||
+      newestWithCover(titleMatches) ||
       null
     );
   } catch {
@@ -193,7 +191,7 @@ export const GET: APIRoute = async ({ url }) => {
     const searchParams = new URLSearchParams({
       [authorKey ? 'author_key' : authorOnly ? 'author' : query.trim().split(/\s+/).length > 1 ? 'q' : 'title']:
         authorKey || query,
-      fields: 'title,subtitle,author_name,author_key,language,first_publish_year,cover_i,isbn,key,edition_key',
+      fields: 'title,subtitle,author_name,author_key,language,first_publish_year,cover_i,isbn,key,edition_key,edition_count',
       limit: String(shouldSort || authorExact || language || discoverLanguages ? 1000 : limit),
       offset: String(shouldSort || authorExact || language || discoverLanguages ? 0 : offset),
     });
@@ -317,10 +315,12 @@ export const GET: APIRoute = async ({ url }) => {
           pageDocs.map((doc: any, index: number) => {
             if ((!language && index >= editionLookupLimit) || !doc.key) return null;
             const docKey = String(doc.key);
-            if (language) return findEditionInLanguage(docKey.replace(/^\/+/, ''), language);
+            if (language) {
+              return findMatchingEdition(docKey.replace(/^\/+/, ''), normalizedPhrase, language, 2500, true);
+            }
             return !language && fallbackEditionMatches.has(docKey)
               ? fallbackEditionMatches.get(docKey)
-              : findMatchingEdition(docKey.replace(/^\/+/, ''), normalizedPhrase, language);
+              : findMatchingEdition(docKey.replace(/^\/+/, ''), normalizedPhrase, language, 2500, true);
           }),
         )
       : pageDocs.map(() => null);
@@ -330,10 +330,10 @@ export const GET: APIRoute = async ({ url }) => {
       return {
         key: doc.key,
         workKey: doc.key,
-        editionKey: language && edition?.key ? edition.key : null,
-        editionUrl: language && edition?.key ? `https://openlibrary.org${edition.key}` : null,
-        editionLanguage: language && edition ? language : null,
-        editionHeroImage: language && edition?.covers?.[0]
+        editionKey: edition?.key || null,
+        editionUrl: edition?.key ? `https://openlibrary.org${edition.key}` : null,
+        editionLanguage: edition?.languages?.[0]?.key?.split('/').pop() || (language && edition ? language : null),
+        editionHeroImage: edition?.covers?.[0]
           ? `https://covers.openlibrary.org/b/id/${edition.covers[0]}-M.jpg`
           : null,
         title: edition?.title || doc.title,
@@ -341,7 +341,10 @@ export const GET: APIRoute = async ({ url }) => {
         author: doc.author_name ? doc.author_name.join(', ') : 'Unknown Author',
         authorKeys: doc.author_key || [],
         editionKeys: edition?.key ? [edition.key.replace(/^\/?books\//i, '')] : (doc.edition_key || []),
-        languages: language && edition ? [language] : doc.language || [],
+        editionCount: Number(doc.edition_count) || doc.edition_key?.length || 0,
+        languages: edition?.languages?.length
+          ? edition.languages.map((item: any) => item.key?.split('/').pop()).filter(Boolean)
+          : doc.language || [],
         pubDate: edition?.publish_date || doc.first_publish_year || 'Unknown',
         isbn: edition?.isbn_13?.[0] || edition?.isbn_10?.[0] || (doc.isbn ? doc.isbn[0] : null),
         heroImage: edition?.covers?.[0]
