@@ -5,6 +5,7 @@ interface Props {
     author?: string;
     isbn?: string;
     status?: string;
+    editionKey?: string;
   }>;
 }
 
@@ -12,11 +13,22 @@ const { libraryBooks = [] } = Astro.props;
 ---
 
 <div class="search-container" data-library-books={JSON.stringify(libraryBooks)}>
-  <input
-    type="text"
-    id="global-book-search"
-    placeholder="Search by title, author, or subtitle"
-  />
+  <div class="search-controls">
+    <input
+      type="text"
+      id="global-book-search"
+      placeholder="Search by title, author, or subtitle"
+    />
+    <select id="search-sort-select" aria-label="Sort search results">
+      <option value="title-asc">Title: A to Z</option>
+      <option value="title-desc">Title: Z to A</option>
+      <option value="year-desc">Year: Newest First</option>
+      <option value="year-asc">Year: Oldest First</option>
+    </select>
+    <select id="search-language-select" aria-label="Filter by language" disabled>
+      <option value="">Languages found after searching</option>
+    </select>
+  </div>
   <div id="search-summary" class="search-summary"></div>
   <div id="search-results" class="results-grid"></div>
   <div id="pagination-controls" class="pagination"></div>
@@ -26,8 +38,14 @@ const { libraryBooks = [] } = Astro.props;
   .search-container {
     margin-bottom: 1.5rem;
   }
+  .search-controls {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+  }
   #global-book-search {
     width: 100%;
+    height: 3rem;
     padding: 0.8rem 1rem;
     font-size: 1rem;
     border: 1px solid #cbd5e1;
@@ -37,6 +55,26 @@ const { libraryBooks = [] } = Astro.props;
   }
   #global-book-search:focus {
     border-color: #0070f3;
+  }
+  #search-sort-select {
+    flex: 0 0 220px;
+    height: 3rem;
+    padding: 0.5rem 0.8rem;
+    border: 1px solid #cbd5e1;
+    border-radius: 6px;
+    background: #fff;
+    color: #334155;
+    font-size: 0.9rem;
+  }
+  #search-language-select {
+    flex: 0 0 220px;
+    height: 3rem;
+    padding: 0.5rem 0.8rem;
+    border: 1px solid #cbd5e1;
+    border-radius: 6px;
+    background: #fff;
+    color: #334155;
+    font-size: 0.9rem;
   }
   .search-summary {
     margin-top: 0.5rem;
@@ -94,18 +132,116 @@ const { libraryBooks = [] } = Astro.props;
     margin-bottom: 0.5rem;
   }
   :global(.search-card h5) {
-    margin: 0 0 0.25rem 0;
+    margin: 0 0 0.45rem 0;
     font-size: 0.9rem;
   }
   :global(.search-card p) {
-    margin: 0 0 0.25rem 0;
+    margin: 0 0 0.4rem 0;
     font-size: 0.75rem;
     color: #64748b;
   }
+  :global(.search-card p.subtitle) {
+    font-size: 0.82rem;
+    line-height: 1.35;
+  }
+  :global(.search-card p.author-text) {
+    margin-bottom: 0.55rem;
+  }
   :global(.search-card p.pub-date) {
-    margin-bottom: 0.5rem;
+    margin-bottom: 0.75rem;
     font-size: 0.7rem;
     color: #94a3b8;
+  }
+  :global(.edition-button),
+  :global(.selected-edition-link) {
+    display: inline-block;
+    margin: 0.2rem 0 0.5rem;
+    color: #39745b;
+    font-size: 0.7rem;
+  }
+  :global(.edition-button) {
+    padding: 0;
+    border: 0;
+    background: transparent;
+    text-decoration: underline;
+    cursor: pointer;
+  }
+  :global(.selected-edition-link[hidden]) {
+    display: none;
+  }
+  :global(.edition-dialog) {
+    width: min(42rem, calc(100% - 2rem));
+    max-height: min(80vh, 42rem);
+    padding: 1rem;
+    border: 1px solid #cbd5e1;
+    border-radius: 8px;
+    background: #fff;
+    color: #334155;
+  }
+  :global(.edition-dialog::backdrop) {
+    background: rgba(15, 23, 42, 0.4);
+  }
+  :global(.edition-dialog-header) {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    margin-bottom: 0.75rem;
+  }
+  :global(.edition-dialog-header h3) {
+    margin: 0;
+    font-size: 1rem;
+  }
+  :global(.edition-dialog-close) {
+    padding: 0.25rem 0.5rem;
+    border: 1px solid #cbd5e1;
+    border-radius: 4px;
+    background: #fff;
+    cursor: pointer;
+  }
+  :global(.edition-list) {
+    display: grid;
+    gap: 0.65rem;
+    overflow-y: auto;
+  }
+  :global(.edition-option) {
+    display: grid;
+    grid-template-columns: 3.5rem minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.5rem;
+    border: 1px solid #e2e8f0;
+    border-radius: 6px;
+    background: #fff;
+    text-align: left;
+    cursor: pointer;
+  }
+  :global(.edition-option:hover) {
+    border-color: #39745b;
+    background: #f8fafc;
+  }
+  :global(.edition-option img) {
+    width: 3.5rem;
+    height: 4.5rem;
+    object-fit: contain;
+    background: #f1f5f9;
+  }
+  :global(.edition-option strong),
+  :global(.edition-option span) {
+    display: block;
+  }
+  :global(.edition-option strong) {
+    font-size: 0.8rem;
+  }
+  :global(.edition-choice-label) {
+    color: #39745b !important;
+    font-weight: 600;
+    white-space: nowrap;
+  }
+  :global(.edition-option span) {
+    margin-top: 0.2rem;
+    color: #64748b;
+    font-size: 0.7rem;
   }
   :global(.shelf-control) {
     display: flex;
@@ -178,6 +314,19 @@ const { libraryBooks = [] } = Astro.props;
   }
 
   @media (max-width: 700px) {
+    .search-controls {
+      flex-direction: column;
+      align-items: stretch;
+      gap: 0.5rem;
+    }
+    #search-sort-select {
+      flex-basis: auto;
+      width: 100%;
+    }
+    #search-language-select {
+      flex-basis: auto;
+      width: 100%;
+    }
     .results-grid {
       grid-template-columns: 1fr;
       gap: 0.75rem;
@@ -211,6 +360,10 @@ const { libraryBooks = [] } = Astro.props;
     :global(.search-card p) {
       font-size: 0.68rem;
     }
+    :global(.search-card p.subtitle) {
+      font-size: 0.76rem;
+      line-height: 1.3;
+    }
     :global(.search-card p.pub-date) {
       font-size: 0.62rem;
     }
@@ -238,6 +391,8 @@ const { libraryBooks = [] } = Astro.props;
 <script>
   const searchContainer = document.querySelector('.search-container') as HTMLElement;
   const searchInput = document.getElementById('global-book-search') as HTMLInputElement;
+  const searchSortSelect = document.getElementById('search-sort-select') as HTMLSelectElement;
+  const searchLanguageSelect = document.getElementById('search-language-select') as HTMLSelectElement;
   const resultsContainer = document.getElementById('search-results') as HTMLElement;
   const summaryContainer = document.getElementById('search-summary') as HTMLElement;
   const paginationContainer = document.getElementById('pagination-controls') as HTMLElement;
@@ -246,6 +401,11 @@ const { libraryBooks = [] } = Astro.props;
   let debounceTimer: NodeJS.Timeout;
   let currentQuery = '';
   let currentPage = 1;
+  let currentSort = searchSortSelect.value;
+  let currentLanguage = '';
+  let currentAuthorOnly = false;
+  let currentAuthorKey = '';
+  let currentAuthorExact = false;
   const pageSize = 16;
   const savedBooksKey = 'my-book-library:books';
   const legacySavedBooksKey = 'my-book-library:plan-to-read';
@@ -275,8 +435,8 @@ const { libraryBooks = [] } = Astro.props;
   }
 
   function isSameBook(first: any, second: any) {
-    if (first.editionKey && second.editionKey) {
-      return first.editionKey === second.editionKey;
+    if (first.editionKey || second.editionKey) {
+      return Boolean(first.editionKey && second.editionKey && first.editionKey === second.editionKey);
     }
     if (first.workKey && second.workKey && first.workKey === second.workKey) return true;
     if (first.workKey && first.workKey === second.key) return true;
@@ -354,30 +514,138 @@ const { libraryBooks = [] } = Astro.props;
     });
   }
 
-  async function performSearch(query: string, page: number = 1) {
+  function splitAuthors(author: string) {
+    return String(author || 'Unknown Author')
+      .split(/\s*(?:,|&|\band\b)\s*/i)
+      .map((name) => name.trim())
+      .filter(Boolean);
+  }
+
+  function escapeHtml(value: string) {
+    return value.replace(/[&<>'"]/g, (character) => ({
+      '&': '&amp;',
+      '<': '&lt;',
+      '>': '&gt;',
+      "'": '&#39;',
+      '"': '&quot;',
+    }[character] || character));
+  }
+
+  function authorLinksMarkup(author: string, authorKeys: string[] = []) {
+    const authors = splitAuthors(author);
+    if (authors.length === 0 || authors.every((name) => name.toLowerCase() === 'unknown author')) {
+      return 'Unknown Author';
+    }
+
+    return authors.map((name, index) => {
+      if (name.toLowerCase() === 'unknown author') {
+        return `${index > 0 ? ', ' : ''}Unknown Author`;
+      }
+      const authorKey = authorKeys[index] || '';
+      const authorParams = authorKey
+        ? `author_key=${encodeURIComponent(authorKey)}`
+        : 'author_exact=1';
+      return `
+      ${index > 0 ? ', ' : ''}<a
+        href="?panel=search-db&query=${encodeURIComponent(name)}&author=1&${authorParams}"
+        class="author-search-link"
+        data-author-query="${escapeHtml(name)}"
+        data-author-key="${escapeHtml(authorKey)}"
+        data-author-exact="${authorKey ? 'false' : 'true'}"
+      >${escapeHtml(name)}</a>
+    `;
+    }).join('');
+  }
+
+  async function performSearch(
+    query: string,
+    page: number = 1,
+    authorOnly = false,
+    authorKey = '',
+    authorExact = false,
+    sort = currentSort,
+    language = currentLanguage,
+  ) {
     currentQuery = query;
     currentPage = page;
+    currentSort = sort;
+    currentLanguage = language;
+    currentAuthorOnly = authorOnly;
+    currentAuthorKey = authorKey;
+    currentAuthorExact = authorExact;
+    searchSortSelect.value = sort;
+    searchLanguageSelect.value = language;
 
     resultsContainer.innerHTML = '<p>Searching...</p>';
     summaryContainer.innerHTML = '';
     paginationContainer.innerHTML = '';
 
     try {
-      const res = await fetch(`/api/search-books.json?q=${encodeURIComponent(query)}&page=${page}&limit=${pageSize}`);
+      const authorParam = authorOnly ? '&author=1' : '';
+      const authorKeyParam = authorKey ? `&author_key=${encodeURIComponent(authorKey)}` : '';
+      const authorExactParam = authorExact ? '&author_exact=1' : '';
+      const sortParam = `&sort=${encodeURIComponent(sort)}`;
+      const languageParam = language ? `&language=${encodeURIComponent(language)}` : '';
+      const res = await fetch(`/api/search-books.json?q=${encodeURIComponent(query)}${authorParam}${authorKeyParam}${authorExactParam}${sortParam}${languageParam}&discover_languages=1&page=${page}&limit=${pageSize}`);
       const data = await res.json();
 
-      const { books = [], totalResults = 0, totalPages = 0 } = data;
+      const { books = [], totalResults = 0, totalPages = 0, languages = [] } = data;
+      const savedBooks = getSavedBooks();
+      const normalizedQuery = query.toLowerCase();
+      const localMatches = savedBooks.filter((book: any) => {
+        const title = String(book.title || '').toLowerCase();
+        const subtitle = String(book.subtitle || '').toLowerCase();
+        const author = String(book.author || '').toLowerCase();
+        return currentAuthorOnly
+          ? author.includes(normalizedQuery)
+          : title.includes(normalizedQuery) || subtitle.includes(normalizedQuery) || author.includes(normalizedQuery);
+      });
+      const savedWorkKeys = new Set(
+        localMatches.map((book: any) => book.workKey).filter(Boolean),
+      );
+      const workResults = books.filter((result: any) =>
+        !savedWorkKeys.has(result.workKey || result.key),
+      );
+      // Only append saved-book matches on the first page so they aren't repeated on every page.
+      const extraLocalMatches = page === 1
+        ? localMatches.filter((book: any) => !workResults.some((result: any) => isSameBook(result, book)))
+        : [];
+      const displayBooks = [...workResults, ...extraLocalMatches];
+      // Substitutions are 1-for-1 so they don't change the overall count.
+      const displayTotalResults = totalResults;
+      const languageNames: Record<string, string> = {
+        ara: 'Arabic', dan: 'Danish', deu: 'German', eng: 'English',
+        fas: 'Persian', fin: 'Finnish', fra: 'French', heb: 'Hebrew',
+        ita: 'Italian', jpn: 'Japanese', nld: 'Dutch', nor: 'Norwegian',
+        por: 'Portuguese', spa: 'Spanish', swe: 'Swedish', tur: 'Turkish',
+        und: 'Unknown',
+      };
+      searchLanguageSelect.innerHTML = '<option value="">All languages</option>';
+      languages.forEach((code: string) => {
+        const option = document.createElement('option');
+        option.value = code;
+        option.textContent = languageNames[code] || code.toUpperCase();
+        searchLanguageSelect.appendChild(option);
+      });
+      searchLanguageSelect.disabled = languages.length === 0;
+      searchLanguageSelect.value = languages.includes(language) ? language : '';
+      currentLanguage = searchLanguageSelect.value;
 
-      if (!books || books.length === 0) {
+      if (displayBooks.length === 0) {
         resultsContainer.innerHTML = '<p>No books found.</p>';
         return;
       }
 
       const startItem = (page - 1) * pageSize + 1;
-      const endItem = Math.min(page * pageSize, totalResults);
-      summaryContainer.innerHTML = `Showing ${startItem}–${endItem} of ${totalResults} results`;
+      const endItem = startItem + displayBooks.length - 1;
+      summaryContainer.innerHTML = `Showing ${startItem}–${endItem} of ${displayTotalResults} results`;
 
-      resultsContainer.innerHTML = books.map((book: any) => `
+      resultsContainer.innerHTML = displayBooks.map((book: any, index: number) => {
+        const matchedSavedBook = savedBooks.find((item: any) => isSameBook(item, book));
+        const firstEditionKey = Array.isArray(book.editionKeys) ? book.editionKeys[0] : null;
+        const editionUrl = matchedSavedBook?.editionUrl
+          || (firstEditionKey ? `https://openlibrary.org/books/${firstEditionKey}` : '');
+        return `
         <div class="search-card">
           <div>
             ${book.heroImage 
@@ -386,8 +654,10 @@ const { libraryBooks = [] } = Astro.props;
             }
             <h5>${book.title}</h5>
             ${book.subtitle ? `<p class="subtitle">${book.subtitle}</p>` : ''}
-            <p>${book.author || 'Unknown Author'}</p>
+            <p class="author-text">${authorLinksMarkup(book.author || 'Unknown Author', book.authorKeys || [])}</p>
             <p class="pub-date">${book.pubDate ? `Published: ${book.pubDate}` : 'Publication date unknown'}</p>
+            <a class="selected-edition-link" href="${editionUrl || '#'}" target="_blank" rel="noopener noreferrer" ${editionUrl ? '' : 'hidden'}>Open selected edition</a>
+            ${book.workKey ? `<button type="button" class="edition-button" data-book-index="${index}">Browse editions</button>` : ''}
           </div>
           <div class="shelf-control">
             <button type="button" class="shelf-primary">Want to Read</button>
@@ -401,11 +671,120 @@ const { libraryBooks = [] } = Astro.props;
             </div>
           </div>
         </div>
-      `).join('');
+      `;
+      }).join('');
 
-      const savedBooks = getSavedBooks();
+      document.querySelectorAll('.search-edition-dialog').forEach((dialog) => dialog.remove());
+      const editionDialog = document.createElement('dialog');
+      editionDialog.className = 'edition-dialog search-edition-dialog';
+      document.body.appendChild(editionDialog);
+
+      async function openEditionPicker(book: any, card: HTMLElement, button: HTMLButtonElement) {
+        button.disabled = true;
+        button.textContent = 'Loading editions...';
+
+        try {
+          const response = await fetch(`/api/book-editions.json?work=${encodeURIComponent(book.workKey)}`);
+          const data = await response.json();
+          const editions = Array.isArray(data.editions) ? data.editions : [];
+
+          editionDialog.innerHTML = '';
+          const header = document.createElement('div');
+          header.className = 'edition-dialog-header';
+          const heading = document.createElement('h3');
+          heading.textContent = `Editions of ${book.title}`;
+          const closeButton = document.createElement('button');
+          closeButton.type = 'button';
+          closeButton.className = 'edition-dialog-close';
+          closeButton.textContent = 'Close';
+          closeButton.addEventListener('click', () => editionDialog.close());
+          header.append(heading, closeButton);
+          editionDialog.appendChild(header);
+
+          const list = document.createElement('div');
+          list.className = 'edition-list';
+          if (editions.length === 0) {
+            const emptyMessage = document.createElement('p');
+            emptyMessage.textContent = 'No editions found.';
+            list.appendChild(emptyMessage);
+          }
+
+          editions.forEach((edition: any) => {
+            const option = document.createElement('button');
+            option.type = 'button';
+            option.className = 'edition-option';
+            const image = document.createElement('img');
+            image.alt = '';
+            if (edition.coverImage) image.src = edition.coverImage;
+            const details = document.createElement('span');
+            const title = document.createElement('strong');
+            title.textContent = edition.title;
+            const metadata = document.createElement('span');
+            metadata.textContent = [edition.language, edition.pubDate, edition.publisher]
+              .filter(Boolean)
+              .join(' · ');
+            details.append(title, metadata);
+            const chooseLabel = document.createElement('span');
+            chooseLabel.className = 'edition-choice-label';
+            const editionAlreadyAdded = getSavedBooks().some((savedBook: any) =>
+              savedBook.editionKey && savedBook.editionKey === edition.key,
+            ) || libraryBooks.some((savedBook: any) =>
+              savedBook.editionKey && savedBook.editionKey === edition.key,
+            );
+            chooseLabel.textContent = editionAlreadyAdded ? '✓ Added' : 'Choose';
+            option.append(image, details, chooseLabel);
+            option.addEventListener('click', () => {
+              book.key = edition.key;
+              book.editionKey = edition.key;
+              book.editionUrl = edition.url;
+              book.editionHeroImage = edition.coverImage;
+              book.title = edition.title;
+              book.subtitle = edition.subtitle;
+              book.pubDate = edition.pubDate;
+              book.isbn = edition.isbn;
+              book.heroImage = edition.coverImage;
+
+              const cardImage = card.querySelector('img');
+              if (cardImage && edition.coverImage) {
+                cardImage.src = edition.coverImage;
+                cardImage.alt = edition.title;
+              }
+              const cardTitle = card.querySelector('h5');
+              if (cardTitle) cardTitle.textContent = edition.title;
+              const pubDate = card.querySelector('.pub-date');
+              if (pubDate) pubDate.textContent = `Published: ${edition.pubDate}`;
+              const selectedLink = card.querySelector<HTMLAnchorElement>('.selected-edition-link');
+              if (selectedLink) {
+                selectedLink.href = edition.url;
+                selectedLink.hidden = false;
+              }
+              button.textContent = 'Change edition';
+              editionDialog.close();
+            });
+            list.appendChild(option);
+          });
+
+          editionDialog.appendChild(list);
+          editionDialog.showModal();
+        } catch {
+          editionDialog.innerHTML = '<p>Unable to load editions.</p>';
+          editionDialog.showModal();
+        } finally {
+          button.disabled = false;
+          if (button.textContent === 'Loading editions...') button.textContent = 'Browse editions';
+        }
+      }
+
+      resultsContainer.querySelectorAll<HTMLButtonElement>('.edition-button').forEach((button) => {
+        const book = displayBooks[Number(button.dataset.bookIndex)];
+        const card = button.closest<HTMLElement>('.search-card');
+        if (book && card) {
+          button.addEventListener('click', () => openEditionPicker(book, card, button));
+        }
+      });
+
       resultsContainer.querySelectorAll<HTMLElement>('.shelf-control').forEach((control, index) => {
-        const book = books[index];
+        const book = displayBooks[index];
         const primaryButton = control.querySelector<HTMLButtonElement>('.shelf-primary')!;
         const toggleButton = control.querySelector<HTMLButtonElement>('.shelf-toggle')!;
         const menu = control.querySelector<HTMLElement>('.shelf-menu')!;
@@ -483,16 +862,51 @@ const { libraryBooks = [] } = Astro.props;
         `;
 
         document.getElementById('prev-page')?.addEventListener('click', () => {
-          if (currentPage > 1) performSearch(currentQuery, currentPage - 1);
+          if (currentPage > 1) performSearch(currentQuery, currentPage - 1, currentAuthorOnly, currentAuthorKey, currentAuthorExact, currentSort, currentLanguage);
         });
 
         document.getElementById('next-page')?.addEventListener('click', () => {
-          if (currentPage < totalPages) performSearch(currentQuery, currentPage + 1);
+          if (currentPage < totalPages) performSearch(currentQuery, currentPage + 1, currentAuthorOnly, currentAuthorKey, currentAuthorExact, currentSort, currentLanguage);
         });
       }
     } catch (err) {
       resultsContainer.innerHTML = '<p>An error occurred while fetching books.</p>';
     }
+  }
+
+  window.addEventListener('book-library:author-search', (event) => {
+    const detail = (event as CustomEvent<{
+      query?: string;
+      authorOnly?: boolean;
+      authorKey?: string;
+      authorExact?: boolean;
+    }>).detail;
+    const query = detail?.query?.trim();
+    if (!query) return;
+
+    searchInput.value = query;
+    performSearch(
+      query,
+      1,
+      detail?.authorOnly === true,
+      detail?.authorKey || '',
+      detail?.authorExact === true,
+    );
+  });
+
+  const initialParams = new URLSearchParams(window.location.search);
+  const initialQuery = initialParams.get('query')?.trim();
+  if (initialQuery) {
+    searchInput.value = initialQuery;
+    performSearch(
+      initialQuery,
+      1,
+      initialParams.get('author') === '1',
+      initialParams.get('author_key') || '',
+      initialParams.get('author_exact') === '1',
+      initialParams.get('sort') || currentSort,
+      initialParams.get('language') || '',
+    );
   }
 
   searchInput?.addEventListener('input', () => {
@@ -503,12 +917,44 @@ const { libraryBooks = [] } = Astro.props;
       resultsContainer.innerHTML = '';
       summaryContainer.innerHTML = '';
       paginationContainer.innerHTML = '';
+      searchLanguageSelect.innerHTML = '<option value="">Languages found after searching</option>';
+      searchLanguageSelect.disabled = true;
+      currentLanguage = '';
       return;
     }
 
     debounceTimer = setTimeout(() => {
-      performSearch(query, 1);
+      performSearch(query, 1, false, '', false, currentSort, '');
     }, 400);
+  });
+
+  searchSortSelect?.addEventListener('change', () => {
+    if (currentQuery) {
+      performSearch(
+        currentQuery,
+        1,
+        currentAuthorOnly,
+        currentAuthorKey,
+        currentAuthorExact,
+        searchSortSelect.value,
+        currentLanguage,
+      );
+    }
+  });
+
+  searchLanguageSelect?.addEventListener('change', () => {
+    currentLanguage = searchLanguageSelect.value;
+    if (currentQuery) {
+      performSearch(
+        currentQuery,
+        1,
+        currentAuthorOnly,
+        currentAuthorKey,
+        currentAuthorExact,
+        currentSort,
+        currentLanguage,
+      );
+    }
   });
 
   document.addEventListener('click', (event) => {

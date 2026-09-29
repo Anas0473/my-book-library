@@ -2,6 +2,13 @@ import type { APIRoute } from 'astro';
 
 export const GET: APIRoute = async ({ url }) => {
   const query = url.searchParams.get('q');
+  const authorOnly = url.searchParams.get('author') === '1';
+  const authorKey = url.searchParams.get('author_key')?.trim();
+  const authorExact = url.searchParams.get('author_exact') === '1';
+  const language = url.searchParams.get('language')?.trim();
+  const discoverLanguages = url.searchParams.get('discover_languages') === '1';
+  const sort = url.searchParams.get('sort') || '';
+  const shouldSort = ['title-asc', 'title-desc', 'year-desc', 'year-asc'].includes(sort);
   const page = Math.max(1, parseInt(url.searchParams.get('page') || '1', 10));
   const requestedLimit = parseInt(url.searchParams.get('limit') || '16', 10);
   const limit = requestedLimit === 15 ? 15 : 16;
@@ -97,10 +104,11 @@ export const GET: APIRoute = async ({ url }) => {
     }
 
     const searchParams = new URLSearchParams({
-      [query.trim().split(/\s+/).length > 1 ? 'q' : 'title']: query,
-      fields: 'title,subtitle,author_name,first_publish_year,cover_i,isbn,key',
-      limit: String(limit),
-      offset: String(offset),
+      [authorKey ? 'author_key' : authorOnly ? 'author' : query.trim().split(/\s+/).length > 1 ? 'q' : 'title']:
+        authorKey || query,
+      fields: 'title,subtitle,author_name,author_key,language,first_publish_year,cover_i,isbn,key,edition_key',
+      limit: String(shouldSort || authorExact || language || discoverLanguages ? 1000 : limit),
+      offset: String(shouldSort || authorExact || language || discoverLanguages ? 0 : offset),
     });
     const apiUrl = `https://openlibrary.org/search.json?${searchParams}`;
 
@@ -118,14 +126,69 @@ export const GET: APIRoute = async ({ url }) => {
     }
 
     const data = await res.json();
-    const totalResults = data.numFound || 0;
-    const totalPages = Math.ceil(totalResults / limit);
+    // OpenLibrary's general "q" search matches loosely across many unrelated fields
+    // (e.g. subjects, contributor notes), so require the full phrase to actually
+    // appear in the title, subtitle, or a single author's name.
+    const isGeneralQuery = !authorKey && !authorOnly && query.trim().split(/\s+/).length > 1;
+    const normalizedPhrase = query.trim().toLocaleLowerCase();
+    const relevantDocs = isGeneralQuery
+      ? (data.docs || []).filter((doc: any) => {
+          const title = String(doc.title || '').toLocaleLowerCase();
+          const subtitle = String(doc.subtitle || '').toLocaleLowerCase();
+          const authors = (doc.author_name || []) as string[];
+          return (
+            title.includes(normalizedPhrase) ||
+            subtitle.includes(normalizedPhrase) ||
+            authors.some((name) => name.toLocaleLowerCase().includes(normalizedPhrase))
+          );
+        })
+      : data.docs || [];
+    const authorMatchingDocs = authorExact
+      ? relevantDocs.filter((doc: any) =>
+          (doc.author_name || []).some(
+            (name: string) => name.trim().toLocaleLowerCase() === query.trim().toLocaleLowerCase(),
+          ),
+        )
+      : relevantDocs;
+    const languageOptions = Array.from(new Set(
+      authorMatchingDocs.flatMap((doc: any) => doc.language || []),
+    )).sort();
+    const matchingDocs = language
+      ? authorMatchingDocs.filter((doc: any) => (doc.language || []).includes(language))
+      : authorMatchingDocs;
+    const sortedDocs = shouldSort
+      ? [...matchingDocs].sort((first: any, second: any) => {
+          if (sort.startsWith('title')) {
+            const comparison = String(first.title || '').localeCompare(
+              String(second.title || ''),
+              undefined,
+              { numeric: true, sensitivity: 'base' },
+            );
+            return sort === 'title-desc' ? -comparison : comparison;
+          }
 
-    const formattedBooks = (data.docs || []).map((doc: any) => ({
+          const firstYear = Number(first.first_publish_year) || 0;
+          const secondYear = Number(second.first_publish_year) || 0;
+          return sort === 'year-desc' ? secondYear - firstYear : firstYear - secondYear;
+        })
+      : matchingDocs;
+    const totalResults = authorExact || shouldSort || language || discoverLanguages
+      ? sortedDocs.length
+      : data.numFound || 0;
+    const totalPages = Math.ceil(totalResults / limit);
+    const pageDocs = authorExact || shouldSort || language || discoverLanguages
+      ? sortedDocs.slice(offset, offset + limit)
+      : sortedDocs;
+
+    const formattedBooks = pageDocs.map((doc: any) => ({
       key: doc.key,
+      workKey: doc.key,
       title: doc.title,
       subtitle: doc.subtitle || null,
       author: doc.author_name ? doc.author_name.join(', ') : 'Unknown Author',
+      authorKeys: doc.author_key || [],
+      editionKeys: doc.edition_key || [],
+      languages: doc.language || [],
       pubDate: doc.first_publish_year || 'Unknown',
       isbn: doc.isbn ? doc.isbn[0] : null,
       heroImage: doc.cover_i
@@ -139,6 +202,7 @@ export const GET: APIRoute = async ({ url }) => {
         totalResults,
         page,
         totalPages,
+        languages: languageOptions,
       }),
       {
         status: 200,
