@@ -1,5 +1,40 @@
 import type { APIRoute } from 'astro';
 
+// Finds the specific edition whose title matches the search phrase, since OpenLibrary's
+// work-level search results only expose a single arbitrary default cover/title, which can
+// belong to an unrelated translation/edition of the same work.
+async function findMatchingEdition(workKey: string, normalizedQuery: string) {
+  try {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 5000);
+    const params = new URLSearchParams({
+      limit: '100',
+      fields: 'key,title,subtitle,publish_date,publishers,isbn_10,isbn_13,covers,languages',
+    });
+    let response: Response;
+    try {
+      response = await fetch(`https://openlibrary.org/${workKey}/editions.json?${params}`, {
+        signal: controller.signal,
+        headers: { 'User-Agent': 'my-book-library/0.0.1' },
+      });
+    } finally {
+      clearTimeout(timeout);
+    }
+    if (!response.ok) return null;
+
+    const data = await response.json();
+    const entries = (data.entries || []).filter((edition: any) => /^\/books\/OL\d+M$/i.test(edition.key || ''));
+    const normalizedTitle = (edition: any) => String(edition.title || '').trim().toLocaleLowerCase();
+    return (
+      entries.find((edition: any) => normalizedTitle(edition) === normalizedQuery) ||
+      entries.find((edition: any) => normalizedTitle(edition).includes(normalizedQuery)) ||
+      null
+    );
+  } catch {
+    return null;
+  }
+}
+
 export const GET: APIRoute = async ({ url }) => {
   const query = url.searchParams.get('q');
   const authorOnly = url.searchParams.get('author') === '1';
@@ -126,23 +161,45 @@ export const GET: APIRoute = async ({ url }) => {
     }
 
     const data = await res.json();
-    // OpenLibrary's general "q" search matches loosely across many unrelated fields
-    // (e.g. subjects, contributor notes), so require the full phrase to actually
-    // appear in the title, subtitle, or a single author's name.
+    // OpenLibrary's general "q" search matches loosely across unrelated fields
+    // (e.g. subjects and contributor notes). Prefer results where the full phrase
+    // appears in the title, subtitle, or an author's name, but retain top-ranked
+    // results when no visible text matches (for alternate or translated titles).
     const isGeneralQuery = !authorKey && !authorOnly && query.trim().split(/\s+/).length > 1;
     const normalizedPhrase = query.trim().toLocaleLowerCase();
-    const relevantDocs = isGeneralQuery
-      ? (data.docs || []).filter((doc: any) => {
-          const title = String(doc.title || '').toLocaleLowerCase();
-          const subtitle = String(doc.subtitle || '').toLocaleLowerCase();
-          const authors = (doc.author_name || []) as string[];
-          return (
-            title.includes(normalizedPhrase) ||
-            subtitle.includes(normalizedPhrase) ||
-            authors.some((name) => name.toLocaleLowerCase().includes(normalizedPhrase))
-          );
-        })
-      : data.docs || [];
+    const topRankedCount = 5;
+    const docs = data.docs || [];
+    const phraseMatches = docs.filter((doc: any) => {
+      const title = String(doc.title || '').toLocaleLowerCase();
+      const subtitle = String(doc.subtitle || '').toLocaleLowerCase();
+      const authors = (doc.author_name || []) as string[];
+      return (
+        title.includes(normalizedPhrase) ||
+        subtitle.includes(normalizedPhrase) ||
+        authors.some((name) => name.toLocaleLowerCase().includes(normalizedPhrase))
+      );
+    });
+    let relevantDocs = isGeneralQuery
+      ? phraseMatches.length > 0
+        ? phraseMatches
+        : docs.slice(0, topRankedCount)
+      : docs;
+    const fallbackEditionMatches = new Map<string, any>();
+    if (isGeneralQuery && phraseMatches.length === 0) {
+      const editionMatches = await Promise.all(
+        relevantDocs.map((doc: any) =>
+          doc.key
+            ? findMatchingEdition(String(doc.key).replace(/^\/+/, ''), normalizedPhrase)
+            : null,
+        ),
+      );
+      relevantDocs.forEach((doc: any, index: number) => {
+        if (doc.key) fallbackEditionMatches.set(String(doc.key), editionMatches[index]);
+      });
+      if (editionMatches.some(Boolean)) {
+        relevantDocs = relevantDocs.filter((doc: any) => fallbackEditionMatches.get(String(doc.key)));
+      }
+    }
     const authorMatchingDocs = authorExact
       ? relevantDocs.filter((doc: any) =>
           (doc.author_name || []).some(
@@ -180,21 +237,42 @@ export const GET: APIRoute = async ({ url }) => {
       ? sortedDocs.slice(offset, offset + limit)
       : sortedDocs;
 
-    const formattedBooks = pageDocs.map((doc: any) => ({
-      key: doc.key,
-      workKey: doc.key,
-      title: doc.title,
-      subtitle: doc.subtitle || null,
-      author: doc.author_name ? doc.author_name.join(', ') : 'Unknown Author',
-      authorKeys: doc.author_key || [],
-      editionKeys: doc.edition_key || [],
-      languages: doc.language || [],
-      pubDate: doc.first_publish_year || 'Unknown',
-      isbn: doc.isbn ? doc.isbn[0] : null,
-      heroImage: doc.cover_i
-        ? `https://covers.openlibrary.org/b/id/${doc.cover_i}-M.jpg`
-        : null,
-    }));
+    // For title-style searches, prefer the specific edition matching the searched phrase
+    // over the work's arbitrary default cover/edition (e.g. a translated title's own cover).
+    // Limited to a handful of docs to keep general (live-as-you-type) searches responsive.
+    const editionLookupLimit = 5;
+    const matchedEditions = isGeneralQuery
+      ? await Promise.all(
+          pageDocs.map((doc: any, index: number) => {
+            if (index >= editionLookupLimit || !doc.key) return null;
+            const docKey = String(doc.key);
+            return fallbackEditionMatches.has(docKey)
+              ? fallbackEditionMatches.get(docKey)
+              : findMatchingEdition(docKey.replace(/^\/+/, ''), normalizedPhrase);
+          }),
+        )
+      : pageDocs.map(() => null);
+
+    const formattedBooks = pageDocs.map((doc: any, index: number) => {
+      const edition = matchedEditions[index];
+      return {
+        key: doc.key,
+        workKey: doc.key,
+        title: edition?.title || doc.title,
+        subtitle: edition?.subtitle || doc.subtitle || null,
+        author: doc.author_name ? doc.author_name.join(', ') : 'Unknown Author',
+        authorKeys: doc.author_key || [],
+        editionKeys: edition?.key ? [edition.key.replace(/^\/?books\//i, '')] : (doc.edition_key || []),
+        languages: doc.language || [],
+        pubDate: edition?.publish_date || doc.first_publish_year || 'Unknown',
+        isbn: edition?.isbn_13?.[0] || edition?.isbn_10?.[0] || (doc.isbn ? doc.isbn[0] : null),
+        heroImage: edition?.covers?.[0]
+          ? `https://covers.openlibrary.org/b/id/${edition.covers[0]}-M.jpg`
+          : doc.cover_i
+            ? `https://covers.openlibrary.org/b/id/${doc.cover_i}-M.jpg`
+            : null,
+      };
+    });
 
     return new Response(
       JSON.stringify({
