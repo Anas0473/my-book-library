@@ -460,8 +460,10 @@ const { libraryBooks = [] } = Astro.props;
   }
 
   function isSameBook(first: any, second: any) {
-    if (first.editionKey || second.editionKey) {
-      return Boolean(first.editionKey && second.editionKey && first.editionKey === second.editionKey);
+    if (first.editionKey && second.editionKey) {
+      const normalizeEditionKey = (value: string) =>
+        String(value).match(/OL\d+M/i)?.[0].toUpperCase() || String(value).replace(/^\/+|\/+$/g, '');
+      return normalizeEditionKey(first.editionKey) === normalizeEditionKey(second.editionKey);
     }
     if (first.workKey && second.workKey && first.workKey === second.workKey) return true;
     if (first.workKey && first.workKey === second.key) return true;
@@ -624,9 +626,7 @@ const { libraryBooks = [] } = Astro.props;
         const matchesLanguage = !currentLanguage
           || (book.editionLanguage
             ? book.editionLanguage === currentLanguage
-            : books.some((result: any) =>
-                (result.workKey || result.key) === book.workKey && result.editionKey === book.editionKey,
-              ));
+            : books.some((result: any) => isSameBook(result, book)));
         return matchesLanguage && (currentAuthorOnly
           ? author.includes(normalizedQuery)
           : title.includes(normalizedQuery) || subtitle.includes(normalizedQuery) || author.includes(normalizedQuery));
