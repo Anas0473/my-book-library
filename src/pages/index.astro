@@ -152,14 +152,18 @@ const read = allBooks.filter((b) => b.data.status === "Read").sort(naturalSort);
       }
       .open-library-sync-form h2 {
         margin: 0;
-        font-size: 1.25rem;
+        color: #334155;
+        font-size: 1.4rem;
+        line-height: 1.2;
       }
       .open-library-sync-form p {
         margin: 0;
-        font-size: 0.9rem;
-        line-height: 1.45;
+        color: #475569;
+        font-size: 0.88rem;
+        line-height: 1.55;
       }
       .open-library-sync-form label {
+        margin-top: 0.35rem;
         font-size: 0.85rem;
         font-weight: 600;
       }
@@ -169,6 +173,9 @@ const read = allBooks.filter((b) => b.data.status === "Read").sort(naturalSort);
         padding: 0.65rem 0.75rem;
         border: 1px solid #cbd5e1;
         border-radius: 6px;
+        color: #1e293b;
+        font: inherit;
+        font-size: 0.95rem;
       }
       .open-library-sync-message {
         min-height: 1.25rem;
@@ -178,6 +185,7 @@ const read = allBooks.filter((b) => b.data.status === "Read").sort(naturalSort);
         display: flex;
         justify-content: flex-end;
         gap: 0.5rem;
+        margin-top: 0.35rem;
       }
       .open-library-sync-actions button {
         min-height: 2.4rem;
@@ -691,7 +699,8 @@ const read = allBooks.filter((b) => b.data.status === "Read").sort(naturalSort);
     <dialog id="open-library-sync-dialog" aria-labelledby="open-library-sync-title">
       <form class="open-library-sync-form" id="open-library-sync-form">
         <h2 id="open-library-sync-title">Connect Open Library</h2>
-        <p>Enter your Open Library username. Your reading log must be public to sync. No password is needed. Only one account can be synced at a time; switching replaces its synced books, while books added only here stay.</p>
+        <p>Enter your Open Library username. Your reading log must be public to sync, and no password is needed.</p>
+        <p>Only one account can be synced at a time. Switching accounts replaces its synced books, while books added only here stay.</p>
         <label for="open-library-username">Open Library username</label>
         <input id="open-library-username" name="username" type="text" autocomplete="username" required />
         <p class="open-library-sync-message" id="open-library-sync-message" role="status" aria-live="polite"></p>
