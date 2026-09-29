@@ -866,7 +866,7 @@ const { libraryBooks = [] } = Astro.props;
         function updateShelfControl(status: string) {
           const label = shelfLabels[status] || shelfLabels['Plan to Read'];
           primaryButton.textContent = `${hasSavedShelf ? '✓ ' : ''}${label}`;
-          removeButton.hidden = !hasLocalSavedBook || Boolean(collectionBook);
+          removeButton.hidden = !hasLocalSavedBook;
           menu.querySelectorAll<HTMLButtonElement>('[data-status]').forEach((option) => {
             if (option.dataset.status === status) {
               option.setAttribute('aria-current', 'true');
@@ -882,6 +882,7 @@ const { libraryBooks = [] } = Astro.props;
           const updatedBook = saveBookToShelf(book, currentStatus || 'Plan to Read');
           currentStatus = updatedBook.status;
           hasSavedShelf = true;
+          hasLocalSavedBook = true;
           updateShelfControl(updatedBook.status);
         });
 
@@ -898,6 +899,7 @@ const { libraryBooks = [] } = Astro.props;
             const updatedBook = saveBookToShelf(book, option.dataset.status || 'Plan to Read');
             currentStatus = updatedBook.status;
             hasSavedShelf = true;
+            hasLocalSavedBook = true;
             updateShelfControl(updatedBook.status);
             menu.hidden = true;
             toggleButton.setAttribute('aria-expanded', 'false');
@@ -905,13 +907,13 @@ const { libraryBooks = [] } = Astro.props;
         });
 
         removeButton.addEventListener('click', () => {
-          if (!hasLocalSavedBook || collectionBook) return;
+          if (!hasLocalSavedBook) return;
           if (!window.confirm(`Delete "${book.title}" from your reading lists?`)) return;
 
           const updatedBooks = getSavedBooks().filter((item: any) => !isSameBook(item, book));
           localStorage.setItem(savedBooksKey, JSON.stringify(updatedBooks));
-          currentStatus = null;
-          hasSavedShelf = false;
+          currentStatus = collectionBook?.status || null;
+          hasSavedShelf = Boolean(collectionBook);
           hasLocalSavedBook = false;
           updateShelfControl('Plan to Read');
           menu.hidden = true;
