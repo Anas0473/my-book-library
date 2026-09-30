@@ -319,7 +319,7 @@ const splitAuthors = (author: string) =>
       }
       .controls {
         display: grid;
-        grid-template-columns: minmax(0, 1fr) max-content max-content max-content;
+        grid-template-columns: minmax(0, 1fr) max-content max-content max-content max-content;
         align-items: center;
         gap: 1rem;
         margin-bottom: 1.5rem;
@@ -393,6 +393,21 @@ const splitAuthors = (author: string) =>
         font-size: 0.9rem;
         color: #334155;
         outline: none;
+      }
+      .reset-filters-button {
+        height: 3rem;
+        padding: 0.5rem 0.8rem;
+        border: 1px solid #cbd5e1;
+        border-radius: 6px;
+        background: #fff;
+        color: #334155;
+        font: inherit;
+        font-size: 0.85rem;
+        cursor: pointer;
+      }
+      .reset-filters-button:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
       }
       .search-input {
         flex: 1;
@@ -666,6 +681,9 @@ const splitAuthors = (author: string) =>
         .language-select {
           width: 100%;
         }
+        .reset-filters-button {
+          width: 100%;
+        }
         .cards-grid {
           grid-template-columns: 1fr;
           gap: 0.75rem;
@@ -796,6 +814,7 @@ const splitAuthors = (author: string) =>
                 <select class="language-select" aria-label="Filter this list by language">
                   <option value="">All languages</option>
                 </select>
+                <button type="button" class="reset-filters-button" disabled>Reset filters</button>
               </div>
               <div class="cards-grid">
                 {books.map((book) => (
@@ -1800,6 +1819,9 @@ const splitAuthors = (author: string) =>
         const languageSelect = panel.querySelector(
           ".language-select",
         ) as HTMLSelectElement;
+        const resetFiltersButton = panel.querySelector(
+          ".reset-filters-button",
+        ) as HTMLButtonElement;
         const grid = panel.querySelector(".cards-grid") as HTMLElement;
         const noMatchMsg = panel.querySelector(".no-match-msg") as HTMLElement;
 
@@ -1867,6 +1889,9 @@ const splitAuthors = (author: string) =>
           ].includes(selectedLanguage)
             ? selectedLanguage
             : "";
+          resetFiltersButton.disabled = !query
+            && sortVal === "date-added-desc"
+            && !languageSelect.value;
           const language = languageSelect.value;
 
           let visibleCount = 0;
@@ -1993,6 +2018,13 @@ const splitAuthors = (author: string) =>
         searchInput.addEventListener("input", updatePanel);
         sortSelect.addEventListener("change", updatePanel);
         languageSelect.addEventListener("change", updatePanel);
+        resetFiltersButton.addEventListener("click", () => {
+          searchInput.value = "";
+          sortSelect.value = "date-added-desc";
+          languageSelect.value = "";
+          updatePanel();
+          searchInput.focus();
+        });
         updatePanel();
         panelRefreshers.set(panel.id, updatePanel);
         panelLanguageLoaders.set(panel.id, () => { void loadMissingEditionLanguages(); });

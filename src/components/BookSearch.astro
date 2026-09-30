@@ -31,6 +31,7 @@ const { libraryBooks = [] } = Astro.props;
     <select id="search-language-select" aria-label="Filter by language" disabled>
       <option value="">Languages found after searching</option>
     </select>
+    <button type="button" id="reset-search-filters" class="search-reset-button" disabled>Reset filters</button>
   </div>
   <div id="search-summary" class="search-summary"></div>
   <div id="search-results" class="results-grid"></div>
@@ -110,6 +111,22 @@ const { libraryBooks = [] } = Astro.props;
     background: #fff;
     color: #334155;
     font-size: 0.9rem;
+  }
+  .search-reset-button {
+    flex: 0 0 auto;
+    height: 3rem;
+    padding: 0.5rem 0.8rem;
+    border: 1px solid #cbd5e1;
+    border-radius: 6px;
+    background: #fff;
+    color: #334155;
+    font: inherit;
+    font-size: 0.85rem;
+    cursor: pointer;
+  }
+  .search-reset-button:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
   }
   .search-summary {
     margin-top: 0.5rem;
@@ -431,6 +448,9 @@ const { libraryBooks = [] } = Astro.props;
       flex-basis: auto;
       width: 100%;
     }
+    .search-reset-button {
+      width: 100%;
+    }
     .results-grid {
       grid-template-columns: 1fr;
       gap: 0.75rem;
@@ -496,6 +516,7 @@ const { libraryBooks = [] } = Astro.props;
   const searchContainer = document.querySelector('.search-container') as HTMLElement;
   const searchInput = document.getElementById('global-book-search') as HTMLInputElement;
   const clearSearchButton = document.getElementById('clear-book-search') as HTMLButtonElement;
+  const resetSearchFiltersButton = document.getElementById('reset-search-filters') as HTMLButtonElement;
   const searchSortSelect = document.getElementById('search-sort-select') as HTMLSelectElement;
   const searchLanguageSelect = document.getElementById('search-language-select') as HTMLSelectElement;
   const resultsContainer = document.getElementById('search-results') as HTMLElement;
@@ -527,6 +548,11 @@ const { libraryBooks = [] } = Astro.props;
   let currentAuthorExact = false;
   function updateSearchClearButton() {
     clearSearchButton.hidden = searchInput.value.length === 0;
+  }
+  function updateSearchResetButton() {
+    resetSearchFiltersButton.disabled = !searchInput.value.trim()
+      && searchSortSelect.value === 'title-asc'
+      && !searchLanguageSelect.value;
   }
   const pageSize = 16;
   const savedBooksKey = 'my-book-library:books';
@@ -707,6 +733,7 @@ const { libraryBooks = [] } = Astro.props;
     currentAuthorExact = authorExact;
     searchSortSelect.value = sort;
     searchLanguageSelect.value = language;
+    updateSearchResetButton();
 
     resultsContainer.innerHTML = '<p>Searching...</p>';
     summaryContainer.innerHTML = '';
@@ -1125,6 +1152,7 @@ const { libraryBooks = [] } = Astro.props;
 
     searchInput.value = query;
     updateSearchClearButton();
+    updateSearchResetButton();
     performSearch(
       query,
       1,
@@ -1139,6 +1167,7 @@ const { libraryBooks = [] } = Astro.props;
   if (initialQuery) {
     searchInput.value = initialQuery;
     updateSearchClearButton();
+    updateSearchResetButton();
     performSearch(
       initialQuery,
       1,
@@ -1153,6 +1182,7 @@ const { libraryBooks = [] } = Astro.props;
   searchInput?.addEventListener('input', () => {
     clearTimeout(debounceTimer);
     updateSearchClearButton();
+    updateSearchResetButton();
     const query = searchInput.value.trim();
 
     if (query.length < 3) {
@@ -1183,7 +1213,20 @@ const { libraryBooks = [] } = Astro.props;
     searchInput.focus();
   });
 
+  resetSearchFiltersButton?.addEventListener('click', () => {
+    clearTimeout(debounceTimer);
+    searchInput.value = '';
+    searchSortSelect.value = 'title-asc';
+    searchLanguageSelect.value = '';
+    currentSort = 'title-asc';
+    currentLanguage = '';
+    searchInput.dispatchEvent(new Event('input', { bubbles: true }));
+    updateSearchResetButton();
+    searchInput.focus();
+  });
+
   searchSortSelect?.addEventListener('change', () => {
+    updateSearchResetButton();
     if (currentQuery) {
       performSearch(
         currentQuery,
@@ -1199,6 +1242,7 @@ const { libraryBooks = [] } = Astro.props;
 
   searchLanguageSelect?.addEventListener('change', () => {
     currentLanguage = searchLanguageSelect.value;
+    updateSearchResetButton();
     if (currentQuery) {
       performSearch(
         currentQuery,
