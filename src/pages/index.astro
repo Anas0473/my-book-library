@@ -732,6 +732,8 @@ const splitAuthors = (author: string) =>
                   </div>
                 </div>
                 <select class="sort-select">
+                  <option value="date-added-desc">Date Added (newest)</option>
+                  <option value="date-added-asc">Date Added (oldest)</option>
                   <option value="title-asc">Title: A to Z</option>
                   <option value="title-desc">Title: Z to A</option>
                   <option value="year-desc">Year: Newest First</option>
@@ -755,6 +757,7 @@ const splitAuthors = (author: string) =>
                     data-subtitle={(book.data.subtitle || "").toLowerCase()}
                     data-author={(book.data.author || "").toLowerCase()}
                     data-year={parseInt(String(book.data.pubDate)) || 0}
+                    data-date-added={(book.data as any).dateAdded || ""}
                     data-language={String((book.data as any).editionLanguage || (book.data as any).language || "").toLowerCase()}
                   >
                     <div>
@@ -998,6 +1001,22 @@ const splitAuthors = (author: string) =>
         var localBooks: any[] = [];
       }
 
+      const existingAddedTimestamps = localBooks
+        .map((book) => Number(book.dateAdded))
+        .filter((dateAdded) => Number.isFinite(dateAdded) && dateAdded > 0);
+      const legacyDateBase = (existingAddedTimestamps.length > 0
+        ? Math.min(...existingAddedTimestamps)
+        : Date.now()) - localBooks.length - 1;
+      let migratedAddedDates = false;
+      localBooks.forEach((book, index) => {
+        if (Number.isFinite(Number(book.dateAdded)) && Number(book.dateAdded) > 0) return;
+        book.dateAdded = legacyDateBase + index;
+        migratedAddedDates = true;
+      });
+      if (migratedAddedDates) {
+        localStorage.setItem(savedBooksKey, JSON.stringify(localBooks));
+      }
+
       function getBookIdentity(book: any) {
         return book.editionKey || book.key || book.isbn || `${book.title}:${book.author}`;
       }
@@ -1181,6 +1200,7 @@ const splitAuthors = (author: string) =>
         card.dataset.subtitle = String(book.subtitle || "").toLowerCase();
         card.dataset.author = String(book.author || "").toLowerCase();
         card.dataset.year = String(parseInt(String(book.pubDate), 10) || 0);
+        card.dataset.dateAdded = String(Number(book.dateAdded) || "");
         const cachedLanguage = editionLanguageCache[normalizeEditionId(book.editionKey)];
         const bookLanguage = [book.editionLanguage, book.language, cachedLanguage]
           .find((language) => isKnownEditionLanguage(language));
@@ -1393,6 +1413,7 @@ const splitAuthors = (author: string) =>
             const syncedBook = {
               ...previousSyncedBook,
               ...book,
+              dateAdded: previousSyncedBook?.dateAdded || Date.now(),
               openLibrarySyncUsername: username,
               openLibraryRemoved: false,
             };
@@ -1732,7 +1753,7 @@ const splitAuthors = (author: string) =>
 
         if (panel.id === pageParams.get("panel")) {
           searchInput.value = pageParams.get("filter") || "";
-          sortSelect.value = pageParams.get("sort") || "title-asc";
+          sortSelect.value = pageParams.get("sort") || "date-added-desc";
         }
 
         function updatePanel() {
@@ -1828,6 +1849,18 @@ const splitAuthors = (author: string) =>
             const titleB = b.dataset.title || "";
             const yearA = parseInt(a.dataset.year || "0", 10);
             const yearB = parseInt(b.dataset.year || "0", 10);
+            const dateAddedA = Number(a.dataset.dateAdded) || 0;
+            const dateAddedB = Number(b.dataset.dateAdded) || 0;
+
+            if (sortVal === "date-added-desc" || sortVal === "date-added-asc") {
+              if (!dateAddedA && dateAddedB) return 1;
+              if (dateAddedA && !dateAddedB) return -1;
+              if (dateAddedA !== dateAddedB) {
+                return sortVal === "date-added-desc"
+                  ? dateAddedA - dateAddedB
+                  : dateAddedB - dateAddedA;
+              }
+            }
 
             if (sortVal === "title-asc") {
               return titleA.localeCompare(titleB, undefined, {
@@ -2034,6 +2067,9 @@ const splitAuthors = (author: string) =>
         const updatedBook = {
           ...(existingIndex >= 0 ? localBooks[existingIndex] : {}),
           ...book,
+          dateAdded: (existingIndex >= 0 ? localBooks[existingIndex].dateAdded : null)
+            || book.dateAdded
+            || Date.now(),
         };
 
         if (existingIndex >= 0) {
