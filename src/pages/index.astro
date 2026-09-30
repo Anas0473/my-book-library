@@ -193,6 +193,45 @@ const splitAuthors = (author: string) =>
       .open-library-sync-status[hidden] {
         display: none;
       }
+      :global(.shelf-undo-toast) {
+        position: fixed;
+        bottom: 1rem;
+        left: 50%;
+        z-index: 20;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 1rem;
+        width: min(32rem, calc(100vw - 2rem));
+        box-sizing: border-box;
+        padding: 0.75rem 1rem;
+        transform: translateX(-50%);
+        border: 1px solid #334155;
+        border-radius: 6px;
+        background: #1e293b;
+        color: #fff;
+        box-shadow: 0 6px 20px rgba(15, 23, 42, 0.24);
+        font-size: 0.85rem;
+      }
+      :global(.shelf-undo-toast button) {
+        flex: 0 0 auto;
+        padding: 0.35rem 0.6rem;
+        border: 1px solid #94a3b8;
+        border-radius: 4px;
+        background: transparent;
+        color: #fff;
+        font: inherit;
+        font-weight: 600;
+        cursor: pointer;
+      }
+      :global(.shelf-undo-toast button:hover) {
+        background: rgba(255, 255, 255, 0.12);
+      }
+      @media (max-width: 700px) {
+        :global(.shelf-undo-toast) {
+          bottom: 5rem;
+        }
+      }
       #open-library-sync-dialog {
         width: min(28rem, calc(100vw - 2rem));
         max-width: none;
@@ -2054,10 +2093,15 @@ const splitAuthors = (author: string) =>
           if (selectedBooks.length === 0) return;
 
           const status = destination.value;
+          const undoBatchId = `move-${Date.now()}-${Math.random().toString(36).slice(2)}`;
           setSelectionMode(false);
           selectedBooks.forEach((book) => {
             window.dispatchEvent(new CustomEvent("library:book-shelf-changed", {
-              detail: { ...book, status },
+              detail: {
+                ...book,
+                status,
+                undoBatchId,
+              },
             }));
           });
         });
@@ -2074,15 +2118,88 @@ const splitAuthors = (author: string) =>
         });
       });
 
+      let shelfUndoTimer = 0;
+      let activeUndoBatchId = "";
+      let shelfUndoActions: Array<{ book: any; previousBook: any }> = [];
+
+      function dismissShelfUndoToast() {
+        window.clearTimeout(shelfUndoTimer);
+        document.querySelector<HTMLElement>(".shelf-undo-toast")?.remove();
+        shelfUndoActions = [];
+        activeUndoBatchId = "";
+      }
+
+      function showShelfUndoToast(book: any, previousBook: any, batchId = "") {
+        if (batchId && batchId === activeUndoBatchId) {
+          shelfUndoActions.push({ book, previousBook });
+        } else {
+          activeUndoBatchId = batchId;
+          shelfUndoActions = [{ book, previousBook }];
+        }
+
+        let toast = document.querySelector<HTMLElement>(".shelf-undo-toast");
+        if (!toast) {
+          toast = document.createElement("div");
+          toast.className = "shelf-undo-toast";
+          toast.setAttribute("role", "status");
+          toast.setAttribute("aria-live", "polite");
+          document.body.appendChild(toast);
+        }
+
+        const targetShelf = shelfDefinitions.find((shelf) => shelf.status === book.status);
+        const message = document.createElement("span");
+        message.textContent = shelfUndoActions.length > 1
+          ? `${shelfUndoActions.length} books moved to ${targetShelf?.label || book.status}.`
+          : `Moved "${book.title}" to ${targetShelf?.label || book.status}.`;
+        const undoButton = document.createElement("button");
+        undoButton.type = "button";
+        undoButton.textContent = "Undo";
+        undoButton.addEventListener("click", () => {
+          let restoredCount = 0;
+          [...shelfUndoActions].forEach(({ book: movedBook, previousBook: oldBook }) => {
+            const existingIndex = localBooks.findIndex((item) => isSameBook(item, movedBook));
+            if (existingIndex < 0 || localBooks[existingIndex].status !== movedBook.status) return;
+
+            const restoredBook = { ...localBooks[existingIndex], ...oldBook };
+            localBooks[existingIndex] = restoredBook;
+            document.querySelectorAll<HTMLElement>("[data-local-book-key]").forEach((card) => {
+              const cardBook = {
+                key: card.dataset.bookKey,
+                workKey: card.dataset.workKey,
+                editionKey: card.dataset.editionKey,
+                isbn: card.dataset.isbn,
+                title: card.dataset.title,
+                author: card.dataset.author,
+              };
+              if (isSameBook(restoredBook, cardBook)) card.remove();
+            });
+            renderLocalBook(restoredBook);
+            restoredCount++;
+          });
+
+          if (restoredCount > 0) {
+            localStorage.setItem(savedBooksKey, JSON.stringify(localBooks));
+            updateShelfCounts();
+            panelRefreshers.forEach((refreshPanel) => refreshPanel());
+          }
+          dismissShelfUndoToast();
+        });
+        toast.replaceChildren(message, undoButton);
+        window.clearTimeout(shelfUndoTimer);
+        shelfUndoTimer = window.setTimeout(dismissShelfUndoToast, 6000);
+      }
+
       window.addEventListener("library:book-shelf-changed", (event) => {
-        const book = (event as CustomEvent).detail;
-        if (!book?.title || !isShelfStatus(book.status)) return;
+        const detail = (event as CustomEvent).detail;
+        if (!detail?.title || !isShelfStatus(detail.status)) return;
+        const { undoBatchId = "", ...book } = detail;
 
         const existingIndex = localBooks.findIndex((item) => isSameBook(item, book));
+        const previousBook = existingIndex >= 0 ? localBooks[existingIndex] : null;
         const updatedBook = {
-          ...(existingIndex >= 0 ? localBooks[existingIndex] : {}),
+          ...(previousBook || {}),
           ...book,
-          dateAdded: (existingIndex >= 0 ? localBooks[existingIndex].dateAdded : null)
+          dateAdded: (previousBook?.dateAdded || null)
             || book.dateAdded
             || Date.now(),
         };
@@ -2109,6 +2226,9 @@ const splitAuthors = (author: string) =>
         renderLocalBook(updatedBook);
         updateShelfCounts();
         panelRefreshers.forEach((refreshPanel) => refreshPanel());
+        if (previousBook && previousBook.status !== updatedBook.status) {
+          showShelfUndoToast(updatedBook, previousBook, undoBatchId);
+        }
       });
 
       window.addEventListener("library:book-removed", (event) => {
