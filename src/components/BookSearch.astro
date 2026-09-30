@@ -14,11 +14,14 @@ const { libraryBooks = [] } = Astro.props;
 
 <div class="search-container" data-library-books={JSON.stringify(libraryBooks)}>
   <div class="search-controls">
-    <input
-      type="text"
-      id="global-book-search"
-      placeholder="Search by title, author, or subtitle"
-    />
+    <div class="search-input-wrap">
+      <input
+        type="text"
+        id="global-book-search"
+        placeholder="Search by title, author, or subtitle"
+      />
+      <button type="button" id="clear-book-search" class="search-clear-button" aria-label="Clear search" title="Clear search" hidden>×</button>
+    </div>
     <select id="search-sort-select" aria-label="Sort search results">
       <option value="title-asc">Title: A to Z</option>
       <option value="title-desc">Title: Z to A</option>
@@ -43,10 +46,15 @@ const { libraryBooks = [] } = Astro.props;
     align-items: center;
     gap: 1rem;
   }
+  .search-input-wrap {
+    position: relative;
+    flex: 1;
+    min-width: 0;
+  }
   #global-book-search {
     width: 100%;
     height: 3rem;
-    padding: 0.8rem 1rem;
+    padding: 0.8rem 2.5rem 0.8rem 1rem;
     font-size: 1rem;
     border: 1px solid #cbd5e1;
     border-radius: 8px;
@@ -55,6 +63,33 @@ const { libraryBooks = [] } = Astro.props;
   }
   #global-book-search:focus {
     border-color: #0070f3;
+  }
+  .search-clear-button {
+    position: absolute;
+    top: 50%;
+    right: 0.55rem;
+    display: grid;
+    width: 1.75rem;
+    height: 1.75rem;
+    place-items: center;
+    box-sizing: border-box;
+    padding: 0 0 0.2rem;
+    transform: translateY(-50%);
+    border: 0;
+    border-radius: 50%;
+    background: transparent;
+    color: #64748b;
+    font: inherit;
+    font-size: 1.2rem;
+    line-height: 1;
+    cursor: pointer;
+  }
+  .search-clear-button:hover {
+    background: #f1f5f9;
+    color: #1e293b;
+  }
+  .search-clear-button[hidden] {
+    display: none;
   }
   #search-sort-select {
     flex: 0 0 220px;
@@ -186,11 +221,17 @@ const { libraryBooks = [] } = Astro.props;
   :global(.edition-dialog) {
     width: min(42rem, calc(100% - 2rem));
     max-height: min(80vh, 42rem);
+    box-sizing: border-box;
     padding: 1rem;
     border: 1px solid #cbd5e1;
     border-radius: 8px;
     background: #fff;
     color: #334155;
+  }
+  :global(.edition-dialog[open]) {
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
   }
   :global(.edition-dialog::backdrop) {
     background: rgba(15, 23, 42, 0.4);
@@ -220,8 +261,11 @@ const { libraryBooks = [] } = Astro.props;
   }
   :global(.edition-list) {
     display: grid;
+    flex: 1 1 auto;
+    min-height: 0;
     gap: 0.65rem;
     overflow-y: auto;
+    overscroll-behavior: contain;
   }
   :global(.edition-option) {
     display: grid;
@@ -410,6 +454,7 @@ const { libraryBooks = [] } = Astro.props;
 <script>
   const searchContainer = document.querySelector('.search-container') as HTMLElement;
   const searchInput = document.getElementById('global-book-search') as HTMLInputElement;
+  const clearSearchButton = document.getElementById('clear-book-search') as HTMLButtonElement;
   const searchSortSelect = document.getElementById('search-sort-select') as HTMLSelectElement;
   const searchLanguageSelect = document.getElementById('search-language-select') as HTMLSelectElement;
   const resultsContainer = document.getElementById('search-results') as HTMLElement;
@@ -436,6 +481,9 @@ const { libraryBooks = [] } = Astro.props;
   let currentAuthorOnly = false;
   let currentAuthorKey = '';
   let currentAuthorExact = false;
+  function updateSearchClearButton() {
+    clearSearchButton.hidden = searchInput.value.length === 0;
+  }
   const pageSize = 16;
   const savedBooksKey = 'my-book-library:books';
   const legacySavedBooksKey = 'my-book-library:plan-to-read';
@@ -969,6 +1017,7 @@ const { libraryBooks = [] } = Astro.props;
     if (!query) return;
 
     searchInput.value = query;
+    updateSearchClearButton();
     performSearch(
       query,
       1,
@@ -982,6 +1031,7 @@ const { libraryBooks = [] } = Astro.props;
   const initialQuery = initialParams.get('query')?.trim();
   if (initialQuery) {
     searchInput.value = initialQuery;
+    updateSearchClearButton();
     performSearch(
       initialQuery,
       1,
@@ -995,9 +1045,17 @@ const { libraryBooks = [] } = Astro.props;
 
   searchInput?.addEventListener('input', () => {
     clearTimeout(debounceTimer);
+    updateSearchClearButton();
     const query = searchInput.value.trim();
 
     if (query.length < 3) {
+      currentQuery = '';
+      currentPage = 1;
+      currentAuthorOnly = false;
+      currentAuthorKey = '';
+      currentAuthorExact = false;
+      currentLanguage = '';
+      searchRequestId++;
       resultsContainer.innerHTML = '';
       summaryContainer.innerHTML = '';
       paginationContainer.innerHTML = '';
@@ -1010,6 +1068,12 @@ const { libraryBooks = [] } = Astro.props;
     debounceTimer = setTimeout(() => {
       performSearch(query, 1, false, '', false, currentSort, '');
     }, 400);
+  });
+
+  clearSearchButton?.addEventListener('click', () => {
+    searchInput.value = '';
+    searchInput.dispatchEvent(new Event('input', { bubbles: true }));
+    searchInput.focus();
   });
 
   searchSortSelect?.addEventListener('change', () => {
