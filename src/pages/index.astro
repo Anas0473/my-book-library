@@ -944,19 +944,26 @@ const splitAuthors = (author: string) =>
       const panelRefreshers = new Map<string, () => void>();
       const panelLanguageLoaders = new Map<string, () => void>();
       const editionLanguageCacheKey = "my-book-library:edition-languages";
+      function normalizeEditionId(value: string) {
+        return String(value || "").match(/OL\d+M/i)?.[0].toUpperCase() || "";
+      }
+      function isKnownEditionLanguage(value: unknown): value is string {
+        return typeof value === "string" && Boolean(value.trim()) && value.trim().toLowerCase() !== "unknown";
+      }
       let editionLanguageCache: Record<string, string> = {};
       try {
         const cachedLanguages = JSON.parse(localStorage.getItem(editionLanguageCacheKey) || "{}");
-        if (cachedLanguages && typeof cachedLanguages === "object") editionLanguageCache = cachedLanguages;
+        if (cachedLanguages && typeof cachedLanguages === "object") {
+          editionLanguageCache = Object.fromEntries(
+            Object.entries(cachedLanguages).filter(([, language]) => isKnownEditionLanguage(language)),
+          ) as Record<string, string>;
+        }
+        localStorage.setItem(editionLanguageCacheKey, JSON.stringify(editionLanguageCache));
       } catch {
         editionLanguageCache = {};
       }
       let languageLoadPromise: Promise<void> | null = null;
       let lastLanguageLoadAt = 0;
-
-      function normalizeEditionId(value: string) {
-        return String(value || "").match(/OL\d+M/i)?.[0].toUpperCase() || "";
-      }
 
       const previousSyncWarning = localStorage.getItem(openLibraryLastSyncResultKey) || "";
       if (/books were not returned by Open Library/.test(previousSyncWarning)) {
@@ -1175,7 +1182,9 @@ const splitAuthors = (author: string) =>
         card.dataset.author = String(book.author || "").toLowerCase();
         card.dataset.year = String(parseInt(String(book.pubDate), 10) || 0);
         const cachedLanguage = editionLanguageCache[normalizeEditionId(book.editionKey)];
-        card.dataset.language = String(book.editionLanguage || book.language || cachedLanguage || "").toLowerCase();
+        const bookLanguage = [book.editionLanguage, book.language, cachedLanguage]
+          .find((language) => isKnownEditionLanguage(language));
+        card.dataset.language = String(bookLanguage || "").toLowerCase();
 
         const selectionLabel = document.createElement("label");
         selectionLabel.className = "local-book-select";
@@ -1228,11 +1237,19 @@ const splitAuthors = (author: string) =>
           pubDate.textContent = `Published: ${book.pubDate}`;
           details.appendChild(pubDate);
         }
-        if (book.editionUrl) {
+        const selectedEditionId = normalizeEditionId(book.editionKey || "");
+        const editionUrl = book.editionUrl || (selectedEditionId
+          ? `https://openlibrary.org/books/${selectedEditionId}`
+          : "");
+        const workId = String(book.workKey || book.key || "").match(/OL\d+W/i)?.[0];
+        const openLibraryUrl = editionUrl || (workId
+          ? `https://openlibrary.org/works/${workId}`
+          : "");
+        if (openLibraryUrl) {
           const editionLink = document.createElement("p");
           editionLink.className = "edition-link-text";
           const link = document.createElement("a");
-          link.href = book.editionUrl;
+          link.href = openLibraryUrl;
           link.target = "_blank";
           link.rel = "noopener noreferrer";
           link.textContent = "Open selected edition";
@@ -1723,17 +1740,22 @@ const splitAuthors = (author: string) =>
           const sortVal = sortSelect.value;
           const cards = Array.from(grid.querySelectorAll<HTMLElement>(".card"));
           cards.forEach((card) => {
-            if (card.dataset.language) return;
+            if (isKnownEditionLanguage(card.dataset.language)) return;
             const cachedLanguage = editionLanguageCache[normalizeEditionId(card.dataset.editionKey || "")];
-            if (cachedLanguage) card.dataset.language = cachedLanguage;
+            card.dataset.language = isKnownEditionLanguage(cachedLanguage)
+              ? cachedLanguage
+              : cachedLanguage === "unknown" ? "unknown" : "";
           });
           const selectedLanguage = languageSelect.value;
           const languageCounts = new Map<string, number>();
           cards.forEach((card) => {
-            const language = card.dataset.language || "unknown";
+            const language = card.dataset.language
+              || (normalizeEditionId(card.dataset.editionKey || "") ? "unverified" : "unknown");
             languageCounts.set(language, (languageCounts.get(language) || 0) + 1);
           });
-          const languages = [...languageCounts.keys()].filter((language) => language !== "unknown").sort();
+          const languages = [...languageCounts.keys()]
+            .filter((language) => language !== "unknown" && language !== "unverified")
+            .sort();
           const languageNames: Record<string, string> = {
             ara: "Arabic", dan: "Danish", deu: "German", eng: "English",
             fas: "Persian", fin: "Finnish", fra: "French", fre: "French", ger: "German", heb: "Hebrew",
@@ -1749,14 +1771,25 @@ const splitAuthors = (author: string) =>
             languageSelect.appendChild(option);
           });
           const unknownCount = languageCounts.get("unknown") || 0;
+          const unverifiedCount = languageCounts.get("unverified") || 0;
           if (unknownCount > 0) {
             const option = document.createElement("option");
             option.value = "unknown";
             option.textContent = `Unknown language (${unknownCount})`;
             languageSelect.appendChild(option);
           }
+          if (unverifiedCount > 0) {
+            const option = document.createElement("option");
+            option.value = "unverified";
+            option.textContent = `Unverified (${unverifiedCount})`;
+            languageSelect.appendChild(option);
+          }
           languageSelect.disabled = cards.length === 0;
-          languageSelect.value = [...languages, ...(unknownCount > 0 ? ["unknown"] : [])].includes(selectedLanguage)
+          languageSelect.value = [
+            ...languages,
+            ...(unknownCount > 0 ? ["unknown"] : []),
+            ...(unverifiedCount > 0 ? ["unverified"] : []),
+          ].includes(selectedLanguage)
             ? selectedLanguage
             : "";
           const language = languageSelect.value;
@@ -1770,7 +1803,10 @@ const splitAuthors = (author: string) =>
             const matchesText = title.includes(query) || subtitle.includes(query) || author.includes(query);
             const matchesLanguage = !language
               || (language === "unknown"
-                ? !card.dataset.language || card.dataset.language === "unknown"
+                ? card.dataset.language === "unknown"
+                  || (!card.dataset.language && !normalizeEditionId(card.dataset.editionKey || ""))
+                : language === "unverified"
+                  ? !card.dataset.language && Boolean(normalizeEditionId(card.dataset.editionKey || ""))
                 : card.dataset.language === language);
             const matches = matchesText && matchesLanguage;
 
@@ -1848,7 +1884,7 @@ const splitAuthors = (author: string) =>
                 let savedBooksChanged = false;
                 localBooks.forEach((book) => {
                   const editionId = normalizeEditionId(book.editionKey || "");
-                  if (editionId && editionLanguageCache[editionId] && !book.editionLanguage) {
+                  if (editionId && editionLanguageCache[editionId] && !isKnownEditionLanguage(book.editionLanguage)) {
                     book.editionLanguage = editionLanguageCache[editionId];
                     savedBooksChanged = true;
                   }

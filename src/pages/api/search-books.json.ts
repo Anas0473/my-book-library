@@ -362,15 +362,19 @@ export const GET: APIRoute = async ({ url }) => {
 
     const formattedBooks = pageDocs.map((doc: any, index: number) => {
       const edition = matchedEditions[index];
+      const selectedEditionId = String(edition?.key || doc.edition_key?.[0] || '')
+        .match(/OL\d+M/i)?.[0].toUpperCase() || null;
       return {
         key: doc.key,
         workKey: doc.key,
-        editionKey: edition?.key || null,
-        editionUrl: edition?.key ? `https://openlibrary.org${edition.key}` : null,
+        editionKey: selectedEditionId ? `/books/${selectedEditionId}` : null,
+        editionUrl: selectedEditionId ? `https://openlibrary.org/books/${selectedEditionId}` : null,
         editionLanguage: edition?.languages?.[0]?.key?.split('/').pop() || (language && edition ? language : null),
         editionHeroImage: edition?.covers?.[0]
           ? `https://covers.openlibrary.org/b/id/${edition.covers[0]}-M.jpg`
-          : null,
+          : selectedEditionId
+            ? `https://covers.openlibrary.org/b/olid/${selectedEditionId}-M.jpg?default=false`
+            : null,
         title: edition?.title || doc.title,
         subtitle: edition?.subtitle || doc.subtitle || null,
         author: doc.author_name ? doc.author_name.join(', ') : 'Unknown Author',

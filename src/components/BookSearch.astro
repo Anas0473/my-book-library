@@ -504,12 +504,17 @@ const { libraryBooks = [] } = Astro.props;
   }
 
   function saveBookToShelf(book: any, status: string) {
+    const firstEditionKey = Array.isArray(book.editionKeys) ? book.editionKeys[0] : null;
+    const selectedEditionKey = book.editionKey || firstEditionKey;
+    const selectedEditionId = String(selectedEditionKey || "").match(/OL\d+M/i)?.[0].toUpperCase();
     let savedBook = {
       key: book.key || book.isbn || `${book.title}:${book.author}`,
       workKey: book.workKey,
-      editionKey: book.editionKey,
-      editionUrl: book.editionUrl,
-      editionHeroImage: book.editionHeroImage,
+      editionKey: book.editionKey || (selectedEditionId ? `/books/${selectedEditionId}` : undefined),
+      editionUrl: book.editionUrl || (selectedEditionId ? `https://openlibrary.org/books/${selectedEditionId}` : undefined),
+      editionHeroImage: book.editionHeroImage || (selectedEditionId
+        ? `https://covers.openlibrary.org/b/olid/${selectedEditionId}-M.jpg?default=false`
+        : undefined),
       editionLanguage: book.editionLanguage,
       editionCount: book.editionCount || 0,
       title: book.title,
@@ -524,9 +529,13 @@ const { libraryBooks = [] } = Astro.props;
     const existingIndex = updatedBooks.findIndex((item: any) => isSameBook(item, savedBook));
 
     if (existingIndex >= 0) {
+      const existingBook = updatedBooks[existingIndex];
       savedBook = {
         ...savedBook,
-        ...updatedBooks[existingIndex],
+        ...existingBook,
+        editionKey: existingBook.editionKey || savedBook.editionKey,
+        editionUrl: existingBook.editionUrl || savedBook.editionUrl,
+        editionHeroImage: existingBook.editionHeroImage || savedBook.editionHeroImage,
         status,
       };
       updatedBooks[existingIndex] = savedBook;
@@ -680,8 +689,8 @@ const { libraryBooks = [] } = Astro.props;
       resultsContainer.innerHTML = displayBooks.map((book: any, index: number) => {
         const matchedSavedBook = savedBooks.find((item: any) => isSameBook(item, book));
         const firstEditionKey = Array.isArray(book.editionKeys) ? book.editionKeys[0] : null;
-        const savedEditionKey = matchedSavedBook?.editionKey || book.editionKey;
-        const savedEditionId = String(savedEditionKey || '').match(/(?:^|\/)(?:books\/)?(OL\d+M)$/i)?.[1];
+        const savedEditionKey = matchedSavedBook?.editionKey || book.editionKey || firstEditionKey;
+        const savedEditionId = String(savedEditionKey || '').match(/OL\d+M/i)?.[0];
         const coverImage = matchedSavedBook?.editionHeroImage
           || book.editionHeroImage
           || (savedEditionId
@@ -689,7 +698,12 @@ const { libraryBooks = [] } = Astro.props;
             : null)
           || book.heroImage;
         const editionUrl = matchedSavedBook?.editionUrl
-          || (firstEditionKey ? `https://openlibrary.org/books/${firstEditionKey}` : '');
+          || book.editionUrl
+          || (savedEditionId ? `https://openlibrary.org/books/${savedEditionId}` : '');
+        const workUrl = book.workKey
+          ? `https://openlibrary.org/${String(book.workKey).replace(/^\/+/, '')}`
+          : '';
+        const recordUrl = editionUrl || workUrl;
         return `
         <div class="search-card">
           <div>
@@ -701,8 +715,8 @@ const { libraryBooks = [] } = Astro.props;
             ${book.subtitle ? `<p class="subtitle">${book.subtitle}</p>` : ''}
             <p class="author-text">${authorLinksMarkup(book.author || 'Unknown Author')}</p>
             <p class="pub-date">${book.pubDate ? `Published: ${book.pubDate}` : 'Publication date unknown'}</p>
-            <a class="selected-edition-link" href="${editionUrl || '#'}" target="_blank" rel="noopener noreferrer" ${editionUrl ? '' : 'hidden'}>Open selected edition</a>
-            ${book.workKey ? `<button type="button" class="edition-button" data-book-index="${index}" data-preferred-edition="${escapeHtml(String(matchedSavedBook?.editionKey || book.editionKey || ''))}">Browse editions${book.editionCount ? ` (${book.editionCount})` : ''}</button>` : ''}
+            <a class="selected-edition-link" href="${escapeHtml(recordUrl || '#')}" target="_blank" rel="noopener noreferrer" ${recordUrl ? '' : 'hidden'}>Open selected edition</a>
+            ${book.workKey ? `<button type="button" class="edition-button" data-book-index="${index}" data-preferred-edition="${escapeHtml(String(savedEditionKey || ''))}">Browse editions${book.editionCount ? ` (${book.editionCount})` : ''}</button>` : ''}
           </div>
           <div class="shelf-control">
             <button type="button" class="shelf-primary">Want to Read</button>
