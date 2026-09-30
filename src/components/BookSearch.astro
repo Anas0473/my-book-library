@@ -252,6 +252,47 @@ const { libraryBooks = [] } = Astro.props;
     color: #64748b;
     font-size: 0.8rem;
   }
+  :global(.edition-view-all) {
+    width: 100%;
+    padding: 0.6rem;
+    border: 1px solid #cbd5e1;
+    border-radius: 6px;
+    background: #fff;
+    color: #39745b;
+    font: inherit;
+    font-size: 0.8rem;
+    cursor: pointer;
+  }
+  :global(.edition-view-all:hover) {
+    background: #f8fafc;
+    border-color: #39745b;
+  }
+  :global(.edition-pagination) {
+    display: flex;
+    flex: 0 0 auto;
+    align-items: center;
+    justify-content: center;
+    gap: 0.75rem;
+    padding-top: 0.75rem;
+    color: #64748b;
+    font-size: 0.8rem;
+  }
+  :global(.edition-pagination[hidden]) {
+    display: none;
+  }
+  :global(.edition-pagination button) {
+    padding: 0.35rem 0.65rem;
+    border: 1px solid #cbd5e1;
+    border-radius: 4px;
+    background: #fff;
+    color: #334155;
+    font: inherit;
+    cursor: pointer;
+  }
+  :global(.edition-pagination button:disabled) {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
   :global(.edition-dialog-close) {
     padding: 0.25rem 0.5rem;
     border: 1px solid #cbd5e1;
@@ -460,6 +501,9 @@ const { libraryBooks = [] } = Astro.props;
   const resultsContainer = document.getElementById('search-results') as HTMLElement;
   const summaryContainer = document.getElementById('search-summary') as HTMLElement;
   const paginationContainer = document.getElementById('pagination-controls') as HTMLElement;
+  const editionDialog = document.createElement('dialog');
+  editionDialog.className = 'edition-dialog search-edition-dialog';
+  document.body.appendChild(editionDialog);
   resultsContainer.addEventListener('error', (event) => {
     const image = event.target;
     if (!(image instanceof HTMLImageElement) || !image.matches('.search-card img')) return;
@@ -783,11 +827,6 @@ const { libraryBooks = [] } = Astro.props;
       `;
       }).join('');
 
-      document.querySelectorAll('.search-edition-dialog').forEach((dialog) => dialog.remove());
-      const editionDialog = document.createElement('dialog');
-      editionDialog.className = 'edition-dialog search-edition-dialog';
-      document.body.appendChild(editionDialog);
-
       async function openEditionPicker(book: any, card: HTMLElement, button: HTMLButtonElement) {
         button.disabled = true;
         button.textContent = 'Loading editions...';
@@ -800,6 +839,10 @@ const { libraryBooks = [] } = Astro.props;
           const response = await fetch(`/api/book-editions.json?${params}`);
           const data = await response.json();
           const editions = Array.isArray(data.editions) ? data.editions : [];
+          const featuredCount = Math.min(
+            editions.length,
+            Number(data.featuredCount) || Math.min(10, editions.length),
+          );
           const totalCount = Number(data.totalCount) || editions.length || book.editionCount || 0;
           book.editionCount = totalCount;
           button.textContent = `Browse editions${book.editionCount ? ` (${book.editionCount})` : ''}`;
@@ -819,82 +862,146 @@ const { libraryBooks = [] } = Astro.props;
 
           const summary = document.createElement('p');
           summary.className = 'edition-summary';
-          summary.textContent = `Showing ${editions.length} of ${totalCount} editions, with the best matches first.`;
+          summary.textContent = totalCount > featuredCount
+            ? `Showing ${featuredCount} featured editions.`
+            : `Showing all ${editions.length} editions.`;
           editionDialog.appendChild(summary);
 
           const list = document.createElement('div');
           list.className = 'edition-list';
-          if (editions.length === 0) {
-            const emptyMessage = document.createElement('p');
-            emptyMessage.textContent = 'No editions found.';
-            list.appendChild(emptyMessage);
-          }
+          const pageSize = 12;
+          let showingAllEditions = false;
+          let currentEditionPage = 1;
+          const pagination = document.createElement('div');
+          pagination.className = 'edition-pagination';
+          pagination.hidden = true;
+          const previousPageButton = document.createElement('button');
+          previousPageButton.type = 'button';
+          previousPageButton.textContent = 'Previous';
+          previousPageButton.setAttribute('aria-label', 'Previous editions page');
+          const pageLabel = document.createElement('span');
+          const nextPageButton = document.createElement('button');
+          nextPageButton.type = 'button';
+          nextPageButton.textContent = 'Next';
+          nextPageButton.setAttribute('aria-label', 'Next editions page');
+          pagination.append(previousPageButton, pageLabel, nextPageButton);
 
-          editions.forEach((edition: any) => {
-            const option = document.createElement('button');
-            option.type = 'button';
-            option.className = 'edition-option';
-            const image = document.createElement('img');
-            image.alt = '';
-            if (edition.coverImage) image.src = edition.coverImage;
-            const details = document.createElement('span');
-            const title = document.createElement('strong');
-            title.textContent = edition.title;
-            const metadata = document.createElement('span');
-            metadata.textContent = [edition.language, edition.pubDate, edition.publisher]
-              .filter(Boolean)
-              .join(' · ');
-            details.append(title, metadata);
-            const chooseLabel = document.createElement('span');
-            chooseLabel.className = 'edition-choice-label';
-            const editionAlreadyAdded = getSavedBooks().some((savedBook: any) =>
-              savedBook.editionKey && savedBook.editionKey === edition.key,
-            ) || libraryBooks.some((savedBook: any) =>
-              savedBook.editionKey && savedBook.editionKey === edition.key,
-            );
-            chooseLabel.textContent = editionAlreadyAdded ? '✓ Added' : 'Choose';
-            option.append(image, details, chooseLabel);
-            option.addEventListener('click', () => {
-              book.key = edition.key;
-              book.editionKey = edition.key;
-              book.editionUrl = edition.url;
-              book.editionHeroImage = edition.coverImage;
-              book.editionLanguage = edition.language;
-              book.title = edition.title;
-              book.subtitle = edition.subtitle;
-              book.pubDate = edition.pubDate;
-              book.isbn = edition.isbn;
-              book.heroImage = edition.coverImage;
+          const renderEditionOptions = () => {
+            const pageCount = Math.max(1, Math.ceil(editions.length / pageSize));
+            const visibleEditions = showingAllEditions
+              ? editions.slice((currentEditionPage - 1) * pageSize, currentEditionPage * pageSize)
+              : editions.slice(0, featuredCount);
+            summary.textContent = showingAllEditions
+              ? `Showing ${(currentEditionPage - 1) * pageSize + 1}–${Math.min(currentEditionPage * pageSize, editions.length)} of ${totalCount} editions.`
+              : totalCount > featuredCount
+                ? `Showing ${featuredCount} featured editions.`
+                : `Showing all ${editions.length} editions.`;
+            pagination.hidden = !showingAllEditions || pageCount <= 1;
+            previousPageButton.disabled = currentEditionPage <= 1;
+            nextPageButton.disabled = currentEditionPage >= pageCount;
+            pageLabel.textContent = `Page ${currentEditionPage} of ${pageCount}`;
+            list.innerHTML = '';
+            if (visibleEditions.length === 0) {
+              const emptyMessage = document.createElement('p');
+              emptyMessage.textContent = 'No editions found.';
+              list.appendChild(emptyMessage);
+              return;
+            }
 
-              const cardImage = card.querySelector('img');
-              if (cardImage && edition.coverImage) {
-                cardImage.src = edition.coverImage;
-                cardImage.alt = edition.title;
-              } else if (edition.coverImage) {
-                const placeholder = card.querySelector('.search-cover-placeholder');
-                if (placeholder) {
-                  const selectedImage = document.createElement('img');
-                  selectedImage.src = edition.coverImage;
-                  selectedImage.alt = edition.title;
-                  placeholder.replaceWith(selectedImage);
+            visibleEditions.forEach((edition: any) => {
+              const option = document.createElement('button');
+              option.type = 'button';
+              option.className = 'edition-option';
+              const image = document.createElement('img');
+              image.alt = '';
+              if (edition.coverImage) image.src = edition.coverImage;
+              const details = document.createElement('span');
+              const title = document.createElement('strong');
+              title.textContent = edition.title;
+              const metadata = document.createElement('span');
+              metadata.textContent = [edition.language, edition.pubDate, edition.publisher]
+                .filter(Boolean)
+                .join(' · ');
+              details.append(title, metadata);
+              const chooseLabel = document.createElement('span');
+              chooseLabel.className = 'edition-choice-label';
+              const editionAlreadyAdded = getSavedBooks().some((savedBook: any) =>
+                savedBook.editionKey && savedBook.editionKey === edition.key,
+              ) || libraryBooks.some((savedBook: any) =>
+                savedBook.editionKey && savedBook.editionKey === edition.key,
+              );
+              chooseLabel.textContent = editionAlreadyAdded ? '✓ Added' : 'Choose';
+              option.append(image, details, chooseLabel);
+              option.addEventListener('click', () => {
+                book.key = edition.key;
+                book.editionKey = edition.key;
+                book.editionUrl = edition.url;
+                book.editionHeroImage = edition.coverImage;
+                book.editionLanguage = edition.language;
+                book.title = edition.title;
+                book.subtitle = edition.subtitle;
+                book.pubDate = edition.pubDate;
+                book.isbn = edition.isbn;
+                book.heroImage = edition.coverImage;
+
+                const cardImage = card.querySelector('img');
+                if (cardImage && edition.coverImage) {
+                  cardImage.src = edition.coverImage;
+                  cardImage.alt = edition.title;
+                } else if (edition.coverImage) {
+                  const placeholder = card.querySelector('.search-cover-placeholder');
+                  if (placeholder) {
+                    const selectedImage = document.createElement('img');
+                    selectedImage.src = edition.coverImage;
+                    selectedImage.alt = edition.title;
+                    placeholder.replaceWith(selectedImage);
+                  }
                 }
-              }
-              const cardTitle = card.querySelector('h5');
-              if (cardTitle) cardTitle.textContent = edition.title;
-              const pubDate = card.querySelector('.pub-date');
-              if (pubDate) pubDate.textContent = `Published: ${edition.pubDate}`;
-              const selectedLink = card.querySelector<HTMLAnchorElement>('.selected-edition-link');
-              if (selectedLink) {
-                selectedLink.href = edition.url;
-                selectedLink.hidden = false;
-              }
-              button.textContent = `Change edition${book.editionCount ? ` (${book.editionCount})` : ''}`;
-              editionDialog.close();
+                const cardTitle = card.querySelector('h5');
+                if (cardTitle) cardTitle.textContent = edition.title;
+                const pubDate = card.querySelector('.pub-date');
+                if (pubDate) pubDate.textContent = `Published: ${edition.pubDate}`;
+                const selectedLink = card.querySelector<HTMLAnchorElement>('.selected-edition-link');
+                if (selectedLink) {
+                  selectedLink.href = edition.url;
+                  selectedLink.hidden = false;
+                }
+                button.textContent = `Change edition${book.editionCount ? ` (${book.editionCount})` : ''}`;
+                editionDialog.close();
+              });
+              list.appendChild(option);
             });
-            list.appendChild(option);
+
+            if (editions.length > featuredCount) {
+              const viewAllButton = document.createElement('button');
+              viewAllButton.type = 'button';
+              viewAllButton.className = 'edition-view-all';
+              viewAllButton.textContent = `View all ${totalCount} editions`;
+              viewAllButton.addEventListener('click', () => {
+                showingAllEditions = true;
+                currentEditionPage = 1;
+                renderEditionOptions();
+                list.scrollTop = 0;
+              });
+              list.appendChild(viewAllButton);
+            }
+          };
+          previousPageButton.addEventListener('click', () => {
+            if (currentEditionPage <= 1) return;
+            currentEditionPage--;
+            renderEditionOptions();
+            list.scrollTop = 0;
           });
+          nextPageButton.addEventListener('click', () => {
+            if (currentEditionPage >= Math.ceil(editions.length / pageSize)) return;
+            currentEditionPage++;
+            renderEditionOptions();
+            list.scrollTop = 0;
+          });
+          renderEditionOptions();
 
           editionDialog.appendChild(list);
+          editionDialog.appendChild(pagination);
           editionDialog.showModal();
         } catch {
           editionDialog.innerHTML = '<p>Unable to load editions.</p>';
