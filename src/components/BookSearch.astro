@@ -523,6 +523,7 @@ const { libraryBooks = [] } = Astro.props;
       pubDate: book.pubDate,
       isbn: book.isbn,
       heroImage: book.heroImage,
+      dateAdded: Number(book.dateAdded) || Date.now(),
       status,
     };
     const updatedBooks = getSavedBooks();
@@ -536,6 +537,7 @@ const { libraryBooks = [] } = Astro.props;
         editionKey: existingBook.editionKey || savedBook.editionKey,
         editionUrl: existingBook.editionUrl || savedBook.editionUrl,
         editionHeroImage: existingBook.editionHeroImage || savedBook.editionHeroImage,
+        dateAdded: existingBook.dateAdded || savedBook.dateAdded,
         status,
       };
       updatedBooks[existingIndex] = savedBook;
