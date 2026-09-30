@@ -257,6 +257,31 @@ export const GET: APIRoute = async ({ url }) => {
           ),
         )
       : relevantDocs;
+    const titleEditionMatches = new Map<string, any>();
+    if (isGeneralQuery && !language) {
+      const titleCandidates = authorMatchingDocs
+        .map((doc: any) => {
+          const title = String(doc.title || '').toLocaleLowerCase();
+          const subtitle = String(doc.subtitle || '').toLocaleLowerCase();
+          const relevance = title.includes(normalizedPhrase) ? 2 : subtitle.includes(normalizedPhrase) ? 1 : 0;
+          return { doc, relevance };
+        })
+        .filter(({ doc, relevance }: any) => doc.key && relevance > 0)
+        .sort((first: any, second: any) =>
+          (Number(second.doc.edition_count) || 0) - (Number(first.doc.edition_count) || 0) ||
+          second.relevance - first.relevance,
+        )
+        .slice(0, topRankedCount);
+      const editions = await Promise.all(titleCandidates.map(({ doc }: any) => {
+        const docKey = String(doc.key);
+        return fallbackEditionMatches.has(docKey)
+          ? fallbackEditionMatches.get(docKey)
+          : findMatchingEdition(docKey.replace(/^\/+/, ''), normalizedPhrase, undefined, 2500, true);
+      }));
+      titleCandidates.forEach(({ doc }: any, index: number) => {
+        if (editions[index]) titleEditionMatches.set(String(doc.key), editions[index]);
+      });
+    }
     const languageEditionMatches = new Map<string, any>();
     if (language) {
       const untaggedDocs = authorMatchingDocs.filter((doc: any) =>
@@ -282,6 +307,21 @@ export const GET: APIRoute = async ({ url }) => {
           (doc.language || []).includes(language) || languageEditionMatches.has(String(doc.key)),
         )
       : authorMatchingDocs;
+    const editionPublicationYear = (doc: any) => {
+      const edition = titleEditionMatches.get(String(doc.key))
+        || fallbackEditionMatches.get(String(doc.key))
+        || languageEditionMatches.get(String(doc.key));
+      const dates = Array.isArray(edition?.publish_date)
+        ? edition.publish_date
+        : [edition?.publish_date];
+      const years = dates.map((date: any) => {
+        const year = String(date || '').match(/\b\d{4}\b/)?.[0];
+        if (year) return Number(year);
+        const timestamp = Date.parse(String(date || ''));
+        return Number.isFinite(timestamp) ? new Date(timestamp).getFullYear() : 0;
+      }).filter((year: number) => year > 0);
+      return years.length > 0 ? Math.max(...years) : Number(doc.first_publish_year) || 0;
+    };
     const sortedDocs = shouldSort
       ? [...matchingDocs].sort((first: any, second: any) => {
           if (sort.startsWith('title')) {
@@ -293,8 +333,8 @@ export const GET: APIRoute = async ({ url }) => {
             return sort === 'title-desc' ? -comparison : comparison;
           }
 
-          const firstYear = Number(first.first_publish_year) || 0;
-          const secondYear = Number(second.first_publish_year) || 0;
+          const firstYear = editionPublicationYear(first);
+          const secondYear = editionPublicationYear(second);
           return sort === 'year-desc' ? secondYear - firstYear : firstYear - secondYear;
         })
       : matchingDocs;
@@ -306,21 +346,16 @@ export const GET: APIRoute = async ({ url }) => {
       ? sortedDocs.slice(offset, offset + limit)
       : sortedDocs;
 
-    // For title-style searches, prefer the specific edition matching the searched phrase
-    // over the work's arbitrary default cover/edition (e.g. a translated title's own cover).
-    // Limited to a handful of docs to keep general (live-as-you-type) searches responsive.
-    const editionLookupLimit = language ? pageDocs.length : 5;
+    // Reuse sort-independent edition lookups so displayed details remain stable across sorts.
     const matchedEditions = isGeneralQuery || language
       ? await Promise.all(
-          pageDocs.map((doc: any, index: number) => {
-            if ((!language && index >= editionLookupLimit) || !doc.key) return null;
+          pageDocs.map((doc: any) => {
+            if (!doc.key) return null;
             const docKey = String(doc.key);
             if (language) {
               return findMatchingEdition(docKey.replace(/^\/+/, ''), normalizedPhrase, language, 2500, true);
             }
-            return !language && fallbackEditionMatches.has(docKey)
-              ? fallbackEditionMatches.get(docKey)
-              : findMatchingEdition(docKey.replace(/^\/+/, ''), normalizedPhrase, language, 2500, true);
+            return fallbackEditionMatches.get(docKey) || titleEditionMatches.get(docKey) || null;
           }),
         )
       : pageDocs.map(() => null);

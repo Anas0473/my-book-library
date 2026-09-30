@@ -268,7 +268,7 @@ const splitAuthors = (author: string) =>
       }
       .controls {
         display: grid;
-        grid-template-columns: minmax(0, 1fr) max-content max-content;
+        grid-template-columns: minmax(0, 1fr) max-content max-content max-content;
         align-items: center;
         gap: 1rem;
         margin-bottom: 1.5rem;
@@ -332,7 +332,8 @@ const splitAuthors = (author: string) =>
         accent-color: #39745b;
       }
       .search-input,
-      .sort-select {
+      .sort-select,
+      .language-select {
         height: 3rem;
         box-sizing: border-box;
         padding: 0.5rem 0.8rem;
@@ -345,11 +346,13 @@ const splitAuthors = (author: string) =>
       .search-input {
         flex: 1;
       }
-      .sort-select {
+      .sort-select,
+      .language-select {
         width: auto;
       }
       .search-input:focus,
-      .sort-select:focus {
+      .sort-select:focus,
+      .language-select:focus {
         border-color: #0070f3;
       }
       .cards-grid {
@@ -609,6 +612,9 @@ const splitAuthors = (author: string) =>
         .sort-select {
           width: 100%;
         }
+        .language-select {
+          width: 100%;
+        }
         .cards-grid {
           grid-template-columns: 1fr;
           gap: 0.75rem;
@@ -731,6 +737,9 @@ const splitAuthors = (author: string) =>
                   <option value="year-desc">Year: Newest First</option>
                   <option value="year-asc">Year: Oldest First</option>
                 </select>
+                <select class="language-select" aria-label="Filter this list by language">
+                  <option value="">All languages</option>
+                </select>
               </div>
               <div class="cards-grid">
                 {books.map((book) => (
@@ -746,6 +755,7 @@ const splitAuthors = (author: string) =>
                     data-subtitle={(book.data.subtitle || "").toLowerCase()}
                     data-author={(book.data.author || "").toLowerCase()}
                     data-year={parseInt(String(book.data.pubDate)) || 0}
+                    data-language={String((book.data as any).editionLanguage || (book.data as any).language || "").toLowerCase()}
                   >
                     <div>
                       {book.data.heroImage ? (
@@ -932,6 +942,21 @@ const splitAuthors = (author: string) =>
       ];
       const serverShelfCounts = new Map<string, number>();
       const panelRefreshers = new Map<string, () => void>();
+      const panelLanguageLoaders = new Map<string, () => void>();
+      const editionLanguageCacheKey = "my-book-library:edition-languages";
+      let editionLanguageCache: Record<string, string> = {};
+      try {
+        const cachedLanguages = JSON.parse(localStorage.getItem(editionLanguageCacheKey) || "{}");
+        if (cachedLanguages && typeof cachedLanguages === "object") editionLanguageCache = cachedLanguages;
+      } catch {
+        editionLanguageCache = {};
+      }
+      let languageLoadPromise: Promise<void> | null = null;
+      let lastLanguageLoadAt = 0;
+
+      function normalizeEditionId(value: string) {
+        return String(value || "").match(/OL\d+M/i)?.[0].toUpperCase() || "";
+      }
 
       const previousSyncWarning = localStorage.getItem(openLibraryLastSyncResultKey) || "";
       if (/books were not returned by Open Library/.test(previousSyncWarning)) {
@@ -1149,6 +1174,8 @@ const splitAuthors = (author: string) =>
         card.dataset.subtitle = String(book.subtitle || "").toLowerCase();
         card.dataset.author = String(book.author || "").toLowerCase();
         card.dataset.year = String(parseInt(String(book.pubDate), 10) || 0);
+        const cachedLanguage = editionLanguageCache[normalizeEditionId(book.editionKey)];
+        card.dataset.language = String(book.editionLanguage || book.language || cachedLanguage || "").toLowerCase();
 
         const selectionLabel = document.createElement("label");
         selectionLabel.className = "local-book-select";
@@ -1460,6 +1487,7 @@ const splitAuthors = (author: string) =>
         panels.forEach((panel) =>
           panel.classList.toggle("active", panel.id === target),
         );
+        panelLanguageLoaders.get(target)?.();
       }
 
       document.addEventListener("click", (event) => {
@@ -1677,10 +1705,13 @@ const splitAuthors = (author: string) =>
         const sortSelect = panel.querySelector(
           ".sort-select",
         ) as HTMLSelectElement;
+        const languageSelect = panel.querySelector(
+          ".language-select",
+        ) as HTMLSelectElement;
         const grid = panel.querySelector(".cards-grid") as HTMLElement;
         const noMatchMsg = panel.querySelector(".no-match-msg") as HTMLElement;
 
-        if (!searchInput || !sortSelect || !grid) return;
+        if (!searchInput || !sortSelect || !languageSelect || !grid) return;
 
         if (panel.id === pageParams.get("panel")) {
           searchInput.value = pageParams.get("filter") || "";
@@ -1691,6 +1722,44 @@ const splitAuthors = (author: string) =>
           const query = searchInput.value.trim().toLowerCase();
           const sortVal = sortSelect.value;
           const cards = Array.from(grid.querySelectorAll<HTMLElement>(".card"));
+          cards.forEach((card) => {
+            if (card.dataset.language) return;
+            const cachedLanguage = editionLanguageCache[normalizeEditionId(card.dataset.editionKey || "")];
+            if (cachedLanguage) card.dataset.language = cachedLanguage;
+          });
+          const selectedLanguage = languageSelect.value;
+          const languageCounts = new Map<string, number>();
+          cards.forEach((card) => {
+            const language = card.dataset.language || "unknown";
+            languageCounts.set(language, (languageCounts.get(language) || 0) + 1);
+          });
+          const languages = [...languageCounts.keys()].filter((language) => language !== "unknown").sort();
+          const languageNames: Record<string, string> = {
+            ara: "Arabic", dan: "Danish", deu: "German", eng: "English",
+            fas: "Persian", fin: "Finnish", fra: "French", fre: "French", ger: "German", heb: "Hebrew",
+            ita: "Italian", jpn: "Japanese", nld: "Dutch", dut: "Dutch", nor: "Norwegian",
+            por: "Portuguese", spa: "Spanish", swe: "Swedish", tur: "Turkish",
+            und: "Unknown language",
+          };
+          languageSelect.innerHTML = `<option value="">All languages (${cards.length})</option>`;
+          languages.forEach((code) => {
+            const option = document.createElement("option");
+            option.value = code;
+            option.textContent = `${languageNames[code] || code.toUpperCase()} (${languageCounts.get(code)})`;
+            languageSelect.appendChild(option);
+          });
+          const unknownCount = languageCounts.get("unknown") || 0;
+          if (unknownCount > 0) {
+            const option = document.createElement("option");
+            option.value = "unknown";
+            option.textContent = `Unknown language (${unknownCount})`;
+            languageSelect.appendChild(option);
+          }
+          languageSelect.disabled = cards.length === 0;
+          languageSelect.value = [...languages, ...(unknownCount > 0 ? ["unknown"] : [])].includes(selectedLanguage)
+            ? selectedLanguage
+            : "";
+          const language = languageSelect.value;
 
           let visibleCount = 0;
 
@@ -1698,7 +1767,12 @@ const splitAuthors = (author: string) =>
             const title = card.dataset.title || "";
             const subtitle = card.dataset.subtitle || "";
             const author = card.dataset.author || "";
-            const matches = title.includes(query) || subtitle.includes(query) || author.includes(query);
+            const matchesText = title.includes(query) || subtitle.includes(query) || author.includes(query);
+            const matchesLanguage = !language
+              || (language === "unknown"
+                ? !card.dataset.language || card.dataset.language === "unknown"
+                : card.dataset.language === language);
+            const matches = matchesText && matchesLanguage;
 
             if (matches) {
               card.style.display = "flex";
@@ -1739,10 +1813,67 @@ const splitAuthors = (author: string) =>
           cards.forEach((card) => grid.appendChild(card));
         }
 
+        async function loadMissingEditionLanguages() {
+          if (languageLoadPromise) return languageLoadPromise;
+          if (Date.now() - lastLanguageLoadAt < 30000) return;
+          const cards = Array.from(grid.querySelectorAll<HTMLElement>(".card"));
+          const editionIds = [...new Set(cards
+            .map((card) => normalizeEditionId(card.dataset.editionKey || ""))
+            .filter((editionId) => editionId && !editionLanguageCache[editionId]))];
+          if (editionIds.length === 0) return;
+          const batchSize = 40;
+          lastLanguageLoadAt = Date.now();
+
+          languageLoadPromise = (async () => {
+            for (let offset = 0; offset < editionIds.length; offset += batchSize) {
+              try {
+                const response = await fetch("/api/edition-languages.json", {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({ editionKeys: editionIds.slice(offset, offset + batchSize) }),
+                });
+                if (!response.ok) continue;
+                const data = await response.json();
+                Object.assign(editionLanguageCache, data.languages || {});
+                (data.resolved || []).forEach((editionId: string) => {
+                  if (!editionLanguageCache[editionId]) editionLanguageCache[editionId] = "unknown";
+                });
+                localStorage.setItem(editionLanguageCacheKey, JSON.stringify(editionLanguageCache));
+                cards.forEach((card) => {
+                  const editionId = normalizeEditionId(card.dataset.editionKey || "");
+                  if (editionId && editionLanguageCache[editionId]) {
+                    card.dataset.language = editionLanguageCache[editionId];
+                  }
+                });
+                let savedBooksChanged = false;
+                localBooks.forEach((book) => {
+                  const editionId = normalizeEditionId(book.editionKey || "");
+                  if (editionId && editionLanguageCache[editionId] && !book.editionLanguage) {
+                    book.editionLanguage = editionLanguageCache[editionId];
+                    savedBooksChanged = true;
+                  }
+                });
+                if (savedBooksChanged) localStorage.setItem(savedBooksKey, JSON.stringify(localBooks));
+                updatePanel();
+              } catch {
+                break;
+              }
+            }
+          })();
+          try {
+            await languageLoadPromise;
+          } finally {
+            languageLoadPromise = null;
+          }
+        }
+
         searchInput.addEventListener("input", updatePanel);
         sortSelect.addEventListener("change", updatePanel);
+        languageSelect.addEventListener("change", updatePanel);
         updatePanel();
         panelRefreshers.set(panel.id, updatePanel);
+        panelLanguageLoaders.set(panel.id, () => { void loadMissingEditionLanguages(); });
+        if (panel.classList.contains("active")) void loadMissingEditionLanguages();
 
         const batchControls = panel.querySelector<HTMLElement>(".batch-controls");
         if (!batchControls) return;
