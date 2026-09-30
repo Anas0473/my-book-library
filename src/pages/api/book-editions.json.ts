@@ -37,8 +37,8 @@ export const GET: APIRoute = async ({ url }) => {
     }
 
     const params = new URLSearchParams({
-      limit: '100',
-      fields: 'key,title,subtitle,publish_date,publishers,isbn_10,isbn_13,covers,languages',
+      limit: '1000',
+      fields: 'key,title,subtitle,publish_date,publishers,isbn_10,isbn_13,covers,languages,ocaid',
     });
     const response = await fetch(`https://openlibrary.org/${workKey}/editions.json?${params}`, {
       headers: { 'User-Agent': 'my-book-library/0.0.1' },
@@ -62,6 +62,7 @@ export const GET: APIRoute = async ({ url }) => {
         publisher: edition.publishers?.[0] || 'Unknown publisher',
         language: edition.languages?.[0]?.key?.replace('/languages/', '') || 'Unknown language',
         isbn: edition.isbn_13?.[0] || edition.isbn_10?.[0] || null,
+        hasDigitalCopy: Boolean(edition.ocaid),
         coverImage: edition.covers?.[0]
           ? `https://covers.openlibrary.org/b/id/${edition.covers[0]}-M.jpg`
           : null,
@@ -70,14 +71,6 @@ export const GET: APIRoute = async ({ url }) => {
     const normalizeEditionKey = (key: string) =>
       String(key || '').match(/OL\d+M/i)?.[0].toUpperCase() || String(key || '').replace(/^\/+|\/+$/g, '');
     const preferredId = normalizeEditionKey(preferredEdition);
-    const getLanguage = (edition: any) => edition.language || 'Unknown language';
-    const hasCover = (edition: any) => Boolean(edition.coverImage);
-    const metadataQuality = (edition: any) => [
-      getLanguage(edition) !== 'Unknown language',
-      edition.pubDate !== 'Unknown',
-      edition.publisher !== 'Unknown publisher',
-      Boolean(edition.isbn),
-    ].filter(Boolean).length;
     const publicationTime = (edition: any) => {
       const dates = Array.isArray(edition.pubDate) ? edition.pubDate : [edition.pubDate];
       const parsed = dates
@@ -87,24 +80,41 @@ export const GET: APIRoute = async ({ url }) => {
       const year = String(dates[0] || '').match(/\b\d{4}\b/)?.[0];
       return year ? Date.UTC(Number(year), 0, 1) : 0;
     };
-    const editions = allEditions
-      .sort((first: any, second: any) => {
-        const firstPreferred = preferredId && normalizeEditionKey(first.key) === preferredId;
-        const secondPreferred = preferredId && normalizeEditionKey(second.key) === preferredId;
-        if (firstPreferred !== secondPreferred) return firstPreferred ? -1 : 1;
+    const compareEditions = (first: any, second: any) => {
+      const firstHasCover = Boolean(first.coverImage);
+      const secondHasCover = Boolean(second.coverImage);
+      if (firstHasCover !== secondHasCover) return firstHasCover ? -1 : 1;
 
-        const firstInLanguage = language && getLanguage(first) === language;
-        const secondInLanguage = language && getLanguage(second) === language;
-        if (firstInLanguage !== secondInLanguage) return firstInLanguage ? -1 : 1;
-
-        if (hasCover(first) !== hasCover(second)) return hasCover(first) ? -1 : 1;
-        return publicationTime(second) - publicationTime(first)
-          || metadataQuality(second) - metadataQuality(first);
-      })
-      .slice(0, 12);
+      const firstInLanguage = language && first.language === language;
+      const secondInLanguage = language && second.language === language;
+      if (firstInLanguage !== secondInLanguage) return firstInLanguage ? -1 : 1;
+      return publicationTime(second) - publicationTime(first)
+        || first.title.localeCompare(second.title, undefined, { sensitivity: 'base' });
+    };
+    const selectedEdition = allEditions.find(
+      (edition: any) => preferredId && normalizeEditionKey(edition.key) === preferredId,
+    );
+    const availableEditions = allEditions
+      .filter((edition: any) => edition.hasDigitalCopy)
+      .sort(compareEditions);
+    const featuredEditions = availableEditions.length > 0
+      ? availableEditions.slice(0, 10)
+      : [...allEditions].sort(compareEditions).slice(0, 10);
+    if (selectedEdition) {
+      const selectedIndex = featuredEditions.findIndex(
+        (edition: any) => normalizeEditionKey(edition.key) === preferredId,
+      );
+      if (selectedIndex >= 0) featuredEditions.splice(selectedIndex, 1);
+      featuredEditions.unshift(selectedEdition);
+    }
+    const featuredKeys = new Set(featuredEditions.map((edition: any) => edition.key));
+    const editions = [
+      ...featuredEditions,
+      ...allEditions.filter((edition: any) => !featuredKeys.has(edition.key)).sort(compareEditions),
+    ];
     const totalCount = Number(data.size) || allEditions.length;
 
-    return new Response(JSON.stringify({ editions, totalCount }), {
+    return new Response(JSON.stringify({ editions, featuredCount: featuredEditions.length, totalCount }), {
       status: 200,
       headers: { 'Content-Type': 'application/json' },
     });
