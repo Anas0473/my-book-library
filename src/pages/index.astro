@@ -2141,21 +2141,27 @@ const splitAuthors = (author: string) =>
               || (normalizeEditionId(card.dataset.editionKey || "") ? "unverified" : "unknown");
             languageCounts.set(language, (languageCounts.get(language) || 0) + 1);
           });
+          const languageNames: Record<string, string> = {
+            cpf: "French-based Creole", mul: "Multiple languages", tib: "Tibetan", tlh: "Klingon",
+            und: "Unknown language", zxx: "No linguistic content",
+          };
+          const intlLanguageNames = new Intl.DisplayNames(["en"], { type: "language", fallback: "none" });
+          const getLanguageName = (code: string) => {
+            if (languageNames[code]) return languageNames[code];
+            try {
+              return intlLanguageNames.of(code) || code.toUpperCase();
+            } catch {
+              return code.toUpperCase();
+            }
+          };
           const languages = [...languageCounts.keys()]
             .filter((language) => language !== "unknown" && language !== "unverified")
-            .sort();
-          const languageNames: Record<string, string> = {
-            ara: "Arabic", dan: "Danish", deu: "German", eng: "English",
-            fas: "Persian", fin: "Finnish", fra: "French", fre: "French", ger: "German", heb: "Hebrew",
-            ita: "Italian", jpn: "Japanese", nld: "Dutch", dut: "Dutch", nor: "Norwegian",
-            por: "Portuguese", spa: "Spanish", swe: "Swedish", tur: "Turkish",
-            und: "Unknown language",
-          };
+            .sort((a, b) => getLanguageName(a).localeCompare(getLanguageName(b)));
           languageSelect.innerHTML = `<option value="">All languages (${cards.length})</option>`;
           languages.forEach((code) => {
             const option = document.createElement("option");
             option.value = code;
-            option.textContent = `${languageNames[code] || code.toUpperCase()} (${languageCounts.get(code)})`;
+            option.textContent = `${getLanguageName(code)} (${languageCounts.get(code)})`;
             languageSelect.appendChild(option);
           });
           const unknownCount = languageCounts.get("unknown") || 0;

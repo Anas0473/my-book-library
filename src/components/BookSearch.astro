@@ -983,11 +983,17 @@ const { libraryBooks = [] } = Astro.props;
               : '';
           summaryContainer.dataset.state = searchUnavailable || isInternetArchive ? 'warning' : '';
       const languageNames: Record<string, string> = {
-        ara: 'Arabic', dan: 'Danish', deu: 'German', eng: 'English',
-        fas: 'Persian', fin: 'Finnish', fra: 'French', heb: 'Hebrew',
-        ita: 'Italian', jpn: 'Japanese', nld: 'Dutch', nor: 'Norwegian',
-        por: 'Portuguese', spa: 'Spanish', swe: 'Swedish', tur: 'Turkish',
-        und: 'Unknown',
+        cpf: 'French-based Creole', mul: 'Multiple languages', tib: 'Tibetan', tlh: 'Klingon',
+        und: 'Unknown', zxx: 'No linguistic content',
+      };
+      const intlLanguageNames = new Intl.DisplayNames(['en'], { type: 'language', fallback: 'none' });
+      const getLanguageName = (code: string) => {
+        if (languageNames[code]) return languageNames[code];
+        try {
+          return intlLanguageNames.of(code) || code.toUpperCase();
+        } catch {
+          return code.toUpperCase();
+        }
       };
       const matchingLibraryBooks = libraryBooks.filter((book: any) => {
         const title = String(book.title || '').toLowerCase();
@@ -1000,12 +1006,13 @@ const { libraryBooks = [] } = Astro.props;
         ...languages,
         ...localMatches.flatMap((book: any) => [book.editionLanguage, book.language]),
         ...matchingLibraryBooks.flatMap((book: any) => [book.editionLanguage, book.language]),
-      ].map((code: any) => String(code || '').toLowerCase()).filter(Boolean))).sort();
+      ].map((code: any) => String(code || '').toLowerCase()).filter(Boolean)))
+        .sort((a, b) => getLanguageName(a).localeCompare(getLanguageName(b)));
       searchLanguageSelect.innerHTML = '<option value="">All languages</option>';
       availableLanguages.forEach((code: string) => {
         const option = document.createElement('option');
         option.value = code;
-        option.textContent = languageNames[code] || code.toUpperCase();
+        option.textContent = getLanguageName(code);
         searchLanguageSelect.appendChild(option);
       });
       searchLanguageSelect.disabled = availableLanguages.length === 0;
