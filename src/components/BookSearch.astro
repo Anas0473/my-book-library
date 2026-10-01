@@ -31,6 +31,10 @@ const { libraryBooks = [] } = Astro.props;
     <select id="search-language-select" aria-label="Filter by language" disabled>
       <option value="">Languages found after searching</option>
     </select>
+    <label class="search-hide-added">
+      <input type="checkbox" id="search-hide-added" />
+      Hide books in my lists
+    </label>
     <button type="button" id="reset-search-filters" class="search-reset-button" disabled>Reset filters</button>
   </div>
   <div id="search-summary" class="search-summary"></div>
@@ -127,6 +131,30 @@ const { libraryBooks = [] } = Astro.props;
   .search-reset-button:disabled {
     opacity: 0.5;
     cursor: not-allowed;
+  }
+  .search-hide-added {
+    display: flex;
+    flex: 0 0 auto;
+    box-sizing: border-box;
+    height: 3rem;
+    align-items: center;
+    gap: 0.35rem;
+    padding: 0.5rem 0.8rem;
+    border: 1px solid #cbd5e1;
+    border-radius: 6px;
+    background: #fff;
+    color: #334155;
+    font-size: 0.9rem;
+    white-space: nowrap;
+    cursor: pointer;
+  }
+  .search-hide-added:focus-within {
+    border-color: #0070f3;
+  }
+  .search-hide-added input {
+    width: 1rem;
+    height: 1rem;
+    accent-color: #39745b;
   }
   .search-summary {
     margin-top: 0.5rem;
@@ -454,6 +482,9 @@ const { libraryBooks = [] } = Astro.props;
     .search-reset-button {
       width: 100%;
     }
+    .search-hide-added {
+      align-self: flex-start;
+    }
     .results-grid {
       grid-template-columns: 1fr;
       gap: 0.75rem;
@@ -520,6 +551,7 @@ const { libraryBooks = [] } = Astro.props;
   const searchInput = document.getElementById('global-book-search') as HTMLInputElement;
   const clearSearchButton = document.getElementById('clear-book-search') as HTMLButtonElement;
   const resetSearchFiltersButton = document.getElementById('reset-search-filters') as HTMLButtonElement;
+  const hideAddedToggle = document.getElementById('search-hide-added') as HTMLInputElement;
   const searchSortSelect = document.getElementById('search-sort-select') as HTMLSelectElement;
   const searchLanguageSelect = document.getElementById('search-language-select') as HTMLSelectElement;
   const resultsContainer = document.getElementById('search-results') as HTMLElement;
@@ -544,6 +576,7 @@ const { libraryBooks = [] } = Astro.props;
   let currentPage = 1;
   let currentSort = searchSortSelect.value;
   let currentLanguage = '';
+  let currentHideAdded = false;
   // Guards against an earlier, slower keystroke's search response overwriting a newer one.
   let searchRequestId = 0;
   let currentAuthorOnly = false;
@@ -557,7 +590,8 @@ const { libraryBooks = [] } = Astro.props;
   function updateSearchResetButton() {
     resetSearchFiltersButton.disabled = !searchInput.value.trim()
       && searchSortSelect.value === 'title-asc'
-      && !searchLanguageSelect.value;
+      && !searchLanguageSelect.value
+      && !hideAddedToggle.checked;
   }
   const pageSize = 16;
   const savedBooksKey = 'my-book-library:books';
@@ -728,6 +762,7 @@ const { libraryBooks = [] } = Astro.props;
     authorExact = false,
     sort = currentSort,
     language = currentLanguage,
+    hideAdded = currentHideAdded,
   ) {
     currentQuery = query;
     currentPage = page;
@@ -736,6 +771,7 @@ const { libraryBooks = [] } = Astro.props;
     currentAuthorOnly = authorOnly;
     currentAuthorKey = authorKey;
     currentAuthorExact = authorExact;
+    currentHideAdded = hideAdded;
     searchSortSelect.value = sort;
     searchLanguageSelect.value = language;
     updateSearchResetButton();
@@ -760,7 +796,7 @@ const { libraryBooks = [] } = Astro.props;
           || matchesIsbn;
       return matchesQuery && (!language || !book.editionLanguage || book.editionLanguage === language);
     });
-    const searchCacheKey = JSON.stringify([query, authorOnly, authorKey, authorExact, sort, language]);
+    const searchCacheKey = JSON.stringify([query, authorOnly, authorKey, authorExact, sort, language, hideAdded]);
 
     resultsContainer.innerHTML = '<p>Searching...</p>';
     summaryContainer.innerHTML = '';
@@ -778,7 +814,7 @@ const { libraryBooks = [] } = Astro.props;
       if (savedFirstResultsKey === searchCacheKey && savedFirstResults) {
         data = savedFirstResults;
       } else {
-        const allResultsParam = hasLocalMatches ? '&all_results=1' : '';
+        const allResultsParam = hasLocalMatches || hideAdded ? '&all_results=1' : '';
         const res = await fetch(`/api/search-books.json?q=${encodeURIComponent(query)}${authorParam}${authorKeyParam}${authorExactParam}${sortParam}${languageParam}&discover_languages=1&page=${page}&limit=${pageSize}${allResultsParam}`);
         data = await res.json();
         if (data.allResults) {
@@ -808,24 +844,46 @@ const { libraryBooks = [] } = Astro.props;
             || matchesIsbn);
       });
       const savedWorkKeys = new Set(
-        localMatches.map((book: any) => book.workKey).filter(Boolean),
+        localMatches
+          .map((book: any) => book.workKey || (String(book.key || '').startsWith('/works/') ? book.key : ''))
+          .filter(Boolean),
       );
+      const addedBooks = [
+        ...savedBooks,
+        ...libraryBooks.filter((book: any) => shelfLabels[book.status]),
+      ];
+      const normalizeEditionKey = (value: unknown) =>
+        String(value || '').match(/OL\d+M/i)?.[0].toUpperCase() || '';
+      const savedEditionKeys = new Set(addedBooks
+        .flatMap((book: any) => [book.editionKey, ...(Array.isArray(book.editionKeys) ? book.editionKeys : [])])
+        .map(normalizeEditionKey)
+        .filter(Boolean));
+      const savedIsbns = new Set(addedBooks
+        .map((book: any) => String(book.isbn || '').replace(/[\s-]/g, '').toUpperCase())
+        .filter(Boolean));
       const localMatchesOnPage = localMatches.filter((book: any) =>
         books.some((result: any) =>
           (book.workKey && book.workKey === (result.workKey || result.key))
           || isSameBook(result, book),
         ),
       );
-      const workResults = books.filter((result: any) =>
-        !savedWorkKeys.has(result.workKey || result.key),
-      );
-      const localOnlyMatches = page === 1
+      const workResults = books.filter((result: any) => {
+        if (savedWorkKeys.has(result.workKey || result.key)) return false;
+        if (!hideAdded) return true;
+        const resultEditionKeys = [result.editionKey, ...(Array.isArray(result.editionKeys) ? result.editionKeys : [])]
+          .map(normalizeEditionKey)
+          .filter(Boolean);
+        if (resultEditionKeys.some((editionKey: string) => savedEditionKeys.has(editionKey))) return false;
+        const resultIsbn = String(result.isbn || '').replace(/[\s-]/g, '').toUpperCase();
+        return !resultIsbn || !savedIsbns.has(resultIsbn);
+      });
+      const localOnlyMatches = !hideAdded && page === 1
         ? localMatches.filter((book: any) => !book.workKey && !localMatchesOnPage.includes(book))
         : [];
       const useLocalResults = hasLocalMatches && books.length === 0;
-      const prioritizedLocalMatches = data.allResults || useLocalResults
+      const prioritizedLocalMatches = !hideAdded && (data.allResults || useLocalResults)
         ? localMatches
-        : [...localMatchesOnPage, ...localOnlyMatches];
+        : hideAdded ? [] : [...localMatchesOnPage, ...localOnlyMatches];
       const sortedLocalMatches = [...prioritizedLocalMatches].sort((first: any, second: any) => {
         if (sort.startsWith('title')) {
           const titleComparison = String(first.title || '').localeCompare(
@@ -855,7 +913,9 @@ const { libraryBooks = [] } = Astro.props;
             ...extraLocalMatches.slice(0, localMatchCount),
             ...workResults.slice(0, pageSize - localMatchCount),
           ];
-      const displayTotalResults = Math.max(totalResults, orderedResults.length);
+      const displayTotalResults = hideAdded && data.allResults
+        ? orderedResults.length
+        : Math.max(totalResults, orderedResults.length);
           const hasCompleteResults = data.allResults || useLocalResults;
           const displayTotalPages = hasCompleteResults
         ? Math.ceil(displayTotalResults / pageSize)
@@ -1315,8 +1375,10 @@ const { libraryBooks = [] } = Astro.props;
     searchInput.value = '';
     searchSortSelect.value = 'title-asc';
     searchLanguageSelect.value = '';
+    hideAddedToggle.checked = false;
     currentSort = 'title-asc';
     currentLanguage = '';
+    currentHideAdded = false;
     searchInput.dispatchEvent(new Event('input', { bubbles: true }));
     updateSearchResetButton();
     searchInput.focus();
@@ -1349,6 +1411,23 @@ const { libraryBooks = [] } = Astro.props;
         currentAuthorExact,
         currentSort,
         currentLanguage,
+      );
+    }
+  });
+
+  hideAddedToggle?.addEventListener('change', () => {
+    currentHideAdded = hideAddedToggle.checked;
+    updateSearchResetButton();
+    if (currentQuery) {
+      performSearch(
+        currentQuery,
+        1,
+        currentAuthorOnly,
+        currentAuthorKey,
+        currentAuthorExact,
+        currentSort,
+        currentLanguage,
+        currentHideAdded,
       );
     }
   });
