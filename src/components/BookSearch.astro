@@ -23,6 +23,7 @@ const { libraryBooks = [] } = Astro.props;
       <button type="button" id="clear-book-search" class="search-clear-button" aria-label="Clear search" title="Clear search" hidden>×</button>
     </div>
     <select id="search-sort-select" aria-label="Sort search results">
+      <option value="relevance">Relevance</option>
       <option value="title-asc">Title: A to Z</option>
       <option value="title-desc">Title: Z to A</option>
       <option value="year-desc">Year: Newest First</option>
@@ -596,7 +597,7 @@ const { libraryBooks = [] } = Astro.props;
   }
   function updateSearchResetButton() {
     resetSearchFiltersButton.disabled = !searchInput.value.trim()
-      && searchSortSelect.value === 'title-asc'
+      && searchSortSelect.value === 'relevance'
       && !searchLanguageSelect.value
       && !hideAddedToggle.checked;
   }
@@ -822,7 +823,7 @@ const { libraryBooks = [] } = Astro.props;
       if (savedFirstResultsKey === searchCacheKey && savedFirstResults) {
         data = savedFirstResults;
       } else {
-        const allResultsParam = hasLocalMatches || hideAdded ? '&all_results=1' : '';
+        const allResultsParam = hideAdded ? '&all_results=1' : '';
         const res = await fetch(`/api/search-books.json?q=${encodeURIComponent(query)}${authorParam}${authorKeyParam}${authorExactParam}${sortParam}${languageParam}&discover_languages=1&page=${page}&limit=${pageSize}${allResultsParam}`);
         data = await res.json();
         if (data.allResults) {
@@ -834,6 +835,7 @@ const { libraryBooks = [] } = Astro.props;
       if (requestId !== searchRequestId) return;
 
       const { books = [], totalResults = 0, totalPages = 0, languages = [] } = data;
+      const searchUnavailable = data.searchUnavailable === true;
       const localMatches = savedBooks.filter((book: any) => {
         const title = String(book.title || '').toLowerCase();
         const subtitle = String(book.subtitle || '').toLowerCase();
@@ -885,11 +887,11 @@ const { libraryBooks = [] } = Astro.props;
         const resultIsbn = String(result.isbn || '').replace(/[\s-]/g, '').toUpperCase();
         return !resultIsbn || !savedIsbns.has(resultIsbn);
       });
-      const localOnlyMatches = !hideAdded && page === 1
+      const localOnlyMatches = !searchUnavailable && !hideAdded && page === 1
         ? localMatches.filter((book: any) => !book.workKey && !localMatchesOnPage.includes(book))
         : [];
-      const useLocalResults = hasLocalMatches && books.length === 0;
-      const prioritizedLocalMatches = !hideAdded && (data.allResults || useLocalResults)
+      const useLocalResults = !searchUnavailable && hasLocalMatches && books.length === 0;
+      const prioritizedLocalMatches = !searchUnavailable && !hideAdded && (data.allResults || useLocalResults)
         ? localMatches
         : hideAdded ? [] : [...localMatchesOnPage, ...localOnlyMatches];
       const sortedLocalMatches = [...prioritizedLocalMatches].sort((first: any, second: any) => {
@@ -907,19 +909,23 @@ const { libraryBooks = [] } = Astro.props;
           const comparison = titleComparison || subtitleComparison;
           return sort === 'title-desc' ? -comparison : comparison;
         }
-        const firstYear = Number(String(first.pubDate || '').match(/\d{4}/)?.[0]) || 0;
-        const secondYear = Number(String(second.pubDate || '').match(/\d{4}/)?.[0]) || 0;
-        return sort === 'year-desc' ? secondYear - firstYear : firstYear - secondYear;
+        if (sort.startsWith('year')) {
+          const firstYear = Number(String(first.pubDate || '').match(/\d{4}/)?.[0]) || 0;
+          const secondYear = Number(String(second.pubDate || '').match(/\d{4}/)?.[0]) || 0;
+          return sort === 'year-desc' ? secondYear - firstYear : firstYear - secondYear;
+        }
+        return 0;
       });
       const extraLocalMatches = sortedLocalMatches.filter((book: any) =>
         !workResults.some((result: any) => isSameBook(result, book)),
       );
       const localMatchCount = Math.min(extraLocalMatches.length, pageSize);
+      const pageLocalMatches = page === 1 ? extraLocalMatches : [];
       const orderedResults = data.allResults
         ? [...extraLocalMatches, ...workResults]
         : [
-            ...extraLocalMatches.slice(0, localMatchCount),
-            ...workResults.slice(0, pageSize - localMatchCount),
+        ...pageLocalMatches.slice(0, localMatchCount),
+        ...workResults.slice(0, pageSize - pageLocalMatches.length),
           ];
       const displayTotalResults = hideAdded && data.allResults
         ? orderedResults.length
@@ -931,12 +937,12 @@ const { libraryBooks = [] } = Astro.props;
           const displayBooks = hasCompleteResults
         ? orderedResults.slice((page - 1) * pageSize, page * pageSize)
         : orderedResults;
-          const searchNotice = data.searchUnavailable
-            ? 'Open Library search is temporarily unavailable; showing your saved matches.'
+          const searchNotice = searchUnavailable
+            ? 'Open Library search is temporarily unavailable.'
             : totalResults === 0 && localMatches.length > 0
               ? 'No Open Library matches; showing your saved matches.'
               : '';
-          summaryContainer.dataset.state = data.searchUnavailable ? 'warning' : '';
+          summaryContainer.dataset.state = searchUnavailable ? 'warning' : '';
       const languageNames: Record<string, string> = {
         ara: 'Arabic', dan: 'Danish', deu: 'German', eng: 'English',
         fas: 'Persian', fin: 'Finnish', fra: 'French', heb: 'Hebrew',
@@ -983,6 +989,9 @@ const { libraryBooks = [] } = Astro.props;
           ? `https://openlibrary.org/${String(book.workKey).replace(/^\/+/, '')}`
           : '';
         const recordUrl = editionUrl || workUrl;
+        const recordLinkLabel = book.provider === 'internet-archive'
+          ? 'View on Internet Archive'
+          : 'Open selected edition';
         return `
         <div class="search-card">
           <div>
@@ -994,7 +1003,7 @@ const { libraryBooks = [] } = Astro.props;
             ${book.subtitle ? `<p class="subtitle">${book.subtitle}</p>` : ''}
             <p class="author-text">${authorLinksMarkup(book.author || 'Unknown Author')}</p>
             <p class="pub-date">${book.pubDate ? `Published: ${book.pubDate}` : 'Publication date unknown'}</p>
-            <a class="selected-edition-link" href="${escapeHtml(recordUrl || '#')}" target="_blank" rel="noopener noreferrer" ${recordUrl ? '' : 'hidden'}>Open selected edition</a>
+            <a class="selected-edition-link" href="${escapeHtml(recordUrl || '#')}" target="_blank" rel="noopener noreferrer" ${recordUrl ? '' : 'hidden'}>${recordLinkLabel}</a>
             ${book.workKey ? `<button type="button" class="edition-button" data-book-index="${index}" data-preferred-edition="${escapeHtml(String(savedEditionKey || ''))}">Browse editions${book.editionCount ? ` (${book.editionCount})` : ''}</button>` : ''}
           </div>
           <div class="shelf-control">
@@ -1389,10 +1398,10 @@ const { libraryBooks = [] } = Astro.props;
   resetSearchFiltersButton?.addEventListener('click', () => {
     clearTimeout(debounceTimer);
     searchInput.value = '';
-    searchSortSelect.value = 'title-asc';
+    searchSortSelect.value = 'relevance';
     searchLanguageSelect.value = '';
     hideAddedToggle.checked = false;
-    currentSort = 'title-asc';
+    currentSort = 'relevance';
     currentLanguage = '';
     currentHideAdded = false;
     searchInput.dispatchEvent(new Event('input', { bubbles: true }));

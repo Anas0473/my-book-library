@@ -99,6 +99,113 @@ async function fetchOpenLibrarySearch(apiUrl: string) {
   return null;
 }
 
+async function fetchInternetArchiveFallback({
+  query,
+  authorOnly,
+  isIsbnSearch,
+  normalizedIsbn,
+  language,
+  sort,
+  page,
+  limit,
+}: {
+  query: string;
+  authorOnly: boolean;
+  isIsbnSearch: boolean;
+  normalizedIsbn: string;
+  language?: string;
+  sort: string;
+  page: number;
+  limit: number;
+}) {
+  const field = isIsbnSearch ? 'isbn' : authorOnly ? 'creator' : 'title';
+  const value = isIsbnSearch ? normalizedIsbn : query.trim().replace(/["\\]/g, '\\$&');
+  const queryParts = [
+    `${field}:"${value}"`,
+    'mediatype:texts',
+    'collection:inlibrary',
+  ];
+  if (language) queryParts.push(`language:${language}`);
+  const params = new URLSearchParams({
+    q: queryParts.join(' AND '),
+    'fl[]': 'identifier,title,creator,year,language,isbn',
+    rows: String(Math.min(limit, 50)),
+    page: String(page),
+    output: 'json',
+  });
+  const apiUrl = `https://archive.org/advancedsearch.php?${params}`;
+  const cached = searchResponseCache.get(apiUrl);
+  let data = cached && cached.expiresAt > Date.now() ? cached.data : null;
+  if (!data) {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 12000);
+    try {
+      const response = await fetch(apiUrl, { signal: controller.signal });
+      if (!response.ok) return null;
+      data = await response.json();
+      searchResponseCache.set(apiUrl, { expiresAt: Date.now() + 10 * 60 * 1000, data });
+    } catch {
+      return null;
+    } finally {
+      clearTimeout(timeout);
+    }
+  }
+
+  const books = (data.response?.docs || []).map((item: any) => {
+    const languageCode = Array.isArray(item.language) ? item.language[0] : item.language;
+    const cover = item.identifier
+      ? `https://archive.org/services/img/${encodeURIComponent(item.identifier)}`
+      : null;
+    const isbn = Array.isArray(item.isbn) ? item.isbn[0] : item.isbn;
+    return {
+      key: `archive:${item.identifier}`,
+      workKey: null,
+      provider: 'internet-archive',
+      editionUrl: `https://archive.org/details/${encodeURIComponent(item.identifier)}`,
+      editionHeroImage: cover,
+      title: item.title || 'Untitled',
+      subtitle: null,
+      author: Array.isArray(item.creator) ? item.creator.join(', ') : item.creator || 'Unknown Author',
+      authorKeys: [],
+      editionKeys: [],
+      editionCount: 0,
+      editionLanguage: languageCode || null,
+      languages: languageCode ? [languageCode] : [],
+      pubDate: item.year || 'Unknown',
+      isbn: isbn || null,
+      heroImage: cover,
+    };
+  });
+  if (sort.startsWith('title')) {
+    books.sort((first: any, second: any) => {
+      const comparison = String(first.title).localeCompare(String(second.title), undefined, {
+        numeric: true,
+        sensitivity: 'base',
+      });
+      return sort === 'title-desc' ? -comparison : comparison;
+    });
+  } else if (sort.startsWith('year')) {
+    books.sort((first: any, second: any) => {
+      const firstYear = Number(first.pubDate) || 0;
+      const secondYear = Number(second.pubDate) || 0;
+      return sort === 'year-desc' ? secondYear - firstYear : firstYear - secondYear;
+    });
+  }
+
+  const totalResults = Number(data.response?.numFound) || 0;
+  const languages = Array.from(new Set(books.flatMap((book: any) => book.languages))) as string[];
+  if (language && !languages.includes(language)) languages.push(language);
+  return {
+    books,
+    totalResults,
+    page,
+    totalPages: Math.ceil(totalResults / limit),
+    allResults: false,
+    languages,
+    searchProvider: 'internet-archive',
+  };
+}
+
 async function findEditionInLanguage(workKey: string, language: string) {
   const cacheKey = `${workKey}:${language}`;
   const cached = languageEditionCache.get(cacheKey);
@@ -230,20 +337,61 @@ export const GET: APIRoute = async ({ url }) => {
         : isIsbnSearch
           ? 'isbn'
           : query.trim().split(/\s+/).length > 1 ? 'q' : 'title';
+    const hasCompleteResultSet = includeAllResults || authorExact;
+    const useOpenLibrarySort = shouldSort && !hasCompleteResultSet;
+    const openLibrarySort = sort.startsWith('title')
+      ? 'title'
+      : sort === 'year-desc'
+        ? 'new'
+        : sort === 'year-asc'
+          ? 'old'
+          : '';
     const searchParams = new URLSearchParams({
       [searchField]: isIsbnSearch ? normalizedIsbn : authorKey || query,
       fields: 'title,subtitle,author_name,author_key,language,first_publish_year,cover_i,isbn,key,edition_key,edition_count',
-      limit: String(shouldSort || authorExact || language || discoverLanguages ? 1000 : limit),
-      offset: String(shouldSort || authorExact || language || discoverLanguages ? 0 : offset),
+      limit: String(hasCompleteResultSet ? 1000 : limit),
+      offset: String(hasCompleteResultSet || (useOpenLibrarySort && sort === 'title-desc') ? 0 : offset),
     });
+    if (language) searchParams.set('language', language);
+    if (useOpenLibrarySort && openLibrarySort) searchParams.set('sort', openLibrarySort);
     const apiUrl = `https://openlibrary.org/search.json?${searchParams}`;
-    const data = await fetchOpenLibrarySearch(apiUrl);
+    let data = await fetchOpenLibrarySearch(apiUrl);
 
     if (!data) {
+      const fallbackParams = {
+        query,
+        authorOnly,
+        isIsbnSearch,
+        normalizedIsbn,
+        language,
+        sort,
+        page,
+        limit,
+      };
+      const fallback = await fetchInternetArchiveFallback(fallbackParams);
+      if (fallback) {
+        return new Response(JSON.stringify(fallback), { status: 200, headers: jsonHeaders });
+      }
       return new Response(
         JSON.stringify({ books: [], totalResults: 0, page, totalPages: 0, searchUnavailable: true }),
         { status: 200, headers: jsonHeaders }
       );
+    }
+    if (useOpenLibrarySort && sort === 'title-desc') {
+      const reverseCount = Math.max(0, Math.min(limit, (Number(data.numFound) || 0) - offset));
+      const reverseOffset = Math.max(0, (Number(data.numFound) || 0) - offset - reverseCount);
+      if (reverseOffset !== 0 || reverseCount !== limit) {
+        searchParams.set('offset', String(reverseOffset));
+        searchParams.set('limit', String(reverseCount));
+        data = await fetchOpenLibrarySearch(`https://openlibrary.org/search.json?${searchParams}`);
+        if (!data) {
+          return new Response(
+            JSON.stringify({ books: [], totalResults: 0, page, totalPages: 0, searchUnavailable: true }),
+            { status: 200, headers: jsonHeaders }
+          );
+        }
+      }
+      data = { ...data, docs: [...(data.docs || [])].reverse() };
     }
     let isbnEdition: any = null;
     if (isIsbnSearch) {
@@ -350,6 +498,7 @@ export const GET: APIRoute = async ({ url }) => {
     }
     const languageOptions = Array.from(new Set([
       ...authorMatchingDocs.flatMap((doc: any) => doc.language || []),
+      ...(Number(data.numFound) > 0 ? ['eng'] : []),
       ...(languageEditionMatches.size > 0 && language ? [language] : []),
     ])).sort();
     const matchingDocs = language
@@ -372,7 +521,7 @@ export const GET: APIRoute = async ({ url }) => {
       }).filter((year: number) => year > 0);
       return years.length > 0 ? Math.max(...years) : Number(doc.first_publish_year) || 0;
     };
-    const sortedDocs = shouldSort
+    const sortedDocs = shouldSort && hasCompleteResultSet
       ? [...matchingDocs].sort((first: any, second: any) => {
           if (sort.startsWith('title')) {
             const titleComparison = String(first.title || '').localeCompare(
@@ -394,11 +543,11 @@ export const GET: APIRoute = async ({ url }) => {
           return sort === 'year-desc' ? secondYear - firstYear : firstYear - secondYear;
         })
       : matchingDocs;
-    const totalResults = authorExact || shouldSort || language || discoverLanguages
+    const totalResults = hasCompleteResultSet
       ? sortedDocs.length
       : data.numFound || 0;
     const totalPages = Math.ceil(totalResults / limit);
-    const pageDocs = authorExact || shouldSort || language || discoverLanguages
+    const pageDocs = hasCompleteResultSet
       ? includeAllResults ? sortedDocs : sortedDocs.slice(offset, offset + limit)
       : sortedDocs;
 
