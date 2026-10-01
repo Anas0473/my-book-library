@@ -305,21 +305,6 @@ const { libraryBooks = [] } = Astro.props;
     color: #64748b;
     font-size: 0.8rem;
   }
-  :global(.edition-view-all) {
-    width: 100%;
-    padding: 0.6rem;
-    border: 1px solid #cbd5e1;
-    border-radius: 6px;
-    background: #fff;
-    color: #39745b;
-    font: inherit;
-    font-size: 0.8rem;
-    cursor: pointer;
-  }
-  :global(.edition-view-all:hover) {
-    background: #f8fafc;
-    border-color: #39745b;
-  }
   :global(.edition-pagination) {
     display: flex;
     flex: 0 0 auto;
@@ -1034,10 +1019,6 @@ const { libraryBooks = [] } = Astro.props;
           const response = await fetch(`/api/book-editions.json?${params}`);
           const data = await response.json();
           const editions = Array.isArray(data.editions) ? data.editions : [];
-          const featuredCount = Math.min(
-            editions.length,
-            Number(data.featuredCount) || Math.min(10, editions.length),
-          );
           const totalCount = Number(data.totalCount) || editions.length || book.editionCount || 0;
           book.editionCount = totalCount;
           button.textContent = `Browse editions${book.editionCount ? ` (${book.editionCount})` : ''}`;
@@ -1057,15 +1038,11 @@ const { libraryBooks = [] } = Astro.props;
 
           const summary = document.createElement('p');
           summary.className = 'edition-summary';
-          summary.textContent = totalCount > featuredCount
-            ? `Showing ${featuredCount} featured editions.`
-            : `Showing all ${editions.length} editions.`;
           editionDialog.appendChild(summary);
 
           const list = document.createElement('div');
           list.className = 'edition-list';
           const pageSize = 12;
-          let showingAllEditions = false;
           let currentEditionPage = 1;
           const pagination = document.createElement('div');
           pagination.className = 'edition-pagination';
@@ -1083,15 +1060,11 @@ const { libraryBooks = [] } = Astro.props;
 
           const renderEditionOptions = () => {
             const pageCount = Math.max(1, Math.ceil(editions.length / pageSize));
-            const visibleEditions = showingAllEditions
-              ? editions.slice((currentEditionPage - 1) * pageSize, currentEditionPage * pageSize)
-              : editions.slice(0, featuredCount);
-            summary.textContent = showingAllEditions
+            const visibleEditions = editions.slice((currentEditionPage - 1) * pageSize, currentEditionPage * pageSize);
+            summary.textContent = pageCount > 1
               ? `Showing ${(currentEditionPage - 1) * pageSize + 1}–${Math.min(currentEditionPage * pageSize, editions.length)} of ${totalCount} editions.`
-              : totalCount > featuredCount
-                ? `Showing ${featuredCount} featured editions.`
-                : `Showing all ${editions.length} editions.`;
-            pagination.hidden = !showingAllEditions || pageCount <= 1;
+              : `Showing all ${editions.length} editions.`;
+            pagination.hidden = pageCount <= 1;
             previousPageButton.disabled = currentEditionPage <= 1;
             nextPageButton.disabled = currentEditionPage >= pageCount;
             pageLabel.textContent = `Page ${currentEditionPage} of ${pageCount}`;
@@ -1179,20 +1152,6 @@ const { libraryBooks = [] } = Astro.props;
               });
               list.appendChild(option);
             });
-
-            if (editions.length > featuredCount) {
-              const viewAllButton = document.createElement('button');
-              viewAllButton.type = 'button';
-              viewAllButton.className = 'edition-view-all';
-              viewAllButton.textContent = `View all ${totalCount} editions`;
-              viewAllButton.addEventListener('click', () => {
-                showingAllEditions = true;
-                currentEditionPage = 1;
-                renderEditionOptions();
-                list.scrollTop = 0;
-              });
-              list.appendChild(viewAllButton);
-            }
           };
           previousPageButton.addEventListener('click', () => {
             if (currentEditionPage <= 1) return;

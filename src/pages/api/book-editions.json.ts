@@ -94,19 +94,16 @@ export const GET: APIRoute = async ({ url }) => {
     const selectedEdition = allEditions.find(
       (edition: any) => preferredId && normalizeEditionKey(edition.key) === preferredId,
     );
-    const availableEditions = allEditions
-      .filter((edition: any) => edition.hasDigitalCopy)
-      .sort(compareEditions);
-    const featuredEditions = availableEditions.length > 0
-      ? availableEditions.slice(0, 10)
-      : [...allEditions].sort(compareEditions).slice(0, 10);
-    if (selectedEdition) {
-      const selectedIndex = featuredEditions.findIndex(
-        (edition: any) => normalizeEditionKey(edition.key) === preferredId,
-      );
-      if (selectedIndex >= 0) featuredEditions.splice(selectedIndex, 1);
-      featuredEditions.unshift(selectedEdition);
-    }
+    const rankedEditions = [
+      ...allEditions.filter((edition: any) => edition.hasDigitalCopy).sort(compareEditions),
+      ...allEditions.filter((edition: any) => !edition.hasDigitalCopy).sort(compareEditions),
+    ];
+    const featuredEditions = selectedEdition
+      ? [
+          selectedEdition,
+          ...rankedEditions.filter((edition: any) => normalizeEditionKey(edition.key) !== preferredId),
+        ].slice(0, 10)
+      : rankedEditions.slice(0, 10);
     const featuredKeys = new Set(featuredEditions.map((edition: any) => edition.key));
     const editions = [
       ...featuredEditions,
