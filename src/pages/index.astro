@@ -33,88 +33,252 @@ const splitAuthors = (author: string) =>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>My Reading List</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&family=Instrument+Serif:ital@0;1&display=swap"
+    />
     <style>
+      :global(:root) {
+        --accent: #f3b94d;
+        --accent-strong: #e6a836;
+        --accent-ink: #1c1a16;
+        --ok: #3fb950;
+        --danger: #f2716b;
+        --surface-dark: #232323;
+        --surface-dark-2: #2c2c2c;
+        --border-dark: #3a3a3a;
+        --text-dark: #ececec;
+        --text-dark-muted: #a8a39a;
+        --font-sans: "Geist", system-ui, -apple-system, sans-serif;
+        --font-serif: "Instrument Serif", Georgia, serif;
+      }
+      /* Page-level tones derive from the chosen background's foreground, so any custom background still works. */
       body {
+        --fg: var(--page-foreground, #ececec);
+        --muted: color-mix(in srgb, var(--fg) 64%, transparent);
+        --faint: color-mix(in srgb, var(--fg) 44%, transparent);
+        --line: color-mix(in srgb, var(--fg) 13%, transparent);
+        --fill: color-mix(in srgb, var(--fg) 5%, transparent);
+        --fill-strong: color-mix(in srgb, var(--fg) 10%, transparent);
         margin: 0;
-        font-family:
-          system-ui,
-          -apple-system,
-          sans-serif;
-        background: #ffffff;
-        color: #1e293b;
-        padding: 1.4rem 3rem 1.5rem 3rem; /* Shifted top padding up from 1rem to 1.4rem */
-      }
-      header h1 {
-        font-size: 1.85rem;
-        font-weight: 700;
-        margin-top: 0;
-        margin-bottom: 1.25rem; /* Slightly enlarged margin from 1rem to 1.25rem */
-        color: #0f172a;
+        background: #1c1c1c;
+        color: var(--fg);
+        font-family: var(--font-sans);
+        -webkit-font-smoothing: antialiased;
       }
       .container {
-        display: flex;
-        gap: 2.5rem;
-      }
-      header h1 {
-        font-size: 1.75rem; /* Slightly tighter heading size */
-        font-weight: 700;
-        margin-top: 0;
-        margin-bottom: 1rem; /* Reduced gap under title from 2rem to 1rem */
-        color: #0f172a;
-      }
-      .container {
-        display: flex;
-        gap: 2.5rem; /* Slightly tighter gap between sidebar and main grid */
-      }
-      header h1 {
-        font-size: 2rem;
-        font-weight: 700;
-        margin-bottom: 2rem;
-        color: #0f172a;
-      }
-      .container {
-        display: flex;
-        gap: 3rem;
+        display: grid;
+        grid-template-columns: 228px minmax(0, 1fr);
+        min-height: 100vh;
       }
       sidebar {
-        width: 180px;
-        flex-shrink: 0;
+        position: sticky;
+        top: 0;
         display: flex;
         flex-direction: column;
-        gap: 1.25rem;
+        gap: 1.75rem;
+        height: 100vh;
+        box-sizing: border-box;
+        padding: 1.5rem 1rem 1rem;
+        border-right: 1px solid var(--line);
+        background: color-mix(in srgb, var(--fg) 2%, transparent);
+      }
+      header h1 {
+        margin: 0;
+        padding: 0 0.6rem;
+        font-family: var(--font-serif);
+        font-size: 1.95rem;
+        font-weight: 400;
+        line-height: 1;
+        letter-spacing: -0.01em;
+      }
+      .title-accent {
+        color: var(--accent);
+        font-style: italic;
+      }
+      .home-link {
+        color: inherit;
+        text-decoration: none;
+      }
+      .home-link:hover {
+        opacity: 0.85;
       }
       .sidebar-section {
         display: flex;
         flex-direction: column;
-        gap: 0.25rem;
+        gap: 0.15rem;
       }
       sidebar h3 {
-        font-size: 0.75rem;
+        margin: 0 0 0.45rem;
+        padding: 0 0.6rem;
+        color: var(--faint);
+        font-size: 0.68rem;
+        font-weight: 500;
+        letter-spacing: 0.1em;
         text-transform: uppercase;
-        letter-spacing: 0.05em;
-        color: #64748b;
-        margin: 0;
+      }
+      .category-btn {
+        position: relative;
+        display: flex;
+        align-items: center;
+        gap: 0.6rem;
+        width: 100%;
+        min-height: 2.25rem;
+        box-sizing: border-box;
+        padding: 0.45rem 0.6rem;
+        border: 0;
+        border-radius: 8px;
+        background: transparent;
+        color: var(--muted);
+        font: inherit;
+        font-size: 0.88rem;
+        font-weight: 500;
+        text-align: left;
+        cursor: pointer;
+      }
+      .category-btn:hover {
+        background: var(--fill);
+        color: var(--fg);
+      }
+      .category-btn.active {
+        background: var(--fill-strong);
+        color: var(--fg);
+      }
+      .category-btn.active::after {
+        content: "";
+        position: absolute;
+        top: 0.5rem;
+        bottom: 0.5rem;
+        left: -1rem;
+        width: 3px;
+        border-radius: 0 3px 3px 0;
+        background: var(--accent);
+      }
+      .category-btn svg {
+        flex: 0 0 auto;
+        width: 0.95rem;
+        height: 0.95rem;
+      }
+      .category-count {
+        min-width: 1.4rem;
+        box-sizing: border-box;
+        margin-left: auto;
+        padding: 0.1rem 0.4rem;
+        border-radius: 999px;
+        background: var(--fill-strong);
+        color: var(--muted);
+        font-size: 0.7rem;
+        font-weight: 600;
+        font-variant-numeric: tabular-nums;
+        line-height: 1.35;
+        text-align: center;
+      }
+      .open-library-button::before {
+        content: "";
+        flex: 0 0 auto;
+        width: 0.5rem;
+        height: 0.5rem;
+        margin: 0 0.22rem;
+        border-radius: 50%;
+        background: var(--faint);
+      }
+      .open-library-button.is-connected::before {
+        background: var(--ok);
+        box-shadow:
+          0 0 0 3px color-mix(in srgb, var(--ok) 22%, transparent),
+          0 0 8px var(--ok);
+      }
+      .open-library-button:disabled {
+        cursor: progress;
+        opacity: 0.7;
+      }
+      .open-library-sync-status {
+        display: block;
+        box-sizing: border-box;
+        margin: 0.1rem 0 0;
+        padding: 0 0.6rem 0 1.95rem;
+        color: var(--faint);
+        font-size: 0.72rem;
+        line-height: 1.4;
+      }
+      .open-library-sync-status[hidden] {
+        display: none;
       }
       .theme-picker {
-        margin-top: 0;
+        position: relative;
+        margin-top: auto;
       }
-      .theme-picker h3 {
-        margin-bottom: 0.5rem;
+      .appearance-toggle {
+        display: flex;
+        align-items: center;
+        gap: 0.6rem;
+        width: 100%;
+        box-sizing: border-box;
+        padding: 0.55rem 0.65rem;
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        background: var(--fill);
+        color: var(--fg);
+        font: inherit;
+        font-size: 0.82rem;
+        cursor: pointer;
+      }
+      .appearance-toggle:hover,
+      .appearance-toggle[aria-expanded="true"] {
+        background: var(--fill-strong);
+      }
+      .appearance-swatch {
+        flex: 0 0 auto;
+        width: 1rem;
+        height: 1rem;
+        box-sizing: border-box;
+        border: 1.5px solid var(--muted);
+        border-radius: 50%;
+        background: var(--page-background, #1c1c1c);
+      }
+      .appearance-value {
+        margin-left: auto;
+        color: var(--faint);
+        font-size: 0.7rem;
+        font-variant-numeric: tabular-nums;
+        white-space: nowrap;
+      }
+      .appearance-panel {
+        position: absolute;
+        right: 0;
+        bottom: calc(100% + 0.5rem);
+        left: 0;
+        z-index: 40;
+        padding: 0.85rem;
+        border: 1px solid var(--border-dark);
+        border-radius: 12px;
+        background: var(--surface-dark);
+        color: var(--text-dark);
+        box-shadow: 0 14px 34px rgba(0, 0, 0, 0.4);
+      }
+      .appearance-panel[hidden] {
+        display: none;
+      }
+      .appearance-panel h3 {
+        margin: 0 0 0.6rem;
+        padding: 0;
+        color: var(--text-dark-muted);
       }
       .theme-custom-controls {
         display: flex;
         align-items: center;
         gap: 0.5rem;
-        margin-bottom: 0;
       }
       .theme-color-input {
-        width: 2rem;
-        height: 2rem;
-        flex: 0 0 2rem;
+        width: 2.25rem;
+        height: 2.25rem;
+        flex: 0 0 2.25rem;
         padding: 2px;
-        border: 1px solid #cbd5e1;
-        border-radius: 6px;
-        background: #fff;
+        border: 1px solid var(--border-dark);
+        border-radius: 8px;
+        background: var(--surface-dark-2);
         cursor: pointer;
       }
       .theme-color-input::-webkit-color-swatch-wrapper {
@@ -122,79 +286,24 @@ const splitAuthors = (author: string) =>
       }
       .theme-color-input::-webkit-color-swatch {
         border: 0;
-        border-radius: 3px;
+        border-radius: 5px;
       }
       .theme-rgb-input {
         box-sizing: border-box;
         width: 100%;
         min-width: 0;
-        height: 2rem;
-        padding: 0.35rem 0.45rem;
-        border: 1px solid #cbd5e1;
-        border-radius: 6px;
-        color: #334155;
+        height: 2.25rem;
+        padding: 0.35rem 0.55rem;
+        border: 1px solid var(--border-dark);
+        border-radius: 8px;
+        background: var(--surface-dark-2);
+        color: var(--text-dark);
         font: inherit;
-        font-size: 0.75rem;
+        font-size: 0.8rem;
+        outline: none;
       }
-      .category-btn {
-        display: flex;
-        align-items: center;
-        width: 100%;
-        min-height: 38px;
-        box-sizing: border-box;
-        text-align: left;
-        padding: 0.5rem 0.8rem;
-        margin-bottom: 0;
-        background: none;
-        border: none;
-        border-radius: 6px;
-        font-size: 0.95rem;
-        color: #334155;
-        cursor: pointer;
-        font-weight: 500;
-      }
-      .category-count {
-        display: inline-block;
-        min-width: 1.25rem;
-        margin-left: 0.35rem;
-        padding: 0.1rem 0.35rem;
-        border-radius: 999px;
-        background: #e2e8f0;
-        color: #475569;
-        font-size: 0.75rem;
-        line-height: 1.2;
-        text-align: center;
-      }
-      .category-btn.active {
-        background: #0070f3;
-        color: #ffffff;
-      }
-      .category-btn.active .category-count,
-      .mobile-nav-button.active .category-count {
-        background: rgba(255, 255, 255, 0.2);
-        color: #ffffff;
-      }
-      .category-btn.search-tab {
-        margin-bottom: 0.25rem;
-        border: 1px dashed #0070f3;
-        color: #0070f3;
-      }
-      .category-btn.search-tab.active {
-        border-style: solid;
-        color: #ffffff;
-      }
-      .open-library-sync-status {
-        display: block;
-        box-sizing: border-box;
-        margin: 0;
-        margin-top: -0.5rem;
-        padding: 0 0.8rem;
-        color: #64748b;
-        font-size: 0.72rem;
-        line-height: 1.35;
-      }
-      .open-library-sync-status[hidden] {
-        display: none;
+      .theme-rgb-input:focus {
+        border-color: var(--accent);
       }
       :global(.shelf-undo-toast) {
         position: fixed;
@@ -209,43 +318,45 @@ const splitAuthors = (author: string) =>
         box-sizing: border-box;
         padding: 0.75rem 1rem;
         transform: translateX(-50%);
-        border: 1px solid #334155;
-        border-radius: 6px;
-        background: #1e293b;
-        color: #fff;
-        box-shadow: 0 6px 20px rgba(15, 23, 42, 0.24);
+        border: 1px solid var(--border-dark);
+        border-radius: 12px;
+        background: var(--surface-dark);
+        color: var(--text-dark);
+        box-shadow: 0 12px 30px rgba(0, 0, 0, 0.4);
         font-size: 0.85rem;
       }
       :global(.shelf-undo-toast button) {
         flex: 0 0 auto;
-        padding: 0.35rem 0.6rem;
-        border: 1px solid #94a3b8;
-        border-radius: 4px;
-        background: transparent;
-        color: #fff;
+        padding: 0.35rem 0.7rem;
+        border: 0;
+        border-radius: 7px;
+        background: var(--accent);
+        color: var(--accent-ink);
         font: inherit;
         font-weight: 600;
         cursor: pointer;
       }
       :global(.shelf-undo-toast button:hover) {
-        background: rgba(255, 255, 255, 0.12);
+        background: var(--accent-strong);
       }
       @media (max-width: 700px) {
         :global(.shelf-undo-toast) {
-          bottom: 5rem;
+          bottom: 5.5rem;
         }
       }
       #open-library-sync-dialog {
         width: min(28rem, calc(100vw - 2rem));
         max-width: none;
-        padding: 1.25rem;
-        border: 1px solid #cbd5e1;
-        border-radius: 8px;
-        color: #334155;
-        box-shadow: 0 12px 32px rgba(15, 23, 42, 0.2);
+        padding: 1.4rem;
+        border: 1px solid var(--border-dark);
+        border-radius: 14px;
+        background: var(--surface-dark);
+        color: var(--text-dark);
+        font-family: var(--font-sans);
+        box-shadow: 0 20px 48px rgba(0, 0, 0, 0.45);
       }
       #open-library-sync-dialog::backdrop {
-        background: rgba(15, 23, 42, 0.45);
+        background: rgba(0, 0, 0, 0.6);
       }
       .open-library-sync-form {
         display: grid;
@@ -253,34 +364,39 @@ const splitAuthors = (author: string) =>
       }
       .open-library-sync-form h2 {
         margin: 0;
-        color: #334155;
-        font-size: 1.4rem;
-        line-height: 1.2;
+        font-family: var(--font-serif);
+        font-size: 1.75rem;
+        font-weight: 400;
+        line-height: 1.1;
       }
       .open-library-sync-form p {
         margin: 0;
-        color: #475569;
-        font-size: 0.88rem;
+        color: var(--text-dark-muted);
+        font-size: 0.86rem;
         line-height: 1.55;
       }
       .open-library-sync-form label {
         margin-top: 0.35rem;
-        font-size: 0.85rem;
+        font-size: 0.82rem;
         font-weight: 600;
       }
       .open-library-sync-form input {
         box-sizing: border-box;
         width: 100%;
         padding: 0.65rem 0.75rem;
-        border: 1px solid #cbd5e1;
-        border-radius: 6px;
-        color: #1e293b;
+        border: 1px solid var(--border-dark);
+        border-radius: 9px;
+        background: var(--surface-dark-2);
+        color: var(--text-dark);
         font: inherit;
-        font-size: 0.95rem;
+        font-size: 0.92rem;
+        outline: none;
+      }
+      .open-library-sync-form input:focus {
+        border-color: var(--accent);
       }
       .open-library-sync-message {
         min-height: 1.25rem;
-        color: #64748b;
       }
       .open-library-sync-actions {
         display: flex;
@@ -290,28 +406,28 @@ const splitAuthors = (author: string) =>
       }
       .open-library-sync-actions button {
         min-height: 2.4rem;
-        padding: 0.45rem 0.75rem;
-        border: 1px solid #cbd5e1;
-        border-radius: 6px;
-        background: #fff;
-        color: #334155;
-        cursor: pointer;
+        padding: 0.45rem 0.85rem;
+        border: 1px solid var(--border-dark);
+        border-radius: 9px;
+        background: transparent;
+        color: var(--text-dark);
         font: inherit;
         font-size: 0.85rem;
+        cursor: pointer;
       }
       .open-library-sync-actions button[type="submit"] {
-        border-color: #39745b;
-        background: #39745b;
-        color: #fff;
+        border-color: var(--accent);
+        background: var(--accent);
+        color: var(--accent-ink);
+        font-weight: 600;
       }
       .open-library-sync-actions button:disabled {
         opacity: 0.6;
         cursor: progress;
       }
       main {
-        flex: 1;
         min-width: 0;
-        width: 100%;
+        padding: 2rem 2.5rem 3rem;
       }
       .category-panel {
         display: none;
@@ -320,29 +436,40 @@ const splitAuthors = (author: string) =>
       .category-panel.active {
         display: block;
       }
+      :global(.panel-heading) {
+        margin-bottom: 1.25rem;
+      }
+      :global(.panel-heading h2) {
+        margin: 0;
+        font-size: 1.5rem;
+        font-weight: 600;
+        letter-spacing: -0.02em;
+        line-height: 1.2;
+      }
       .shelf-jump-button {
         position: fixed;
         right: 1.25rem;
         bottom: 1.25rem;
         z-index: 30;
         display: grid;
-        width: 3rem;
-        height: 3rem;
+        width: 2.75rem;
+        height: 2.75rem;
         place-items: center;
-        border: 1px solid #2d604a;
+        border: 0;
         border-radius: 50%;
-        background: #39745b;
-        color: #fff;
-        box-shadow: 0 3px 12px rgba(15, 23, 42, 0.2);
-        font-size: 1.5rem;
+        background: var(--accent);
+        color: var(--accent-ink);
+        box-shadow: 0 6px 18px rgba(0, 0, 0, 0.35);
+        font-size: 1.3rem;
+        font-weight: 600;
         line-height: 1;
         cursor: pointer;
       }
       .shelf-jump-button:hover {
-        background: #2d604a;
+        background: var(--accent-strong);
       }
       .shelf-jump-button:focus-visible {
-        outline: 3px solid #93c5fd;
+        outline: 3px solid color-mix(in srgb, var(--accent) 45%, transparent);
         outline-offset: 3px;
       }
       .shelf-jump-button[hidden] {
@@ -352,9 +479,14 @@ const splitAuthors = (author: string) =>
         display: grid;
         grid-template-columns: minmax(0, 1fr) max-content max-content max-content max-content;
         align-items: center;
-        gap: 1rem;
-        margin-bottom: 1.5rem;
+        gap: 0.6rem;
         width: 100%;
+        box-sizing: border-box;
+        margin-bottom: 1.75rem;
+        padding: 0.75rem;
+        border: 1px solid var(--line);
+        border-radius: 14px;
+        background: var(--fill);
       }
       .category-panel.selection-mode .controls {
         grid-template-columns: minmax(0, 1fr) max-content max-content max-content;
@@ -390,9 +522,9 @@ const splitAuthors = (author: string) =>
         box-sizing: border-box;
         flex-wrap: wrap;
         padding: 0.5rem;
-        border: 1px solid #cbd5e1;
-        border-radius: 6px;
-        background: #f8fafc;
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        background: var(--fill);
       }
       .batch-controls[hidden],
       .batch-actions[hidden] {
@@ -413,14 +545,17 @@ const splitAuthors = (author: string) =>
       }
       .batch-controls button,
       .batch-controls select {
-        height: 3rem;
-        padding: 0.5rem 0.8rem;
-        border: 1px solid #cbd5e1;
-        border-radius: 6px;
-        background: #fff;
-        color: #334155;
+        height: 2.5rem;
+        padding: 0.45rem 0.75rem;
+        border: 1px solid var(--line);
+        border-radius: 9px;
+        background: var(--fill);
+        color: var(--fg);
         font: inherit;
-        font-size: 0.9rem;
+        font-size: 0.85rem;
+      }
+      .batch-controls button:hover:not(:disabled) {
+        background: var(--fill-strong);
       }
       .batch-controls button {
         cursor: pointer;
@@ -430,66 +565,79 @@ const splitAuthors = (author: string) =>
         cursor: not-allowed;
       }
       .batch-controls .batch-remove {
-        border-color: #f2b8b5;
-        color: #b42318;
+        border-color: color-mix(in srgb, var(--danger) 45%, transparent);
+        color: var(--danger);
       }
       .batch-select-all,
       .batch-move-control {
         display: flex;
         align-items: center;
         gap: 0.35rem;
-        color: #475569;
+        color: var(--muted);
         font-size: 0.8rem;
       }
       .batch-select-all {
-        min-height: 3rem;
+        min-height: 2.5rem;
         box-sizing: border-box;
-        padding: 0.5rem 0.65rem;
-        border: 1px solid #cbd5e1;
-        border-radius: 6px;
-        background: #fff;
+        padding: 0.45rem 0.65rem;
+        border: 1px solid var(--line);
+        border-radius: 9px;
+        background: var(--fill);
       }
       .selection-count {
         display: inline-flex;
-        min-height: 3rem;
+        min-height: 2.5rem;
         box-sizing: border-box;
         align-items: center;
-        padding: 0.5rem 0.65rem;
-        border: 1px solid #cbd5e1;
-        border-radius: 6px;
-        background: #fff;
+        padding: 0.45rem 0.65rem;
+        border: 1px solid var(--line);
+        border-radius: 9px;
+        background: var(--fill);
       }
       .batch-select-all input,
-      .local-book-select input {
+      :global(.local-book-select input) {
         width: 1rem;
         height: 1rem;
-        accent-color: #39745b;
+        accent-color: var(--accent);
       }
       .search-input,
       .sort-select,
       .language-select {
-        height: 3rem;
+        height: 2.5rem;
         box-sizing: border-box;
-        padding: 0.5rem 0.8rem;
-        border: 1px solid #cbd5e1;
-        border-radius: 6px;
-        font-size: 0.9rem;
-        color: #334155;
-        outline: none;
-      }
-      .reset-filters-button {
-        height: 3rem;
-        padding: 0.5rem 0.8rem;
-        border: 1px solid #cbd5e1;
-        border-radius: 6px;
-        background: #fff;
-        color: #334155;
+        padding: 0.45rem 0.75rem;
+        border: 1px solid var(--line);
+        border-radius: 9px;
+        background: var(--fill);
+        color: var(--fg);
         font: inherit;
         font-size: 0.85rem;
+        outline: none;
+      }
+      .search-input::placeholder {
+        color: var(--faint);
+      }
+      .sort-select:disabled,
+      .language-select:disabled {
+        opacity: 0.55;
+      }
+      .reset-filters-button {
+        height: 2.5rem;
+        padding: 0.45rem 0.75rem;
+        border: 0;
+        border-radius: 9px;
+        background: transparent;
+        color: var(--muted);
+        font: inherit;
+        font-size: 0.82rem;
         cursor: pointer;
       }
+      .reset-filters-button:hover:not(:disabled) {
+        background: var(--fill-strong);
+        color: var(--fg);
+      }
       .reset-filters-button:disabled {
-        opacity: 0.5;
+        opacity: 0.45;
         cursor: not-allowed;
       }
       .search-input {
@@ -517,15 +665,15 @@ const splitAuthors = (author: string) =>
         border: 0;
         border-radius: 50%;
         background: transparent;
-        color: #64748b;
+        color: var(--muted);
         font: inherit;
         font-size: 1.2rem;
         line-height: 1;
         cursor: pointer;
       }
       .filter-clear-button:hover {
-        background: #f1f5f9;
-        color: #1e293b;
+        background: var(--fill-strong);
+        color: var(--fg);
       }
       .filter-clear-button[hidden] {
         display: none;
@@ -537,106 +685,109 @@ const splitAuthors = (author: string) =>
       .search-input:focus,
       .sort-select:focus,
       .language-select:focus {
-        border-color: #0070f3;
+        border-color: var(--accent);
+        box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 18%, transparent);
       }
       .cards-grid {
         display: grid;
-        grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
-        gap: 1rem;
+        grid-template-columns: repeat(auto-fill, minmax(168px, 1fr));
+        gap: 1.75rem 1.25rem;
       }
-      .card {
-        border: 1px solid #e2e8f0;
-        border-radius: 8px;
-        padding: 0.8rem;
-        text-decoration: none;
-        color: inherit;
-        background: #fff;
+      :global(.card) {
         display: flex;
         flex-direction: column;
         justify-content: space-between;
-        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
-      }
-      :global(.local-book-card) {
+        gap: 0.75rem;
         min-width: 0;
-        border: 1px solid #e2e8f0;
-        border-radius: 8px;
-        padding: 0.8rem;
+        padding: 0;
+        border: 0;
+        background: transparent;
         color: inherit;
-        background: #fff;
-        display: flex;
-        flex-direction: column;
-        justify-content: space-between;
-        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+        text-decoration: none;
       }
-      :global(.local-book-card .cover-placeholder) {
+      :global(.card .cover-img),
+      :global(.card .cover-placeholder) {
+        display: block;
         width: 100%;
-        height: 200px;
-        background: #f8fafc;
-        border: 1px dashed #cbd5e1;
-        border-radius: 4px;
+        height: auto;
+        aspect-ratio: 2 / 3;
+        box-sizing: border-box;
+        margin-bottom: 0.75rem;
+        border-radius: 6px;
+      }
+      :global(.card .cover-img) {
+        object-fit: cover;
+        background: var(--fill);
+        box-shadow: 0 8px 20px rgba(0, 0, 0, 0.28);
+      }
+      :global(.card .cover-placeholder) {
         display: flex;
         align-items: center;
         justify-content: center;
-        color: #94a3b8;
+        border: 1px dashed var(--line);
+        background: var(--fill);
+        color: var(--faint);
+        font-size: 0.68rem;
         font-weight: 600;
-        font-size: 0.75rem;
+        letter-spacing: 0.08em;
         text-align: center;
-        margin-bottom: 0.5rem;
       }
-      :global(.local-book-card .cover-img) {
-        width: 100%;
-        height: 200px;
-        object-fit: contain;
-        background: transparent;
-        border-radius: 4px;
-        margin-bottom: 0.5rem;
-      }
-      :global(.local-book-card h4) {
-        margin: 0 0 0.25rem;
+      :global(.card h4) {
+        margin: 0 0 0.2rem;
+        color: var(--fg);
         font-size: 0.9rem;
-        font-weight: 700;
-        color: #0f172a;
+        font-weight: 600;
         line-height: 1.3;
       }
-      :global(.local-book-card .subtitle-text),
-      .subtitle-text {
-        margin: 0 0 0.4rem;
-        font-size: 0.9rem;
-        color: #475569;
+      :global(.card .subtitle-text) {
+        margin: 0 0 0.3rem;
+        color: var(--muted);
+        font-size: 0.8rem;
         line-height: 1.35;
       }
-      :global(.local-book-card .author-text) {
-        margin: 0 0 0.55rem;
-        font-size: 0.75rem;
-        color: #64748b;
+      :global(.card .author-text) {
+        display: block;
+        margin: 0 0 0.2rem;
+        color: var(--muted);
+        font-size: 0.78rem;
       }
-      :global(.local-book-card .pub-date-text) {
-        margin: 0 0 0.75rem;
-        font-size: 0.7rem;
-        color: #94a3b8;
+      :global(.card .pub-date-text) {
+        margin: 0 0 0.45rem;
+        color: var(--faint);
+        font-size: 0.72rem;
       }
-      :global(.local-book-card .edition-link-text) {
-        margin: 0.15rem 0 0.65rem;
-        font-size: 0.7rem;
+      :global(.author-search-link) {
+        color: inherit;
+        text-decoration: none;
       }
-      :global(.local-book-card .edition-link-text a) {
-        color: #39745b;
+      :global(.author-search-link:hover) {
+        color: var(--fg);
+        text-decoration: underline;
       }
-      :global(.local-book-card .open-library-removed) {
+      :global(.card .edition-link-text) {
+        margin: 0.1rem 0 0;
+        font-size: 0.72rem;
+      }
+      :global(.card .edition-link-text a) {
+        color: var(--muted);
+      }
+      :global(.card .edition-link-text a:hover) {
+        color: var(--accent);
+      }
+      :global(.card .open-library-removed) {
         display: inline-block;
         margin: 0.35rem 0 0;
-        padding: 0.2rem 0.4rem;
-        border-radius: 4px;
-        background: #f1f5f9;
-        color: #64748b;
+        padding: 0.2rem 0.45rem;
+        border-radius: 6px;
+        background: var(--fill-strong);
+        color: var(--muted);
         font-size: 0.68rem;
       }
       :global(.local-book-select) {
         display: none;
         align-items: center;
         gap: 0.4rem;
-        margin-bottom: 0.5rem;
-        color: #475569;
+        color: var(--muted);
         font-size: 0.75rem;
       }
       :global(.selection-mode .local-book-select) {
@@ -646,91 +797,27 @@ const splitAuthors = (author: string) =>
         cursor: pointer;
       }
       :global(.selection-mode .local-book-card:hover) {
-        border-color: #39745b;
-        box-shadow: 0 0 0 2px rgba(57, 116, 91, 0.14);
-      }
-      .cover-placeholder {
-        width: 100%;
-        height: 200px;
-        background: #f8fafc;
-        border: 1px dashed #cbd5e1;
-        border-radius: 4px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        color: #94a3b8;
-        font-weight: 600;
-        font-size: 0.75rem;
-        text-align: center;
-        margin-bottom: 0.5rem;
-      }
-      .cover-img {
-        width: 100%;
-        height: 200px;
-        object-fit: contain;
-        background: transparent;
-        border-radius: 4px;
-        margin-bottom: 0.5rem;
-      }
-      .card h4 {
-        margin: 0 0 0.25rem 0;
-        font-size: 0.9rem;
-        font-weight: 700;
-        color: #0f172a;
-        line-height: 1.3;
-      }
-      .author-text {
-        margin: 0 0 0.55rem 0;
-        font-size: 0.75rem;
-        color: #64748b;
-      }
-      .pub-date-text {
-        margin: 0 0 0.75rem;
-        font-size: 0.7rem;
-        color: #94a3b8;
+        border-radius: 8px;
+        outline: 2px solid color-mix(in srgb, var(--accent) 60%, transparent);
+        outline-offset: 6px;
       }
       .empty-msg {
-        color: #94a3b8;
+        color: var(--faint);
         font-size: 0.9rem;
       }
       .shelf-indicator {
         display: block;
         margin-top: 0.75rem;
-        padding: 0.4rem 0.55rem;
-        border-radius: 4px;
-        background: #39745b;
-        color: #fff;
-        font-size: 0.75rem;
+        padding: 0.45rem 0.55rem;
+        border-radius: 8px;
+        background: var(--accent);
+        color: var(--accent-ink);
+        font-size: 0.78rem;
         font-weight: 600;
         text-align: center;
       }
       .mobile-nav {
         display: none;
-      }
-      body,
-      header h1,
-      sidebar h3,
-      .category-btn,
-      .open-library-sync-status,
-      .empty-msg {
-        color: var(--page-foreground, #1e293b);
-      }
-      .category-btn.search-tab {
-        border-color: var(--page-foreground, #0070f3);
-      }
-      .category-btn.search-tab:not(.active) {
-        color: var(--page-foreground, #0070f3);
-      }
-      .card,
-      :global(.local-book-card) {
-        color: #1e293b;
-      }
-      .home-link {
-        color: inherit;
-        text-decoration: none;
-      }
-      .home-link:hover {
-        opacity: 0.8;
       }
       :global(.search-card img),
       :global(.card .cover-img) {
@@ -750,7 +837,7 @@ const splitAuthors = (author: string) =>
         cursor: zoom-out;
       }
       :global(.cover-lightbox::backdrop) {
-        background: rgba(15, 23, 42, 0.75);
+        background: rgba(0, 0, 0, 0.8);
       }
       :global(.cover-lightbox img) {
         display: block;
@@ -760,35 +847,65 @@ const splitAuthors = (author: string) =>
         max-height: 90vh;
         object-fit: contain;
         border-radius: 8px;
-        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
       }
 
       @media (max-width: 700px) {
-        body {
-          padding: 1rem 0.75rem 5rem;
-        }
-        header h1 {
-          font-size: 1.5rem;
-          margin-bottom: 1.25rem;
-        }
         .container {
           display: block;
+          min-height: 0;
         }
         sidebar {
-          display: block;
-          margin-bottom: 1rem;
+          position: relative;
+          z-index: 15;
+          flex-direction: row;
+          align-items: center;
+          justify-content: space-between;
+          gap: 1rem;
+          height: auto;
+          padding: 1.1rem 1rem 0.5rem;
+          border-right: 0;
+          background: transparent;
         }
-        sidebar > :not(.theme-picker) {
+        sidebar > .sidebar-section {
           display: none;
+        }
+        header h1 {
+          padding: 0;
+          font-size: 1.65rem;
         }
         .theme-picker {
           margin-top: 0;
         }
-        .theme-picker h3 {
-          margin-bottom: 0.4rem;
+        .appearance-toggle {
+          justify-content: center;
+          width: 2.25rem;
+          height: 2.25rem;
+          padding: 0;
+          border-radius: 50%;
+        }
+        .appearance-label,
+        .appearance-value {
+          display: none;
+        }
+        .appearance-swatch {
+          width: 1.05rem;
+          height: 1.05rem;
+        }
+        .appearance-panel {
+          top: calc(100% + 0.5rem);
+          bottom: auto;
+          left: auto;
+          width: 15rem;
         }
         main {
-          width: 100%;
+          padding: 0.75rem 1rem 6.5rem;
+        }
+        :global(.panel-heading) {
+          margin-bottom: 1rem;
+        }
+        :global(.panel-heading h2) {
+          font-size: 1.35rem;
         }
         .mobile-nav {
           position: fixed;
@@ -797,22 +914,24 @@ const splitAuthors = (author: string) =>
           left: 0;
           z-index: 10;
           display: grid;
-          grid-template-columns: repeat(4, 1fr);
-          gap: 0.25rem;
-          padding: 0.5rem;
-          border-top: 1px solid #e2e8f0;
-          background: rgba(255, 255, 255, 0.96);
-          box-shadow: 0 -4px 12px rgba(15, 23, 42, 0.08);
+          grid-template-columns: repeat(5, 1fr);
+          gap: 0.15rem;
+          padding: 0.4rem 0.4rem calc(0.4rem + env(safe-area-inset-bottom));
+          border-top: 1px solid var(--line);
+          background: color-mix(in srgb, var(--page-background, #1c1c1c) 92%, transparent);
+          -webkit-backdrop-filter: blur(14px);
+          backdrop-filter: blur(14px);
         }
         .shelf-jump-button {
           right: 1rem;
-          bottom: 5.25rem;
+          bottom: 5.5rem;
         }
         .controls {
           display: flex;
           flex-direction: column;
+          align-items: stretch;
           gap: 0.5rem;
-          margin-bottom: 1rem;
+          margin-bottom: 1.25rem;
         }
         .category-panel.selection-mode .controls {
           display: flex;
@@ -850,46 +969,77 @@ const splitAuthors = (author: string) =>
           width: 100%;
         }
         .reset-filters-button {
-          width: 100%;
+          align-self: flex-start;
         }
         .cards-grid {
-          grid-template-columns: 1fr;
-          gap: 0.75rem;
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+          gap: 1.5rem 0.9rem;
         }
         .mobile-nav-button {
-          min-height: 2.75rem;
-          padding: 0.35rem 0.2rem;
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          justify-content: center;
+          gap: 0.25rem;
+          min-width: 0;
+          min-height: 3rem;
+          padding: 0.3rem 0.15rem;
           border: 0;
-          border-radius: 6px;
+          border-radius: 10px;
           background: transparent;
-          color: #64748b;
-          font-size: 0.72rem;
+          color: var(--muted);
+          font: inherit;
+          font-size: 0.68rem;
+          font-weight: 500;
           cursor: pointer;
         }
-        .mobile-nav-button .category-count {
-          font-size: 0.68rem;
+        .mobile-nav-button .category-count,
+        .mobile-nav-icon {
+          display: grid;
+          place-items: center;
+          min-width: 1.4rem;
+          height: 1.4rem;
+          box-sizing: border-box;
+          margin: 0;
+          padding: 0 0.3rem;
+          border-radius: 999px;
+          background: var(--fill-strong);
+          color: var(--muted);
+          font-size: 0.65rem;
+        }
+        .mobile-nav-icon svg {
+          width: 0.75rem;
+          height: 0.75rem;
+        }
+        .mobile-nav-button.open-library-button::before {
+          width: 0.55rem;
+          height: 0.55rem;
+          margin: 0.42rem 0;
         }
         .mobile-nav-button.active {
-          background: #0070f3;
-          color: #ffffff;
+          color: var(--fg);
           font-weight: 600;
+        }
+        .mobile-nav-button.active .category-count,
+        .mobile-nav-button.active .mobile-nav-icon {
+          background: var(--accent);
+          color: var(--accent-ink);
         }
       }
     </style>
   </head>
   <body>
-    <header>
-      <h1><a href="/?panel=search-db" class="home-link" id="home-link">My Reading List</a></h1>
-    </header>
-
     <div class="container">
       <sidebar>
+        <header>
+          <h1><a href="/?panel=search-db" class="home-link" id="home-link">My Reading <span class="title-accent">List</span></a></h1>
+        </header>
         <div class="sidebar-section">
           <h3>Database</h3>
           <button class="category-btn search-tab active" data-target="search-db"
-            >🔍 Search Books</button
+            ><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7" /><path d="m20 20-3.5-3.5" /></svg>Search books</button
           >
-          <button type="button" class="category-btn" id="open-library-sync-button">
+          <button type="button" class="category-btn open-library-button" id="open-library-sync-button">
             Connect Open Library
           </button>
           <p class="open-library-sync-status" id="open-library-sync-status" role="status" aria-live="polite" hidden></p>
@@ -907,10 +1057,17 @@ const splitAuthors = (author: string) =>
           >
         </div>
         <section class="theme-picker" aria-labelledby="theme-picker-title">
-          <h3 id="theme-picker-title">Background</h3>
-          <div class="theme-custom-controls">
-            <input class="theme-color-input" id="theme-color-input" type="color" value="#ffffff" aria-label="Choose a custom background color" />
-            <input class="theme-rgb-input" id="theme-rgb-input" type="text" inputmode="text" placeholder="RGB or #hex" aria-label="RGB values or hex color" autocomplete="off" />
+          <button type="button" class="appearance-toggle" id="appearance-toggle" aria-expanded="false" aria-controls="appearance-panel" aria-label="Appearance">
+            <span class="appearance-swatch" aria-hidden="true"></span>
+            <span class="appearance-label">Appearance</span>
+            <span class="appearance-value" id="appearance-value" aria-hidden="true"></span>
+          </button>
+          <div class="appearance-panel" id="appearance-panel" hidden>
+            <h3 id="theme-picker-title">Background</h3>
+            <div class="theme-custom-controls">
+              <input class="theme-color-input" id="theme-color-input" type="color" value="#1c1c1c" aria-label="Choose a custom background color" />
+              <input class="theme-rgb-input" id="theme-rgb-input" type="text" inputmode="text" placeholder="RGB or #hex" aria-label="RGB values or hex color" autocomplete="off" />
+            </div>
           </div>
         </section>
       </sidebar>
@@ -935,17 +1092,22 @@ const splitAuthors = (author: string) =>
           [
             {
               id: "plan-to-read",
+              title: "Plan to Read",
               books: planToRead,
               empty: "No books planned yet.",
             },
             {
               id: "reading",
+              title: "Reading",
               books: reading,
               empty: "No books currently being read.",
             },
-            { id: "read", books: read, empty: "No completed books yet." },
-          ].map(({ id, books, empty }) => (
+            { id: "read", title: "Read", books: read, empty: "No completed books yet." },
+          ].map(({ id, title, books, empty }) => (
             <div id={id} class="category-panel">
+              <div class="panel-heading">
+                <h2>{title}</h2>
+              </div>
               <div class="controls">
                 <div class="filter-input-wrap">
                   <input
@@ -1087,10 +1249,11 @@ const splitAuthors = (author: string) =>
     </div>
 
     <nav class="mobile-nav" aria-label="Reading lists">
-      <button class="mobile-nav-button" data-target="plan-to-read">Plan to Read <span class="category-count">{planToRead.length}</span></button>
-      <button class="mobile-nav-button" data-target="reading">Reading <span class="category-count">{reading.length}</span></button>
-      <button class="mobile-nav-button" data-target="read">Read <span class="category-count">{read.length}</span></button>
-      <button type="button" class="mobile-nav-button" id="mobile-open-library-sync-button">Connect</button>
+      <button class="mobile-nav-button active" data-target="search-db"><span class="mobile-nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><circle cx="11" cy="11" r="7" /><path d="m20 20-3.5-3.5" /></svg></span>Search</button>
+      <button class="mobile-nav-button" data-target="plan-to-read" aria-label="Plan to Read"><span class="category-count">{planToRead.length}</span>Plan</button>
+      <button class="mobile-nav-button" data-target="reading"><span class="category-count">{reading.length}</span>Reading</button>
+      <button class="mobile-nav-button" data-target="read"><span class="category-count">{read.length}</span>Read</button>
+      <button type="button" class="mobile-nav-button open-library-button" id="mobile-open-library-sync-button">Connect</button>
     </nav>
 
     <!-- Avoids "back to top" class/label text that ad blockers (e.g. Brave Shields) hide. -->
@@ -1134,13 +1297,18 @@ const splitAuthors = (author: string) =>
       const openLibrarySyncMessage = document.getElementById("open-library-sync-message") as HTMLElement;
       const openLibrarySyncSubmit = document.getElementById("open-library-sync-submit") as HTMLButtonElement;
       const openLibrarySyncCancel = document.getElementById("open-library-sync-cancel") as HTMLButtonElement;
-      const backgroundPreferenceKey = "my-book-library:page-background";
+      // v2: the old key auto-saved white on every load, so it can't tell a real choice from the old default.
+      const backgroundPreferenceKey = "my-book-library:page-background-v2";
+      localStorage.removeItem("my-book-library:page-background");
       const backgroundColorInput = document.getElementById("theme-color-input") as HTMLInputElement;
       const backgroundRgbInput = document.getElementById("theme-rgb-input") as HTMLInputElement;
+      const appearanceToggle = document.getElementById("appearance-toggle") as HTMLButtonElement;
+      const appearancePanel = document.getElementById("appearance-panel") as HTMLElement;
+      const appearanceValue = document.getElementById("appearance-value") as HTMLElement;
       const savedBackground = localStorage.getItem(backgroundPreferenceKey);
       const selectedBackground = /^#[0-9a-f]{6}$/i.test(savedBackground || "")
-        ? savedBackground || "#ffffff"
-        : "#ffffff";
+        ? savedBackground || "#1c1c1c"
+        : "#1c1c1c";
       function setPageForeground(background: string) {
         const channels = background.match(/[0-9a-f]{2}/gi)?.map((channel) => parseInt(channel, 16) / 255) || [1, 1, 1];
         const luminance = channels
@@ -1152,19 +1320,41 @@ const splitAuthors = (author: string) =>
           "--page-foreground",
           lightContrast > darkContrast ? "#ffffff" : "#0f172a",
         );
+        document.documentElement.style.colorScheme = lightContrast > darkContrast ? "dark" : "light";
       }
 
-      function setPageBackground(background: string) {
+      function setPageBackground(background: string, persist = true) {
         document.body.style.backgroundColor = background;
         setPageForeground(background);
-        localStorage.setItem(backgroundPreferenceKey, background);
+        if (persist) localStorage.setItem(backgroundPreferenceKey, background);
         backgroundColorInput.value = background;
         const rgb = background.match(/[0-9a-f]{2}/gi) || [];
         backgroundRgbInput.value = rgb.map((value) => parseInt(value, 16)).join(", ");
         backgroundRgbInput.setCustomValidity("");
+        document.body.style.setProperty("--page-background", background);
+        appearanceValue.textContent = backgroundRgbInput.value;
       }
 
-      setPageBackground(selectedBackground);
+      setPageBackground(selectedBackground, false);
+
+      function setAppearanceOpen(open: boolean) {
+        appearancePanel.hidden = !open;
+        appearanceToggle.setAttribute("aria-expanded", String(open));
+      }
+      appearanceToggle.addEventListener("click", () =>
+        setAppearanceOpen(appearanceToggle.getAttribute("aria-expanded") !== "true"),
+      );
+      document.addEventListener("click", (event) => {
+        if (!appearancePanel.hidden && !(event.target as Element).closest?.(".theme-picker")) {
+          setAppearanceOpen(false);
+        }
+      });
+      document.addEventListener("keydown", (event) => {
+        if (event.key === "Escape" && !appearancePanel.hidden) {
+          setAppearanceOpen(false);
+          appearanceToggle.focus();
+        }
+      });
 
       backgroundColorInput.addEventListener("input", () => {
         setPageBackground(backgroundColorInput.value);
@@ -1331,7 +1521,7 @@ const splitAuthors = (author: string) =>
 
       function createShelfControl(book: any) {
         const control = document.createElement("div");
-        control.className = "shelf-control";
+        control.className = "shelf-control is-saved";
 
         const currentShelf = shelfDefinitions.find((shelf) => shelf.status === book.status)
           || shelfDefinitions[0];
@@ -1583,8 +1773,11 @@ const splitAuthors = (author: string) =>
         const username = localStorage.getItem(openLibraryUsernameKey);
         const lastSyncResult = localStorage.getItem(openLibraryLastSyncResultKey);
         openLibrarySyncButton.textContent = username
-          ? "Sync Open Library"
+          ? "Open Library connected"
           : "Connect Open Library";
+        openLibrarySyncButton.title = username ? "Sync Open Library" : "";
+        openLibrarySyncButton.classList.toggle("is-connected", Boolean(username));
+        mobileOpenLibrarySyncButton.classList.toggle("is-connected", Boolean(username));
         mobileOpenLibrarySyncButton.textContent = username ? "Sync" : "Connect";
         mobileOpenLibrarySyncButton.setAttribute(
           "aria-label",
