@@ -92,6 +92,7 @@ export const GET: APIRoute = async ({ url }) => {
   const authorExact = url.searchParams.get('author_exact') === '1';
   const language = url.searchParams.get('language')?.trim();
   const discoverLanguages = url.searchParams.get('discover_languages') === '1';
+  const includeAllResults = url.searchParams.get('all_results') === '1';
   const sort = url.searchParams.get('sort') || '';
   const shouldSort = ['title-asc', 'title-desc', 'year-desc', 'year-asc'].includes(sort);
   const page = Math.max(1, parseInt(url.searchParams.get('page') || '1', 10));
@@ -372,20 +373,21 @@ export const GET: APIRoute = async ({ url }) => {
       : data.numFound || 0;
     const totalPages = Math.ceil(totalResults / limit);
     const pageDocs = authorExact || shouldSort || language || discoverLanguages
-      ? sortedDocs.slice(offset, offset + limit)
+      ? includeAllResults ? sortedDocs : sortedDocs.slice(offset, offset + limit)
       : sortedDocs;
 
     // Reuse sort-independent edition lookups so displayed details remain stable across sorts.
+    const editionLookupDocs = includeAllResults ? pageDocs.slice(0, limit) : pageDocs;
     const matchedEditions = isIsbnSearch
-      ? pageDocs.map((doc: any) =>
+      ? editionLookupDocs.map((doc: any) =>
           isbnEdition && (
             isbnEdition.works?.some((work: any) => work.key === doc.key)
-            || pageDocs.length === 1
+            || editionLookupDocs.length === 1
           ) ? isbnEdition : null,
         )
       : isGeneralQuery || language
       ? await Promise.all(
-          pageDocs.map((doc: any) => {
+          editionLookupDocs.map((doc: any) => {
             if (!doc.key) return null;
             const docKey = String(doc.key);
             if (language) {
@@ -438,6 +440,7 @@ export const GET: APIRoute = async ({ url }) => {
         totalResults,
         page,
         totalPages,
+        allResults: includeAllResults,
         languages: languageOptions,
       }),
       {
