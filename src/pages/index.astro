@@ -328,12 +328,43 @@ const splitAuthors = (author: string) =>
         margin-bottom: 1.5rem;
         width: 100%;
       }
+      .category-panel.selection-mode .controls {
+        grid-template-columns: minmax(0, 1fr) max-content max-content max-content;
+        grid-template-rows: auto auto;
+      }
+      .category-panel.selection-mode .search-input {
+        grid-column: 1;
+        grid-row: 1;
+      }
+      .category-panel.selection-mode .sort-select {
+        grid-column: 2;
+        grid-row: 1;
+      }
+      .category-panel.selection-mode .language-select {
+        grid-column: 3;
+        grid-row: 1;
+      }
+      .category-panel.selection-mode .reset-filters-button {
+        grid-column: 4;
+        grid-row: 1;
+      }
       .batch-controls {
         display: flex;
         align-items: center;
         gap: 0.5rem;
         flex-wrap: wrap;
         margin: 0;
+      }
+      .category-panel.selection-mode .batch-controls {
+        grid-column: 1 / -1;
+        grid-row: 2;
+        width: 100%;
+        box-sizing: border-box;
+        flex-wrap: wrap;
+        padding: 0.5rem;
+        border: 1px solid #cbd5e1;
+        border-radius: 6px;
+        background: #f8fafc;
       }
       .batch-controls[hidden],
       .batch-actions[hidden] {
@@ -348,6 +379,9 @@ const splitAuthors = (author: string) =>
         align-items: center;
         gap: 0.5rem;
         flex-wrap: wrap;
+      }
+      .category-panel.selection-mode .batch-actions {
+        flex: 1 1 auto;
       }
       .batch-controls button,
       .batch-controls select {
@@ -378,6 +412,24 @@ const splitAuthors = (author: string) =>
         gap: 0.35rem;
         color: #475569;
         font-size: 0.8rem;
+      }
+      .batch-select-all {
+        min-height: 3rem;
+        box-sizing: border-box;
+        padding: 0.5rem 0.65rem;
+        border: 1px solid #cbd5e1;
+        border-radius: 6px;
+        background: #fff;
+      }
+      .selection-count {
+        display: inline-flex;
+        min-height: 3rem;
+        box-sizing: border-box;
+        align-items: center;
+        padding: 0.5rem 0.65rem;
+        border: 1px solid #cbd5e1;
+        border-radius: 6px;
+        background: #fff;
       }
       .batch-select-all input,
       .local-book-select input {
@@ -658,6 +710,11 @@ const splitAuthors = (author: string) =>
           gap: 0.5rem;
           margin-bottom: 1rem;
         }
+        .category-panel.selection-mode .controls {
+          display: flex;
+          flex-direction: column;
+          align-items: stretch;
+        }
         .batch-controls,
         .batch-actions {
           width: 100%;
@@ -673,6 +730,10 @@ const splitAuthors = (author: string) =>
         }
         .batch-actions {
           gap: 0.35rem;
+        }
+        .category-panel.selection-mode .batch-controls {
+          align-items: stretch;
+          flex-direction: column;
         }
         .batch-controls button,
         .batch-controls select {
