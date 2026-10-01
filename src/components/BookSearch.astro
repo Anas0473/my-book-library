@@ -18,7 +18,7 @@ const { libraryBooks = [] } = Astro.props;
       <input
         type="text"
         id="global-book-search"
-        placeholder="Search by title, author, or subtitle"
+        placeholder="Search by title, author, subtitle, or ISBN"
       />
       <button type="button" id="clear-book-search" class="search-clear-button" aria-label="Clear search" title="Clear search" hidden>×</button>
     </div>
@@ -755,17 +755,26 @@ const { libraryBooks = [] } = Astro.props;
       const { books = [], totalResults = 0, totalPages = 0, languages = [] } = data;
       const savedBooks = getSavedBooks();
       const normalizedQuery = query.toLowerCase();
+      const normalizedIsbnQuery = query
+        .replace(/^ISBN(?:-1[03])?\s*[:#]?\s*/i, '')
+        .replace(/[\s-]/g, '')
+        .toUpperCase();
       const localMatches = savedBooks.filter((book: any) => {
         const title = String(book.title || '').toLowerCase();
         const subtitle = String(book.subtitle || '').toLowerCase();
         const author = String(book.author || '').toLowerCase();
+        const isbn = String(book.isbn || '').replace(/[\s-]/g, '').toUpperCase();
+        const matchesIsbn = normalizedIsbnQuery.length >= 10 && isbn.includes(normalizedIsbnQuery);
         const matchesLanguage = !currentLanguage
           || (book.editionLanguage
             ? book.editionLanguage === currentLanguage
             : books.some((result: any) => isSameBook(result, book)));
         return matchesLanguage && (currentAuthorOnly
           ? author.includes(normalizedQuery)
-          : title.includes(normalizedQuery) || subtitle.includes(normalizedQuery) || author.includes(normalizedQuery));
+          : title.includes(normalizedQuery)
+            || subtitle.includes(normalizedQuery)
+            || author.includes(normalizedQuery)
+            || matchesIsbn);
       });
       const savedWorkKeys = new Set(
         localMatches.map((book: any) => book.workKey).filter(Boolean),

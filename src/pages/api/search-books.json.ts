@@ -109,6 +109,13 @@ export const GET: APIRoute = async ({ url }) => {
   }
 
   const trimmedQuery = query.trim();
+  const normalizedIsbn = trimmedQuery
+    .replace(/^ISBN(?:-1[03])?\s*[:#]?\s*/i, '')
+    .replace(/[\s-]/g, '')
+    .toUpperCase();
+  const isIsbnSearch = !authorKey
+    && !authorOnly
+    && /^(?:\d{9}[\dX]|\d{13})$/.test(normalizedIsbn);
   const directUrlMatch = trimmedQuery.match(
     /(?:https?:\/\/(?:www\.)?openlibrary\.org)?\/?(books|works)\/(OL\d+[MW])(?:[/?#]|$)/i,
   );
@@ -188,9 +195,15 @@ export const GET: APIRoute = async ({ url }) => {
       );
     }
 
+    const searchField = authorKey
+      ? 'author_key'
+      : authorOnly
+        ? 'author'
+        : isIsbnSearch
+          ? 'isbn'
+          : query.trim().split(/\s+/).length > 1 ? 'q' : 'title';
     const searchParams = new URLSearchParams({
-      [authorKey ? 'author_key' : authorOnly ? 'author' : query.trim().split(/\s+/).length > 1 ? 'q' : 'title']:
-        authorKey || query,
+      [searchField]: isIsbnSearch ? normalizedIsbn : authorKey || query,
       fields: 'title,subtitle,author_name,author_key,language,first_publish_year,cover_i,isbn,key,edition_key,edition_count',
       limit: String(shouldSort || authorExact || language || discoverLanguages ? 1000 : limit),
       offset: String(shouldSort || authorExact || language || discoverLanguages ? 0 : offset),
@@ -211,6 +224,22 @@ export const GET: APIRoute = async ({ url }) => {
     }
 
     const data = await res.json();
+    let isbnEdition: any = null;
+    if (isIsbnSearch) {
+      const isbnController = new AbortController();
+      const isbnTimeout = setTimeout(() => isbnController.abort(), 8000);
+      try {
+        const isbnResponse = await fetch(`https://openlibrary.org/isbn/${normalizedIsbn}.json`, {
+          signal: isbnController.signal,
+          headers: { 'User-Agent': 'my-book-library/0.0.1' },
+        });
+        if (isbnResponse.ok) isbnEdition = await isbnResponse.json();
+      } catch {
+        // Keep the ISBN work result usable if edition lookup is unavailable.
+      } finally {
+        clearTimeout(isbnTimeout);
+      }
+    }
     // OpenLibrary's general "q" search matches loosely across unrelated fields
     // (e.g. subjects and contributor notes). Prefer results where the full phrase
     // appears in the title, subtitle, or an author's name, but retain top-ranked
@@ -347,7 +376,14 @@ export const GET: APIRoute = async ({ url }) => {
       : sortedDocs;
 
     // Reuse sort-independent edition lookups so displayed details remain stable across sorts.
-    const matchedEditions = isGeneralQuery || language
+    const matchedEditions = isIsbnSearch
+      ? pageDocs.map((doc: any) =>
+          isbnEdition && (
+            isbnEdition.works?.some((work: any) => work.key === doc.key)
+            || pageDocs.length === 1
+          ) ? isbnEdition : null,
+        )
+      : isGeneralQuery || language
       ? await Promise.all(
           pageDocs.map((doc: any) => {
             if (!doc.key) return null;
@@ -362,7 +398,7 @@ export const GET: APIRoute = async ({ url }) => {
 
     const formattedBooks = pageDocs.map((doc: any, index: number) => {
       const edition = matchedEditions[index];
-      const selectedEditionId = String(edition?.key || doc.edition_key?.[0] || '')
+      const selectedEditionId = String(edition?.key || (!isIsbnSearch ? doc.edition_key?.[0] : '') || '')
         .match(/OL\d+M/i)?.[0].toUpperCase() || null;
       return {
         key: doc.key,
@@ -385,7 +421,9 @@ export const GET: APIRoute = async ({ url }) => {
           ? edition.languages.map((item: any) => item.key?.split('/').pop()).filter(Boolean)
           : doc.language || [],
         pubDate: edition?.publish_date || doc.first_publish_year || 'Unknown',
-        isbn: edition?.isbn_13?.[0] || edition?.isbn_10?.[0] || (doc.isbn ? doc.isbn[0] : null),
+        isbn: isIsbnSearch
+          ? normalizedIsbn
+          : edition?.isbn_13?.[0] || edition?.isbn_10?.[0] || (doc.isbn ? doc.isbn[0] : null),
         heroImage: edition?.covers?.[0]
           ? `https://covers.openlibrary.org/b/id/${edition.covers[0]}-M.jpg`
           : doc.cover_i

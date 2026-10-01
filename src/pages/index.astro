@@ -781,7 +781,7 @@ const splitAuthors = (author: string) =>
                 <input
                   type="text"
                   class="search-input"
-                  placeholder="Filter your list by title, subtitle, or author..."
+                  placeholder="Filter by title, subtitle, author, or ISBN..."
                 />
                 <div class="batch-controls" hidden>
                   <button type="button" class="selection-toggle" aria-pressed="false">Select books</button>
@@ -1834,6 +1834,10 @@ const splitAuthors = (author: string) =>
 
         function updatePanel() {
           const query = searchInput.value.trim().toLowerCase();
+          const normalizedIsbnQuery = searchInput.value.trim()
+            .replace(/^ISBN(?:-1[03])?\s*[:#]?\s*/i, "")
+            .replace(/[\s-]/g, "")
+            .toUpperCase();
           const sortVal = sortSelect.value;
           const cards = Array.from(grid.querySelectorAll<HTMLElement>(".card"));
           cards.forEach((card) => {
@@ -1900,7 +1904,12 @@ const splitAuthors = (author: string) =>
             const title = card.dataset.title || "";
             const subtitle = card.dataset.subtitle || "";
             const author = card.dataset.author || "";
-            const matchesText = title.includes(query) || subtitle.includes(query) || author.includes(query);
+            const isbn = String(card.dataset.isbn || "").replace(/[\s-]/g, "").toUpperCase();
+            const matchesIsbn = normalizedIsbnQuery.length >= 10 && isbn.includes(normalizedIsbnQuery);
+            const matchesText = title.includes(query)
+              || subtitle.includes(query)
+              || author.includes(query)
+              || matchesIsbn;
             const matchesLanguage = !language
               || (language === "unknown"
                 ? card.dataset.language === "unknown"
