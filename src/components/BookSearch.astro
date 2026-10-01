@@ -6,6 +6,8 @@ interface Props {
     isbn?: string;
     status?: string;
     editionKey?: string;
+    editionLanguage?: string;
+    language?: string;
   }>;
 }
 
@@ -182,6 +184,22 @@ const { libraryBooks = [] } = Astro.props;
     gap: 1rem;
     margin-top: 1rem;
   }
+  .page-jump {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    margin: 0;
+    font-size: 0.85rem;
+  }
+  .page-jump input {
+    width: 4.25rem;
+    height: 2.25rem;
+    box-sizing: border-box;
+    padding: 0.3rem;
+    border: 1px solid #cbd5e1;
+    border-radius: 6px;
+    font: inherit;
+  }
   :global(.pagination button) {
     padding: 0.4rem 0.9rem;
     border: 1px solid #cbd5e1;
@@ -256,7 +274,7 @@ const { libraryBooks = [] } = Astro.props;
   }
   :global(.edition-button),
   :global(.selected-edition-link) {
-    display: inline-block;
+    display: block;
     margin: 0.2rem 0 0.5rem;
     color: #39745b;
     font-size: 0.7rem;
@@ -528,9 +546,11 @@ const { libraryBooks = [] } = Astro.props;
     }
     .pagination {
       gap: 0.5rem;
+      flex-wrap: wrap;
     }
     :global(.pagination button),
-    :global(.pagination span) {
+    :global(.pagination span),
+    .page-jump {
       font-size: 0.72rem;
     }
     :global(.pagination button) {
@@ -789,6 +809,38 @@ const { libraryBooks = [] } = Astro.props;
           || matchesIsbn;
       return matchesQuery && (!language || !book.editionLanguage || book.editionLanguage === language);
     });
+    const savedSearchMatches = hideAdded
+      ? [
+          ...savedBooks,
+          ...libraryBooks.filter((book: any) => shelfLabels[book.status]),
+        ].filter((book: any) => {
+            const title = String(book.title || '').toLowerCase();
+            const subtitle = String(book.subtitle || '').toLowerCase();
+            const author = String(book.author || '').toLowerCase();
+            const isbn = String(book.isbn || '').replace(/[\s-]/g, '').toUpperCase();
+            const matchesIsbn = normalizedIsbnQuery.length >= 10 && isbn.includes(normalizedIsbnQuery);
+            const matchesQuery = authorOnly
+              ? author.includes(normalizedQuery)
+              : title.includes(normalizedQuery)
+                || subtitle.includes(normalizedQuery)
+                || author.includes(normalizedQuery)
+                || matchesIsbn;
+            return matchesQuery && (!language || !book.editionLanguage || book.editionLanguage === language);
+          })
+      : [];
+    const excludedWorkKeys = Array.from(new Set(savedSearchMatches
+          .map((book: any) => String(book.workKey || (String(book.key || '').startsWith('/works/') ? book.key : '')))
+          .filter((workKey: string) => /^\/?works\/OL\d+W$/i.test(workKey))
+          .map((workKey: string) => workKey.startsWith('/') ? workKey : `/${workKey}`)));
+    const excludeWorkKeyParams = excludedWorkKeys
+      .map((workKey: string) => `&exclude_work_key=${encodeURIComponent(workKey)}`)
+      .join('');
+    const excludedIsbns = Array.from(new Set(savedSearchMatches
+      .map((book: any) => String(book.isbn || '').replace(/[\s-]/g, '').toUpperCase())
+      .filter((isbn: string) => /^(?:\d{9}[\dX]|\d{13})$/.test(isbn))));
+    const excludeIsbnParams = excludedIsbns
+      .map((isbn: string) => `&exclude_isbn=${encodeURIComponent(isbn)}`)
+      .join('');
     const searchCacheKey = JSON.stringify([query, authorOnly, authorKey, authorExact, sort, language, hideAdded]);
 
     resultsContainer.innerHTML = '<p>Searching...</p>';
@@ -808,8 +860,7 @@ const { libraryBooks = [] } = Astro.props;
       if (savedFirstResultsKey === searchCacheKey && savedFirstResults) {
         data = savedFirstResults;
       } else {
-        const allResultsParam = hideAdded ? '&all_results=1' : '';
-        const res = await fetch(`/api/search-books.json?q=${encodeURIComponent(query)}${authorParam}${authorKeyParam}${authorExactParam}${sortParam}${languageParam}&discover_languages=1&page=${page}&limit=${pageSize}${allResultsParam}`);
+        const res = await fetch(`/api/search-books.json?q=${encodeURIComponent(query)}${authorParam}${authorKeyParam}${authorExactParam}${sortParam}${languageParam}${excludeWorkKeyParams}${excludeIsbnParams}&discover_languages=1&page=${page}&limit=${pageSize}`);
         data = await res.json();
         if (data.allResults) {
           savedFirstResultsKey = searchCacheKey;
@@ -821,6 +872,7 @@ const { libraryBooks = [] } = Astro.props;
 
       const { books = [], totalResults = 0, totalPages = 0, languages = [] } = data;
       const searchUnavailable = data.searchUnavailable === true;
+      const isInternetArchive = data.searchProvider === 'internet-archive';
       const localMatches = savedBooks.filter((book: any) => {
         const title = String(book.title || '').toLowerCase();
         const subtitle = String(book.subtitle || '').toLowerCase();
@@ -922,12 +974,14 @@ const { libraryBooks = [] } = Astro.props;
           const displayBooks = hasCompleteResults
         ? orderedResults.slice((page - 1) * pageSize, page * pageSize)
         : orderedResults;
-          const searchNotice = searchUnavailable
-            ? 'Open Library search is temporarily unavailable.'
+          const searchNotice = isInternetArchive
+            ? 'Open Library is unavailable.'
+            : searchUnavailable
+              ? 'Open Library search is temporarily unavailable.'
             : totalResults === 0 && localMatches.length > 0
               ? 'No Open Library matches; showing your saved matches.'
               : '';
-          summaryContainer.dataset.state = searchUnavailable ? 'warning' : '';
+          summaryContainer.dataset.state = searchUnavailable || isInternetArchive ? 'warning' : '';
       const languageNames: Record<string, string> = {
         ara: 'Arabic', dan: 'Danish', deu: 'German', eng: 'English',
         fas: 'Persian', fin: 'Finnish', fra: 'French', heb: 'Hebrew',
@@ -935,26 +989,44 @@ const { libraryBooks = [] } = Astro.props;
         por: 'Portuguese', spa: 'Spanish', swe: 'Swedish', tur: 'Turkish',
         und: 'Unknown',
       };
+      const matchingLibraryBooks = libraryBooks.filter((book: any) => {
+        const title = String(book.title || '').toLowerCase();
+        const author = String(book.author || '').toLowerCase();
+        const isbn = String(book.isbn || '').replace(/[\s-]/g, '').toUpperCase();
+        const matchesIsbn = normalizedIsbnQuery.length >= 10 && isbn.includes(normalizedIsbnQuery);
+        return (currentAuthorOnly ? author.includes(normalizedQuery) : title.includes(normalizedQuery) || author.includes(normalizedQuery) || matchesIsbn);
+      });
+      const availableLanguages = Array.from(new Set([
+        ...languages,
+        ...localMatches.flatMap((book: any) => [book.editionLanguage, book.language]),
+        ...matchingLibraryBooks.flatMap((book: any) => [book.editionLanguage, book.language]),
+      ].map((code: any) => String(code || '').toLowerCase()).filter(Boolean))).sort();
       searchLanguageSelect.innerHTML = '<option value="">All languages</option>';
-      languages.forEach((code: string) => {
+      availableLanguages.forEach((code: string) => {
         const option = document.createElement('option');
         option.value = code;
         option.textContent = languageNames[code] || code.toUpperCase();
         searchLanguageSelect.appendChild(option);
       });
-      searchLanguageSelect.disabled = languages.length === 0;
-      searchLanguageSelect.value = languages.includes(language) ? language : '';
+      searchLanguageSelect.disabled = availableLanguages.length === 0;
+      searchLanguageSelect.value = availableLanguages.includes(language) ? language : '';
       currentLanguage = searchLanguageSelect.value;
 
       if (displayBooks.length === 0) {
         resultsContainer.innerHTML = '<p>No books found.</p>';
-        summaryContainer.textContent = searchNotice;
+        summaryContainer.textContent = isInternetArchive
+          ? `${searchNotice} No results found in Internet Archive.`
+          : searchNotice;
         return;
       }
 
       const startItem = (page - 1) * pageSize + 1;
       const endItem = startItem + displayBooks.length - 1;
-      summaryContainer.textContent = `${searchNotice ? `${searchNotice} ` : ''}Showing ${startItem}–${endItem} of ${displayTotalResults} results`;
+      const resultCount = displayTotalResults === 1
+        ? '1 of 1 results'
+        : `${startItem}–${endItem} of ${displayTotalResults} results`;
+      const resultSource = isInternetArchive ? ' from Internet Archive.' : '';
+      summaryContainer.textContent = `${searchNotice ? `${searchNotice} ` : ''}Showing ${resultCount}${resultSource}`;
 
       resultsContainer.innerHTML = displayBooks.map((book: any, index: number) => {
         const matchedSavedBook = savedBooks.find((item: any) => isSameBook(item, book));
@@ -1263,7 +1335,12 @@ const { libraryBooks = [] } = Astro.props;
       if (displayTotalPages > 1) {
         paginationContainer.innerHTML = `
           <button id="prev-page" ${page <= 1 ? 'disabled' : ''}>← Previous</button>
-          <span>Page ${page} of ${displayTotalPages}</span>
+          <form id="go-to-page-form" class="page-jump">
+            <label for="go-to-page-input">Go to page</label>
+            <input id="go-to-page-input" type="number" min="1" max="${displayTotalPages}" step="1" value="${page}" inputmode="numeric" />
+            <span>of ${displayTotalPages}</span>
+            <button type="submit" formnovalidate>Go</button>
+          </form>
           <button id="next-page" ${page >= displayTotalPages ? 'disabled' : ''}>Next →</button>
         `;
 
@@ -1273,6 +1350,18 @@ const { libraryBooks = [] } = Astro.props;
 
         document.getElementById('next-page')?.addEventListener('click', () => {
           if (currentPage < displayTotalPages) performSearch(currentQuery, currentPage + 1, currentAuthorOnly, currentAuthorKey, currentAuthorExact, currentSort, currentLanguage);
+        });
+
+        document.getElementById('go-to-page-form')?.addEventListener('submit', (event) => {
+          event.preventDefault();
+          const input = document.getElementById('go-to-page-input') as HTMLInputElement;
+          const requestedPage = Number(input.value);
+          if (!Number.isFinite(requestedPage)) return;
+          const targetPage = Math.max(1, Math.min(displayTotalPages, Math.trunc(requestedPage)));
+          input.value = String(targetPage);
+          if (targetPage !== currentPage) {
+            performSearch(currentQuery, targetPage, currentAuthorOnly, currentAuthorKey, currentAuthorExact, currentSort, currentLanguage);
+          }
         });
       }
     } catch (err) {

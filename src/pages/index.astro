@@ -893,6 +893,7 @@ const splitAuthors = (author: string) =>
               isbn: data.isbn,
               status: data.status,
               editionKey: (data as any).editionKey,
+              editionLanguage: (data as any).editionLanguage || (data as any).language,
             }))}
           />
         </div>
@@ -2029,6 +2030,32 @@ const splitAuthors = (author: string) =>
             .replace(/^ISBN(?:-1[03])?\s*[:#]?\s*/i, "")
             .replace(/[\s-]/g, "")
             .toUpperCase();
+          const queryTerms = query.split(/\s+/).filter(Boolean).map((term) =>
+            term.normalize("NFKD").replace(/[\u0300-\u036f]/g, ""),
+          );
+          const isWithinOneEdit = (first: string, second: string) => {
+            if (Math.abs(first.length - second.length) > 1) return false;
+            let firstIndex = 0;
+            let secondIndex = 0;
+            let edits = 0;
+            while (firstIndex < first.length && secondIndex < second.length) {
+              if (first[firstIndex] === second[secondIndex]) {
+                firstIndex++;
+                secondIndex++;
+                continue;
+              }
+              if (++edits > 1) return false;
+              if (first.length === second.length) {
+                firstIndex++;
+                secondIndex++;
+              } else if (first.length > second.length) {
+                firstIndex++;
+              } else {
+                secondIndex++;
+              }
+            }
+            return edits + (first.length - firstIndex) + (second.length - secondIndex) <= 1;
+          };
           const sortVal = sortSelect.value;
           const cards = Array.from(grid.querySelectorAll<HTMLElement>(".card"));
           cards.forEach((card) => {
@@ -2098,9 +2125,16 @@ const splitAuthors = (author: string) =>
             const author = card.dataset.author || "";
             const isbn = String(card.dataset.isbn || "").replace(/[\s-]/g, "").toUpperCase();
             const matchesIsbn = normalizedIsbnQuery.length >= 10 && isbn.includes(normalizedIsbnQuery);
-            const matchesText = title.includes(query)
-              || subtitle.includes(query)
-              || author.includes(query)
+            const searchableFields = [title, subtitle, author].map((field) =>
+              field.normalize("NFKD").replace(/[\u0300-\u036f]/g, ""),
+            );
+            const matchesText = queryTerms.every((term) => searchableFields.some((field) => {
+              if (field.includes(term)) return true;
+              if (term.length < 6) return false;
+              return field.split(/[^a-z0-9]+/).some((word) =>
+                Math.abs(word.length - term.length) <= 1 && isWithinOneEdit(word, term),
+              );
+            }))
               || matchesIsbn;
             const matchesLanguage = !language
               || (language === "unknown"
