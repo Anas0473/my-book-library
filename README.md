@@ -41,6 +41,12 @@ The `src/content/` directory contains "collections" of related Markdown and MDX 
 
 Any static assets, like images, can be placed in the `public/` directory.
 
+## Optional Search Fallback
+
+Search uses Open Library first, then Internet Archive's cataloged books when Open Library is unavailable. No API key is required for the Internet Archive fallback.
+
+Fallback results link to their source and do not support the Open Library edition picker. Internet Archive's catalog is narrower than Open Library, so fallback result totals may differ.
+
 ## 🧞 Commands
 
 All commands are run from the root of the project, from a terminal:
