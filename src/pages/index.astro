@@ -332,7 +332,7 @@ const splitAuthors = (author: string) =>
         grid-template-columns: minmax(0, 1fr) max-content max-content max-content;
         grid-template-rows: auto auto;
       }
-      .category-panel.selection-mode .search-input {
+      .category-panel.selection-mode .filter-input-wrap {
         grid-column: 1;
         grid-row: 1;
       }
@@ -466,6 +466,41 @@ const splitAuthors = (author: string) =>
       }
       .search-input {
         flex: 1;
+      }
+      .filter-input-wrap {
+        position: relative;
+        min-width: 0;
+      }
+      .filter-input-wrap .search-input {
+        width: 100%;
+        padding-right: 2.5rem;
+      }
+      .filter-clear-button {
+        position: absolute;
+        top: 50%;
+        right: 0.55rem;
+        display: grid;
+        width: 1.75rem;
+        height: 1.75rem;
+        place-items: center;
+        box-sizing: border-box;
+        padding: 0 0 0.2rem;
+        transform: translateY(-50%);
+        border: 0;
+        border-radius: 50%;
+        background: transparent;
+        color: #64748b;
+        font: inherit;
+        font-size: 1.2rem;
+        line-height: 1;
+        cursor: pointer;
+      }
+      .filter-clear-button:hover {
+        background: #f1f5f9;
+        color: #1e293b;
+      }
+      .filter-clear-button[hidden] {
+        display: none;
       }
       .sort-select,
       .language-select {
@@ -879,11 +914,14 @@ const splitAuthors = (author: string) =>
           ].map(({ id, books, empty }) => (
             <div id={id} class="category-panel">
               <div class="controls">
-                <input
-                  type="text"
-                  class="search-input"
-                  placeholder="Filter by title, subtitle, author, or ISBN..."
-                />
+                <div class="filter-input-wrap">
+                  <input
+                    type="text"
+                    class="search-input"
+                    placeholder="Filter by title, subtitle, author, or ISBN..."
+                  />
+                  <button type="button" class="filter-clear-button" aria-label="Clear filter" title="Clear filter" hidden>×</button>
+                </div>
                 <div class="batch-controls" hidden>
                   <button type="button" class="selection-toggle" aria-pressed="false">Select books</button>
                   <div class="batch-actions" hidden>
@@ -1707,6 +1745,11 @@ const splitAuthors = (author: string) =>
         activatePanel("search-db");
         persistPanel("search-db");
         document.getElementById("reset-search-filters")?.click();
+        document.querySelectorAll<HTMLInputElement>(".category-panel .filter-input-wrap .search-input").forEach((input) => {
+          if (!input.value) return;
+          input.value = "";
+          input.dispatchEvent(new Event("input", { bubbles: true }));
+        });
         window.scrollTo({ top: 0 });
       });
 
@@ -1969,6 +2012,7 @@ const splitAuthors = (author: string) =>
         const resetFiltersButton = panel.querySelector(
           ".reset-filters-button",
         ) as HTMLButtonElement;
+        const clearFilterButton = panel.querySelector<HTMLButtonElement>(".filter-clear-button");
         const grid = panel.querySelector(".cards-grid") as HTMLElement;
         const noMatchMsg = panel.querySelector(".no-match-msg") as HTMLElement;
 
@@ -2043,6 +2087,7 @@ const splitAuthors = (author: string) =>
           resetFiltersButton.disabled = !query
             && sortVal === "date-added-desc"
             && !languageSelect.value;
+          if (clearFilterButton) clearFilterButton.hidden = searchInput.value.length === 0;
           const language = languageSelect.value;
 
           let visibleCount = 0;
@@ -2184,6 +2229,11 @@ const splitAuthors = (author: string) =>
         }
 
         searchInput.addEventListener("input", updatePanel);
+        clearFilterButton?.addEventListener("click", () => {
+          searchInput.value = "";
+          updatePanel();
+          searchInput.focus();
+        });
         sortSelect.addEventListener("change", updatePanel);
         languageSelect.addEventListener("change", updatePanel);
         resetFiltersButton.addEventListener("click", () => {
