@@ -367,6 +367,22 @@ export const GET: APIRoute = async ({ url }) => {
         : isIsbnSearch
           ? 'isbn'
           : query.trim().split(/\s+/).length > 1 ? 'q' : 'title';
+    const isGeneralQuery = !authorKey && !authorOnly && !isIsbnSearch
+      && query.trim().split(/\s+/).length > 1;
+    const structuredQuery = isGeneralQuery
+      ? query.trim().split(/\s+/)
+          .map((term) => term.replace(/["\\]/g, '').trim())
+          .filter(Boolean)
+          .map((term, index, terms) => {
+            const fields = ['title', 'subtitle', 'author'];
+            const alternatives = fields.flatMap((field) => [
+              `${field}:"${term}"`,
+              ...(index === terms.length - 1 ? [`${field}:${term}*`] : []),
+            ]);
+            return `(${alternatives.join(' OR ')})`;
+          })
+          .join(' AND ')
+      : query;
     const hasCompleteResultSet = includeAllResults || authorExact;
     const useOpenLibrarySort = shouldSort && !hasCompleteResultSet;
     const openLibrarySort = sort.startsWith('title')
@@ -377,12 +393,28 @@ export const GET: APIRoute = async ({ url }) => {
           ? 'old'
           : '';
     const searchParams = new URLSearchParams({
-      [searchField]: isIsbnSearch ? normalizedIsbn : authorKey || query,
+      [searchField]: isIsbnSearch ? normalizedIsbn : authorKey || structuredQuery,
       fields: 'title,subtitle,author_name,author_key,language,first_publish_year,cover_i,isbn,key,edition_key,edition_count',
       limit: String(hasCompleteResultSet ? 1000 : limit),
       offset: String(hasCompleteResultSet || (useOpenLibrarySort && sort === 'title-desc') ? 0 : offset),
     });
+    const languageSearchParams = new URLSearchParams(searchParams);
+    languageSearchParams.set('limit', '1000');
+    languageSearchParams.set('offset', '0');
     if (language) searchParams.set('language', language);
+    const excludedWorkKeys = url.searchParams.getAll('exclude_work_key')
+      .map((workKey) => workKey.trim())
+      .filter((workKey) => /^\/?works\/OL\d+W$/i.test(workKey))
+      .map((workKey) => `NOT key:${workKey.startsWith('/') ? workKey : `/${workKey}`}`);
+    const excludedIsbns = url.searchParams.getAll('exclude_isbn')
+      .map((isbn) => isbn.replace(/[\s-]/g, '').toUpperCase())
+      .filter((isbn) => /^(?:\d{9}[\dX]|\d{13})$/.test(isbn))
+      .map((isbn) => `NOT isbn:${isbn}`);
+    const exclusionFilters = [...excludedWorkKeys, ...excludedIsbns];
+    if (exclusionFilters.length > 0) {
+      const queryFilter = [searchParams.get('q'), ...exclusionFilters].filter(Boolean).join(' AND ');
+      searchParams.set('q', queryFilter);
+    }
     if (useOpenLibrarySort && openLibrarySort) searchParams.set('sort', openLibrarySort);
     const apiUrl = `https://openlibrary.org/search.json?${searchParams}`;
     let data = await fetchOpenLibrarySearch(apiUrl);
@@ -443,41 +475,11 @@ export const GET: APIRoute = async ({ url }) => {
     // (e.g. subjects and contributor notes). Prefer results where the full phrase
     // appears in the title, subtitle, or an author's name, but retain top-ranked
     // results when no visible text matches (for alternate or translated titles).
-    const isGeneralQuery = !authorKey && !authorOnly && query.trim().split(/\s+/).length > 1;
     const normalizedPhrase = query.trim().toLocaleLowerCase();
     const topRankedCount = 5;
     const docs = data.docs || [];
-    const phraseMatches = docs.filter((doc: any) => {
-      const title = String(doc.title || '').toLocaleLowerCase();
-      const subtitle = String(doc.subtitle || '').toLocaleLowerCase();
-      const authors = (doc.author_name || []) as string[];
-      return (
-        title.includes(normalizedPhrase) ||
-        subtitle.includes(normalizedPhrase) ||
-        authors.some((name) => name.toLocaleLowerCase().includes(normalizedPhrase))
-      );
-    });
-    let relevantDocs = isGeneralQuery
-      ? phraseMatches.length > 0
-        ? phraseMatches
-        : docs.slice(0, topRankedCount)
-      : docs;
+    const relevantDocs = docs;
     const fallbackEditionMatches = new Map<string, any>();
-    if (isGeneralQuery && phraseMatches.length === 0) {
-      const editionMatches = await Promise.all(
-        relevantDocs.map((doc: any) =>
-          doc.key
-            ? findMatchingEdition(String(doc.key).replace(/^\/+/, ''), normalizedPhrase)
-            : null,
-        ),
-      );
-      relevantDocs.forEach((doc: any, index: number) => {
-        if (doc.key) fallbackEditionMatches.set(String(doc.key), editionMatches[index]);
-      });
-      if (editionMatches.some(Boolean)) {
-        relevantDocs = relevantDocs.filter((doc: any) => fallbackEditionMatches.get(String(doc.key)));
-      }
-    }
     const authorMatchingDocs = authorExact
       ? relevantDocs.filter((doc: any) =>
           (doc.author_name || []).some(
@@ -526,9 +528,19 @@ export const GET: APIRoute = async ({ url }) => {
         });
       }
     }
+    const languageDiscoveryData = discoverLanguages
+      ? await fetchOpenLibrarySearch(`https://openlibrary.org/search.json?${languageSearchParams}`)
+      : null;
+    const languageOptionDocs = languageDiscoveryData?.docs || authorMatchingDocs;
+    const languageOptionMatchingDocs = authorExact
+      ? languageOptionDocs.filter((doc: any) =>
+          (doc.author_name || []).some(
+            (name: string) => name.trim().toLocaleLowerCase() === query.trim().toLocaleLowerCase(),
+          ),
+        )
+      : languageOptionDocs;
     const languageOptions = Array.from(new Set([
-      ...authorMatchingDocs.flatMap((doc: any) => doc.language || []),
-      ...(Number(data.numFound) > 0 ? ['eng'] : []),
+      ...languageOptionMatchingDocs.flatMap((doc: any) => doc.language || []),
       ...(languageEditionMatches.size > 0 && language ? [language] : []),
     ])).sort();
     const matchingDocs = language
