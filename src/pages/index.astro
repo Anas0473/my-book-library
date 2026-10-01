@@ -320,6 +320,34 @@ const splitAuthors = (author: string) =>
       .category-panel.active {
         display: block;
       }
+      .shelf-jump-button {
+        position: fixed;
+        right: 1.25rem;
+        bottom: 1.25rem;
+        z-index: 30;
+        display: grid;
+        width: 3rem;
+        height: 3rem;
+        place-items: center;
+        border: 1px solid #2d604a;
+        border-radius: 50%;
+        background: #39745b;
+        color: #fff;
+        box-shadow: 0 3px 12px rgba(15, 23, 42, 0.2);
+        font-size: 1.5rem;
+        line-height: 1;
+        cursor: pointer;
+      }
+      .shelf-jump-button:hover {
+        background: #2d604a;
+      }
+      .shelf-jump-button:focus-visible {
+        outline: 3px solid #93c5fd;
+        outline-offset: 3px;
+      }
+      .shelf-jump-button[hidden] {
+        display: none;
+      }
       .controls {
         display: grid;
         grid-template-columns: minmax(0, 1fr) max-content max-content max-content max-content;
@@ -776,6 +804,10 @@ const splitAuthors = (author: string) =>
           background: rgba(255, 255, 255, 0.96);
           box-shadow: 0 -4px 12px rgba(15, 23, 42, 0.08);
         }
+        .shelf-jump-button {
+          right: 1rem;
+          bottom: 5.25rem;
+        }
         .controls {
           display: flex;
           flex-direction: column;
@@ -1061,6 +1093,9 @@ const splitAuthors = (author: string) =>
       <button type="button" class="mobile-nav-button" id="mobile-open-library-sync-button">Connect</button>
     </nav>
 
+    <!-- Avoids "back to top" class/label text that ad blockers (e.g. Brave Shields) hide. -->
+    <button type="button" class="shelf-jump-button" aria-label="Jump to start of list" title="Jump to start of list" hidden>↑</button>
+
     <dialog id="open-library-sync-dialog" aria-labelledby="open-library-sync-title">
       <form class="open-library-sync-form" id="open-library-sync-form">
         <h2 id="open-library-sync-title">Connect Open Library</h2>
@@ -1081,6 +1116,9 @@ const splitAuthors = (author: string) =>
         ".category-btn, .mobile-nav-button",
       );
       const panels = document.querySelectorAll(".category-panel");
+      const backToTopButton = document.querySelector<HTMLButtonElement>(
+        ".shelf-jump-button",
+      );
       const savedBooksKey = "my-book-library:books";
       const legacySavedBooksKey = "my-book-library:plan-to-read";
       const openLibraryUsernameKey = "my-book-library:openlibrary-username";
@@ -1739,7 +1777,26 @@ const splitAuthors = (author: string) =>
           panel.classList.toggle("active", panel.id === target),
         );
         panelLanguageLoaders.get(target)?.();
+        updateBackToTopButton();
       }
+
+      function updateBackToTopButton() {
+        const activePanel = document.querySelector<HTMLElement>(
+          ".category-panel.active",
+        );
+        const isShelfPanel = activePanel?.id !== "search-db";
+        backToTopButton!.hidden = !isShelfPanel || window.scrollY < 40;
+      }
+
+      window.addEventListener("scroll", updateBackToTopButton, { passive: true });
+      backToTopButton?.addEventListener("click", () => {
+        window.scrollTo({
+          top: 0,
+          behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches
+            ? "instant"
+            : "smooth",
+        });
+      });
 
       function clearSearchInputs() {
         document.querySelectorAll<HTMLInputElement>(
