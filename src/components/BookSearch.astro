@@ -822,10 +822,30 @@ const { libraryBooks = [] } = Astro.props;
       const localOnlyMatches = page === 1
         ? localMatches.filter((book: any) => !book.workKey && !localMatchesOnPage.includes(book))
         : [];
-      const prioritizedLocalMatches = data.allResults
+      const useLocalResults = hasLocalMatches && books.length === 0;
+      const prioritizedLocalMatches = data.allResults || useLocalResults
         ? localMatches
         : [...localMatchesOnPage, ...localOnlyMatches];
-      const extraLocalMatches = prioritizedLocalMatches.filter((book: any) =>
+      const sortedLocalMatches = [...prioritizedLocalMatches].sort((first: any, second: any) => {
+        if (sort.startsWith('title')) {
+          const titleComparison = String(first.title || '').localeCompare(
+            String(second.title || ''),
+            undefined,
+            { numeric: true, sensitivity: 'base' },
+          );
+          const subtitleComparison = String(first.subtitle || '').localeCompare(
+            String(second.subtitle || ''),
+            undefined,
+            { numeric: true, sensitivity: 'base' },
+          );
+          const comparison = titleComparison || subtitleComparison;
+          return sort === 'title-desc' ? -comparison : comparison;
+        }
+        const firstYear = Number(String(first.pubDate || '').match(/\d{4}/)?.[0]) || 0;
+        const secondYear = Number(String(second.pubDate || '').match(/\d{4}/)?.[0]) || 0;
+        return sort === 'year-desc' ? secondYear - firstYear : firstYear - secondYear;
+      });
+      const extraLocalMatches = sortedLocalMatches.filter((book: any) =>
         !workResults.some((result: any) => isSameBook(result, book)),
       );
       const localMatchCount = Math.min(extraLocalMatches.length, pageSize);
@@ -836,10 +856,11 @@ const { libraryBooks = [] } = Astro.props;
             ...workResults.slice(0, pageSize - localMatchCount),
           ];
       const displayTotalResults = Math.max(totalResults, orderedResults.length);
-      const displayTotalPages = data.allResults
+          const hasCompleteResults = data.allResults || useLocalResults;
+          const displayTotalPages = hasCompleteResults
         ? Math.ceil(displayTotalResults / pageSize)
         : totalPages;
-      const displayBooks = data.allResults
+          const displayBooks = hasCompleteResults
         ? orderedResults.slice((page - 1) * pageSize, page * pageSize)
         : orderedResults;
       const languageNames: Record<string, string> = {

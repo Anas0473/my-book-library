@@ -8,6 +8,9 @@ const naturalSort = (a: any, b: any) =>
   a.data.title.localeCompare(b.data.title, undefined, {
     numeric: true,
     sensitivity: "base",
+  }) || String(a.data.subtitle || "").localeCompare(String(b.data.subtitle || ""), undefined, {
+    numeric: true,
+    sensitivity: "base",
   });
 
 const reading = allBooks
@@ -1951,16 +1954,28 @@ const splitAuthors = (author: string) =>
             }
 
             if (sortVal === "title-asc") {
-              return titleA.localeCompare(titleB, undefined, {
+              const titleComparison = titleA.localeCompare(titleB, undefined, {
                 numeric: true,
                 sensitivity: "base",
               });
+              const subtitleComparison = (a.dataset.subtitle || "").localeCompare(
+                b.dataset.subtitle || "",
+                undefined,
+                { numeric: true, sensitivity: "base" },
+              );
+              return titleComparison || subtitleComparison;
             }
             if (sortVal === "title-desc") {
-              return titleB.localeCompare(titleA, undefined, {
+              const titleComparison = titleB.localeCompare(titleA, undefined, {
                 numeric: true,
                 sensitivity: "base",
               });
+              const subtitleComparison = (b.dataset.subtitle || "").localeCompare(
+                a.dataset.subtitle || "",
+                undefined,
+                { numeric: true, sensitivity: "base" },
+              );
+              return titleComparison || subtitleComparison;
             }
             if (sortVal === "year-desc") return yearB - yearA;
             if (sortVal === "year-asc") return yearA - yearB;
