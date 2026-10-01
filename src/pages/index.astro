@@ -669,6 +669,36 @@ const splitAuthors = (author: string) =>
       .home-link:hover {
         opacity: 0.8;
       }
+      :global(.search-card img),
+      :global(.card .cover-img) {
+        cursor: zoom-in;
+      }
+      :global(.selection-mode .card .cover-img) {
+        cursor: pointer;
+      }
+      :global(.cover-lightbox) {
+        max-width: 90vw;
+        max-height: 90vh;
+        padding: 0;
+        border: 0;
+        border-radius: 8px;
+        background: transparent;
+        overflow: visible;
+        cursor: zoom-out;
+      }
+      :global(.cover-lightbox::backdrop) {
+        background: rgba(15, 23, 42, 0.75);
+      }
+      :global(.cover-lightbox img) {
+        display: block;
+        width: auto;
+        height: min(85vh, 48rem);
+        max-width: 90vw;
+        max-height: 90vh;
+        object-fit: contain;
+        border-radius: 8px;
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
+      }
 
       @media (max-width: 700px) {
         body {
@@ -1680,6 +1710,44 @@ const splitAuthors = (author: string) =>
         window.scrollTo({ top: 0 });
       });
 
+      const coverLightbox = document.createElement("dialog");
+      coverLightbox.className = "cover-lightbox";
+      const coverLightboxImage = document.createElement("img");
+      coverLightboxImage.referrerPolicy = "no-referrer";
+      coverLightbox.appendChild(coverLightboxImage);
+      let coverLightboxRequest = 0;
+      coverLightbox.addEventListener("click", () => coverLightbox.close());
+      document.body.appendChild(coverLightbox);
+
+      document.addEventListener("click", (event) => {
+        const cover = (event.target as HTMLElement).closest<HTMLImageElement>(
+          ".search-card img, .card .cover-img",
+        );
+        if (!cover?.src || cover.closest(".selection-mode")) return;
+
+        event.preventDefault();
+        event.stopPropagation();
+        const largeSrc = cover.src
+          .replace(/^(https:\/\/covers\.openlibrary\.org\/b\/.+)-M\.jpg/, "$1-L.jpg")
+          .replace(
+            /^https:\/\/archive\.org\/services\/img\/([^/?#]+)$/,
+            "https://archive.org/download/$1/page/cover_w800.jpg",
+          );
+        coverLightboxImage.onerror = null;
+        coverLightboxImage.src = cover.src;
+        coverLightboxImage.alt = cover.alt;
+        coverLightbox.showModal();
+
+        const requestId = ++coverLightboxRequest;
+        if (largeSrc === cover.src) return;
+        const largeImage = new Image();
+        largeImage.referrerPolicy = "no-referrer";
+        largeImage.onload = () => {
+          if (requestId === coverLightboxRequest) coverLightboxImage.src = largeSrc;
+        };
+        largeImage.src = largeSrc;
+      });
+
       document.addEventListener("click", (event) => {
         const target = (event.target as HTMLElement).closest<HTMLAnchorElement>(
           ".author-search-link",
@@ -2397,6 +2465,10 @@ const splitAuthors = (author: string) =>
 
       document.addEventListener("keydown", (event) => {
         if (event.key !== "Escape") return;
+        if (coverLightbox.open) {
+          coverLightbox.close();
+          return;
+        }
         document.querySelectorAll<HTMLElement>(".category-panel.selection-mode").forEach((panel) => {
           panel.querySelector<HTMLButtonElement>(".selection-toggle")?.click();
         });
