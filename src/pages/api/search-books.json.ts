@@ -355,11 +355,17 @@ export const GET: APIRoute = async ({ url }) => {
     const sortedDocs = shouldSort
       ? [...matchingDocs].sort((first: any, second: any) => {
           if (sort.startsWith('title')) {
-            const comparison = String(first.title || '').localeCompare(
+            const titleComparison = String(first.title || '').localeCompare(
               String(second.title || ''),
               undefined,
               { numeric: true, sensitivity: 'base' },
             );
+            const subtitleComparison = String(first.subtitle || '').localeCompare(
+              String(second.subtitle || ''),
+              undefined,
+              { numeric: true, sensitivity: 'base' },
+            );
+            const comparison = titleComparison || subtitleComparison;
             return sort === 'title-desc' ? -comparison : comparison;
           }
 
