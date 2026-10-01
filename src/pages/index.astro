@@ -1741,6 +1741,16 @@ const splitAuthors = (author: string) =>
         panelLanguageLoaders.get(target)?.();
       }
 
+      function clearSearchInputs() {
+        document.querySelectorAll<HTMLInputElement>(
+          "#global-book-search, .category-panel .filter-input-wrap .search-input",
+        ).forEach((input) => {
+          if (!input.value) return;
+          input.value = "";
+          input.dispatchEvent(new Event("input", { bubbles: true }));
+        });
+      }
+
       document.getElementById("home-link")?.addEventListener("click", (event) => {
         event.preventDefault();
         activatePanel("search-db");
@@ -1803,6 +1813,7 @@ const splitAuthors = (author: string) =>
         const query = target.dataset.authorQuery?.trim();
         if (!query) return;
 
+        clearSearchInputs();
         activatePanel("search-db");
         const authorKey = target.dataset.authorKey?.trim() || "";
         const authorExact = target.dataset.authorExact === "true";
@@ -1964,6 +1975,7 @@ const splitAuthors = (author: string) =>
           const target = btn.getAttribute("data-target");
 
           if (target) {
+            clearSearchInputs();
             activatePanel(target);
             persistPanel(target);
           }
