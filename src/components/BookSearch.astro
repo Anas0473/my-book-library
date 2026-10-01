@@ -171,7 +171,7 @@ const { libraryBooks = [] } = Astro.props;
   }
   .results-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
     gap: 1rem;
     margin-top: 0.75rem;
   }
@@ -601,7 +601,7 @@ const { libraryBooks = [] } = Astro.props;
       && !searchLanguageSelect.value
       && !hideAddedToggle.checked;
   }
-  const pageSize = 16;
+  const pageSize = 14;
   const savedBooksKey = 'my-book-library:books';
   const legacySavedBooksKey = 'my-book-library:plan-to-read';
   const shelfLabels: Record<string, string> = {

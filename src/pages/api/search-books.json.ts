@@ -72,6 +72,7 @@ async function findMatchingEdition(
 
 const languageEditionCache = new Map<string, { expiresAt: number; edition: any | null }>();
 const searchResponseCache = new Map<string, { expiresAt: number; data: any }>();
+const selectedEditionCache = new Map<string, { expiresAt: number; edition: any | null }>();
 
 async function fetchOpenLibrarySearch(apiUrl: string) {
   const cached = searchResponseCache.get(apiUrl);
@@ -97,6 +98,35 @@ async function fetchOpenLibrarySearch(apiUrl: string) {
     }
   }
   return null;
+}
+
+async function fetchSelectedEdition(editionKey: string) {
+  const editionId = editionKey.match(/OL\d+M/i)?.[0].toUpperCase();
+  if (!editionId) return null;
+
+  const cached = selectedEditionCache.get(editionId);
+  if (cached && cached.expiresAt > Date.now()) return cached.edition;
+
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 4000);
+  let edition: any = null;
+  try {
+    const response = await fetch(`https://openlibrary.org/books/${editionId}.json`, {
+      signal: controller.signal,
+      headers: { 'User-Agent': 'my-book-library/0.0.1' },
+    });
+    if (response.ok) edition = await response.json();
+  } catch {
+    // Keep the work-level result usable when edition details are unavailable.
+  } finally {
+    clearTimeout(timeout);
+  }
+
+  selectedEditionCache.set(editionId, {
+    expiresAt: Date.now() + (edition ? 10 : 2) * 60 * 1000,
+    edition,
+  });
+  return edition;
 }
 
 async function fetchInternetArchiveFallback({
@@ -129,8 +159,8 @@ async function fetchInternetArchiveFallback({
   const params = new URLSearchParams({
     q: queryParts.join(' AND '),
     'fl[]': 'identifier,title,creator,year,language,isbn',
-    rows: String(Math.min(limit, 50)),
-    page: String(page),
+    rows: '1000',
+    page: '1',
     output: 'json',
   });
   const apiUrl = `https://archive.org/advancedsearch.php?${params}`;
@@ -192,11 +222,11 @@ async function fetchInternetArchiveFallback({
     });
   }
 
-  const totalResults = Number(data.response?.numFound) || 0;
+  const totalResults = Math.min(Number(data.response?.numFound) || 0, books.length);
   const languages = Array.from(new Set(books.flatMap((book: any) => book.languages))) as string[];
   if (language && !languages.includes(language)) languages.push(language);
   return {
-    books,
+    books: books.slice((page - 1) * limit, page * limit),
     totalResults,
     page,
     totalPages: Math.ceil(totalResults / limit),
@@ -230,8 +260,8 @@ export const GET: APIRoute = async ({ url }) => {
   const sort = url.searchParams.get('sort') || '';
   const shouldSort = ['title-asc', 'title-desc', 'year-desc', 'year-asc'].includes(sort);
   const page = Math.max(1, parseInt(url.searchParams.get('page') || '1', 10));
-  const requestedLimit = parseInt(url.searchParams.get('limit') || '16', 10);
-  const limit = requestedLimit === 15 ? 15 : 16;
+  const requestedLimit = parseInt(url.searchParams.get('limit') || '14', 10);
+  const limit = requestedLimit === 14 || requestedLimit === 15 ? requestedLimit : 16;
   const offset = (page - 1) * limit;
 
   const jsonHeaders = { 'Content-Type': 'application/json' };
@@ -572,9 +602,32 @@ export const GET: APIRoute = async ({ url }) => {
           }),
         )
       : pageDocs.map(() => null);
+      const editionDetailsDocs = includeAllResults ? pageDocs.slice(0, limit) : pageDocs;
+      const selectedEditions = await Promise.all(editionDetailsDocs.map(async (doc: any, index: number) => {
+        const matchedEdition = matchedEditions[index];
+        let edition = matchedEdition;
+        const editionKey = matchedEdition?.key || (!isIsbnSearch ? doc.edition_key?.[0] : '');
+        if (!edition && editionKey) edition = await fetchSelectedEdition(String(editionKey));
+
+        const hasCover = Array.isArray(edition?.covers)
+          && edition.covers.some((coverId: any) => Number(coverId) > 0);
+        if (!hasCover && doc.key) {
+          const coverEdition = await findMatchingEdition(
+            String(doc.key).replace(/^\/+/, ''),
+            normalizedPhrase,
+            language,
+            2500,
+            true,
+          );
+          if (coverEdition?.covers?.some((coverId: any) => Number(coverId) > 0)) {
+            edition = coverEdition;
+          }
+        }
+        return edition;
+      }));
 
     const formattedBooks = pageDocs.map((doc: any, index: number) => {
-      const edition = matchedEditions[index];
+        const edition = selectedEditions[index] || matchedEditions[index];
       const selectedEditionId = String(edition?.key || (!isIsbnSearch ? doc.edition_key?.[0] : '') || '')
         .match(/OL\d+M/i)?.[0].toUpperCase() || null;
       return {
