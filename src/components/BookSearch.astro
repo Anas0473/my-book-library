@@ -161,6 +161,13 @@ const { libraryBooks = [] } = Astro.props;
     font-size: 0.85rem;
     color: var(--page-foreground, #64748b);
   }
+  .search-summary[data-state="warning"] {
+    padding: 0.55rem 0.75rem;
+    border-left: 3px solid #f59e0b;
+    border-radius: 4px;
+    background: #fffbeb;
+    color: #92400e;
+  }
   .results-grid {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
@@ -800,6 +807,7 @@ const { libraryBooks = [] } = Astro.props;
 
     resultsContainer.innerHTML = '<p>Searching...</p>';
     summaryContainer.innerHTML = '';
+    summaryContainer.dataset.state = '';
     paginationContainer.innerHTML = '';
 
     const requestId = ++searchRequestId;
@@ -923,6 +931,12 @@ const { libraryBooks = [] } = Astro.props;
           const displayBooks = hasCompleteResults
         ? orderedResults.slice((page - 1) * pageSize, page * pageSize)
         : orderedResults;
+          const searchNotice = data.searchUnavailable
+            ? 'Open Library search is temporarily unavailable; showing your saved matches.'
+            : totalResults === 0 && localMatches.length > 0
+              ? 'No Open Library matches; showing your saved matches.'
+              : '';
+          summaryContainer.dataset.state = data.searchUnavailable ? 'warning' : '';
       const languageNames: Record<string, string> = {
         ara: 'Arabic', dan: 'Danish', deu: 'German', eng: 'English',
         fas: 'Persian', fin: 'Finnish', fra: 'French', heb: 'Hebrew',
@@ -943,12 +957,13 @@ const { libraryBooks = [] } = Astro.props;
 
       if (displayBooks.length === 0) {
         resultsContainer.innerHTML = '<p>No books found.</p>';
+        summaryContainer.textContent = searchNotice;
         return;
       }
 
       const startItem = (page - 1) * pageSize + 1;
       const endItem = startItem + displayBooks.length - 1;
-      summaryContainer.innerHTML = `Showing ${startItem}–${endItem} of ${displayTotalResults} results`;
+      summaryContainer.textContent = `${searchNotice ? `${searchNotice} ` : ''}Showing ${startItem}–${endItem} of ${displayTotalResults} results`;
 
       resultsContainer.innerHTML = displayBooks.map((book: any, index: number) => {
         const matchedSavedBook = savedBooks.find((item: any) => isSameBook(item, book));
@@ -1340,6 +1355,7 @@ const { libraryBooks = [] } = Astro.props;
     clearTimeout(debounceTimer);
     updateSearchClearButton();
     updateSearchResetButton();
+    summaryContainer.dataset.state = '';
     const query = searchInput.value.trim();
 
     if (query.length < 3) {

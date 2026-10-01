@@ -71,6 +71,33 @@ async function findMatchingEdition(
 }
 
 const languageEditionCache = new Map<string, { expiresAt: number; edition: any | null }>();
+const searchResponseCache = new Map<string, { expiresAt: number; data: any }>();
+
+async function fetchOpenLibrarySearch(apiUrl: string) {
+  const cached = searchResponseCache.get(apiUrl);
+  if (cached && cached.expiresAt > Date.now()) return cached.data;
+
+  for (let attempt = 0; attempt < 2; attempt++) {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 15000);
+    try {
+      const response = await fetch(apiUrl, {
+        signal: controller.signal,
+        headers: { 'User-Agent': 'my-book-library/0.0.1' },
+      });
+      if (response.ok) {
+        const data = await response.json();
+        searchResponseCache.set(apiUrl, { expiresAt: Date.now() + 10 * 60 * 1000, data });
+        return data;
+      }
+    } catch {
+      // Retry once; Open Library's large searches intermittently time out.
+    } finally {
+      clearTimeout(timeout);
+    }
+  }
+  return null;
+}
 
 async function findEditionInLanguage(workKey: string, language: string) {
   const cacheKey = `${workKey}:${language}`;
@@ -210,21 +237,14 @@ export const GET: APIRoute = async ({ url }) => {
       offset: String(shouldSort || authorExact || language || discoverLanguages ? 0 : offset),
     });
     const apiUrl = `https://openlibrary.org/search.json?${searchParams}`;
+    const data = await fetchOpenLibrarySearch(apiUrl);
 
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 8000);
-
-    const res = await fetch(apiUrl, { signal: controller.signal });
-    clearTimeout(timeout);
-
-    if (!res.ok) {
+    if (!data) {
       return new Response(
-        JSON.stringify({ books: [], totalResults: 0, page, totalPages: 0 }),
+        JSON.stringify({ books: [], totalResults: 0, page, totalPages: 0, searchUnavailable: true }),
         { status: 200, headers: jsonHeaders }
       );
     }
-
-    const data = await res.json();
     let isbnEdition: any = null;
     if (isIsbnSearch) {
       const isbnController = new AbortController();
@@ -457,7 +477,7 @@ export const GET: APIRoute = async ({ url }) => {
   } catch (error) {
     console.error('API Fetch error:', error);
     return new Response(
-      JSON.stringify({ books: [], totalResults: 0, page, totalPages: 0 }),
+      JSON.stringify({ books: [], totalResults: 0, page, totalPages: 0, searchUnavailable: true }),
       { status: 200, headers: jsonHeaders }
     );
   }
