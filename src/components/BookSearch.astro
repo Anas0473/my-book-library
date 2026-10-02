@@ -72,11 +72,14 @@ const { libraryBooks = [] } = Astro.props;
   }
   .search-summary[data-state="warning"] {
     display: inline-block;
+    max-width: min(100%, 42rem);
+    box-sizing: border-box;
     padding: 0.45rem 0.7rem;
     border-left: 3px solid var(--accent);
     border-radius: 6px;
     background: color-mix(in srgb, var(--accent) 14%, transparent);
     color: var(--fg);
+    line-height: 1.4;
   }
   .search-controls {
     display: grid;
@@ -1107,9 +1110,9 @@ const { libraryBooks = [] } = Astro.props;
         ? orderedResults.slice((page - 1) * pageSize, page * pageSize)
         : orderedResults;
           const searchNotice = isInternetArchive
-            ? 'Open Library is unavailable.'
+            ? 'Open Library is temporarily unavailable. Please try again later.'
             : searchUnavailable
-              ? 'Open Library search is temporarily unavailable.'
+              ? 'Open Library search is temporarily unavailable. Please try again later.'
             : totalResults === 0 && localMatches.length > 0
               ? 'No Open Library matches; showing your saved matches.'
               : '';
@@ -1171,7 +1174,15 @@ const { libraryBooks = [] } = Astro.props;
         ? '1 of 1 results'
         : `${startItem}–${endItem} of ${displayTotalResults} results`;
       const resultSource = isInternetArchive ? ' from Internet Archive.' : '';
-      summaryContainer.textContent = `${searchNotice ? `${searchNotice} ` : ''}Showing ${resultCount}${resultSource}`;
+      if (isInternetArchive || searchUnavailable) {
+        const notice = document.createElement('span');
+        notice.textContent = searchNotice;
+        const count = document.createElement('span');
+        count.textContent = `Showing ${resultCount}${resultSource}`;
+        summaryContainer.replaceChildren(notice, document.createElement('br'), count);
+      } else {
+        summaryContainer.textContent = `${searchNotice ? `${searchNotice} ` : ''}Showing ${resultCount}${resultSource}`;
+      }
 
       resultsContainer.innerHTML = displayBooks.map((book: any, index: number) => {
         const matchedSavedBook = savedBooks.find((item: any) => isSameBook(item, book));
@@ -1240,7 +1251,7 @@ const { libraryBooks = [] } = Astro.props;
           header.append(heading, closeButton);
           const notice = document.createElement('p');
           notice.className = 'edition-unavailable-notice';
-          notice.textContent = 'Open Library is unavailable. Please try again later.';
+          notice.textContent = 'Open Library is temporarily unavailable. Please try again later.';
           editionDialog.append(header, notice);
           editionDialog.showModal();
         };
