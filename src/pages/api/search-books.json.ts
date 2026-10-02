@@ -12,7 +12,7 @@ async function findMatchingEdition(
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), timeoutMs);
     const params = new URLSearchParams({
-      limit: '100',
+      limit: language ? '1000' : '100',
       fields: 'key,title,subtitle,publish_date,publishers,isbn_10,isbn_13,covers,languages',
     });
     let response: Response;
@@ -618,7 +618,7 @@ export const GET: APIRoute = async ({ url }) => {
       const selectedEditions = await Promise.all(editionDetailsDocs.map(async (doc: any, index: number) => {
         const matchedEdition = matchedEditions[index];
         let edition = matchedEdition;
-        const editionKey = matchedEdition?.key || (!isIsbnSearch ? doc.edition_key?.[0] : '');
+        const editionKey = matchedEdition?.key || (!isIsbnSearch && !language ? doc.edition_key?.[0] : '');
         if (!edition && editionKey) edition = await fetchSelectedEdition(String(editionKey));
 
         const hasCover = Array.isArray(edition?.covers)
@@ -640,7 +640,7 @@ export const GET: APIRoute = async ({ url }) => {
 
     const formattedBooks = pageDocs.map((doc: any, index: number) => {
         const edition = selectedEditions[index] || matchedEditions[index];
-      const selectedEditionId = String(edition?.key || (!isIsbnSearch ? doc.edition_key?.[0] : '') || '')
+      const selectedEditionId = String(edition?.key || (!isIsbnSearch && !language ? doc.edition_key?.[0] : '') || '')
         .match(/OL\d+M/i)?.[0].toUpperCase() || null;
       return {
         key: doc.key,
@@ -668,11 +668,11 @@ export const GET: APIRoute = async ({ url }) => {
           : edition?.isbn_13?.[0] || edition?.isbn_10?.[0] || (doc.isbn ? doc.isbn[0] : null),
         heroImage: edition?.covers?.[0]
           ? `https://covers.openlibrary.org/b/id/${edition.covers[0]}-M.jpg`
-          : doc.cover_i
+          : !language && doc.cover_i
             ? `https://covers.openlibrary.org/b/id/${doc.cover_i}-M.jpg`
             : null,
       };
-    });
+    }).filter((book: any) => !language || book.editionLanguage === language);
 
     return new Response(
       JSON.stringify({
