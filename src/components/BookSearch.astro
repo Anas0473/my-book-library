@@ -24,8 +24,8 @@ const { libraryBooks = [] } = Astro.props;
       <input
         type="text"
         id="global-book-search"
-        aria-label="Search books by title, author, subtitle, or ISBN"
-        placeholder="Search by title, author, subtitle, or ISBN"
+        aria-label="Search books by title, subtitle, author, or ISBN"
+        placeholder="Search by title, subtitle, author, or ISBN"
       />
       <button type="button" id="clear-book-search" class="search-clear-button" aria-label="Clear search" title="Clear search" hidden>×</button>
     </div>
@@ -639,8 +639,8 @@ const { libraryBooks = [] } = Astro.props;
   const searchInputCompactQuery = window.matchMedia('(max-width: 700px)');
   function updateSearchPlaceholder() {
     searchInput.placeholder = searchInputCompactQuery.matches
-      ? 'Title, author, or ISBN'
-      : 'Search by title, author, subtitle, or ISBN';
+      ? 'Title, subtitle, author, or ISBN'
+      : 'Search by title, subtitle, author, or ISBN';
   }
   updateSearchPlaceholder();
   searchInputCompactQuery.addEventListener('change', updateSearchPlaceholder);
