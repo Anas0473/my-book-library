@@ -2377,8 +2377,48 @@ const splitAuthors = (author: string) =>
 
           const summary = document.createElement("p");
           summary.className = "edition-summary";
-          summary.textContent = `Showing ${editions.length} of ${editionCount} editions, with the best matches first.`;
-          categoryEditionDialog.appendChild(summary);
+          const filterRow = document.createElement("div");
+          filterRow.className = "edition-filter-row";
+          const languageFilter = document.createElement("select");
+          languageFilter.className = "edition-language-filter";
+          languageFilter.setAttribute("aria-label", "Filter editions by language");
+          const allLanguagesOption = document.createElement("option");
+          allLanguagesOption.value = "";
+          allLanguagesOption.textContent = "All languages";
+          languageFilter.appendChild(allLanguagesOption);
+          const editionLanguageNames = new Intl.DisplayNames(["en"], { type: "language", fallback: "none" });
+          const normalizeEditionLanguage = (code: string) =>
+            ["und", "unknown", "unknown language"].includes(code.trim().toLowerCase())
+              ? "unknown"
+              : code.trim().toLowerCase();
+          const getEditionLanguageName = (code: string) => {
+            if (code === "unknown") return "Unknown";
+            try {
+              return editionLanguageNames.of(code) || code.toUpperCase();
+            } catch {
+              return code.toUpperCase();
+            }
+          };
+          const editionLanguages: string[] = [];
+          editions.forEach((edition: any) => {
+            const code = normalizeEditionLanguage(String(edition.language || ""));
+            if (code && !editionLanguages.includes(code)) editionLanguages.push(code);
+          });
+          editionLanguages.sort((first, second) => {
+              if (first === "unknown language") return 1;
+              if (first === "unknown") return 1;
+              if (second === "unknown") return -1;
+              return getEditionLanguageName(first).localeCompare(getEditionLanguageName(second));
+            });
+          editionLanguages.forEach((code) => {
+            const option = document.createElement("option");
+            option.value = code;
+            option.textContent = getEditionLanguageName(code);
+            languageFilter.appendChild(option);
+          });
+          const preferredLanguage = normalizeEditionLanguage(String(language || ""));
+          languageFilter.value = editionLanguages.includes(preferredLanguage) ? preferredLanguage : "";
+          filterRow.append(summary, languageFilter);
 
           const list = document.createElement("div");
           list.className = "edition-list";
@@ -2409,7 +2449,7 @@ const splitAuthors = (author: string) =>
             backButton.textContent = "Back to editions";
             backButton.addEventListener("click", () => {
               preview.hidden = true;
-              summary.hidden = false;
+              filterRow.hidden = false;
               list.hidden = false;
               renderEditionOptions();
               list.scrollTop = listScrollPosition;
@@ -2482,23 +2522,34 @@ const splitAuthors = (author: string) =>
 
             preview.replaceChildren(backButton, body);
             listScrollPosition = list.scrollTop;
-            summary.hidden = true;
+            filterRow.hidden = true;
             list.hidden = true;
             pagination.hidden = true;
             preview.hidden = false;
           };
 
           const renderEditionOptions = () => {
-            const pageCount = Math.max(1, Math.ceil(editions.length / pageSize));
-            const visibleEditions = editions.slice(
+            const filteredEditions = editions.filter((edition: any) =>
+              !languageFilter.value || normalizeEditionLanguage(String(edition.language || "")) === languageFilter.value,
+            );
+            const pageCount = Math.max(1, Math.ceil(filteredEditions.length / pageSize));
+            const visibleEditions = filteredEditions.slice(
               (currentEditionPage - 1) * pageSize,
               currentEditionPage * pageSize,
             );
+            const languageName = languageFilter.value ? getEditionLanguageName(languageFilter.value) : "";
+            const languageCountLabel = languageName === "Unknown"
+              ? `${filteredEditions.length} editions with unknown language`
+              : `${filteredEditions.length} ${languageName} editions`;
             summary.textContent = pageCount > 1
-              ? `Showing ${(currentEditionPage - 1) * pageSize + 1}–${Math.min(currentEditionPage * pageSize, editions.length)} of ${editionCount} editions.`
-              : editions.length === 1
-                ? "1 edition found."
-                : `${editions.length} editions found.`;
+              ? `Showing ${(currentEditionPage - 1) * pageSize + 1}–${Math.min(currentEditionPage * pageSize, filteredEditions.length)} of ${languageFilter.value ? languageCountLabel : `${editionCount} editions`}.`
+              : languageName
+                ? languageName === "Unknown"
+                  ? `${filteredEditions.length} editions with unknown language found.`
+                  : `${filteredEditions.length} ${languageName} ${filteredEditions.length === 1 ? "edition" : "editions"} found.`
+                : editions.length === 1
+                  ? "1 edition found."
+                  : `${editions.length} editions found.`;
             pagination.hidden = pageCount <= 1;
             previousPageButton.disabled = currentEditionPage <= 1;
             nextPageButton.disabled = currentEditionPage >= pageCount;
@@ -2544,13 +2595,22 @@ const splitAuthors = (author: string) =>
             list.scrollTop = 0;
           });
           nextPageButton.addEventListener("click", () => {
-            if (currentEditionPage >= Math.ceil(editions.length / pageSize)) return;
+            const filteredCount = editions.filter((edition: any) =>
+              !languageFilter.value || normalizeEditionLanguage(String(edition.language || "")) === languageFilter.value,
+            ).length;
+            if (currentEditionPage >= Math.ceil(filteredCount / pageSize)) return;
             currentEditionPage++;
+            renderEditionOptions();
+            list.scrollTop = 0;
+          });
+          languageFilter.addEventListener("change", () => {
+            currentEditionPage = 1;
             renderEditionOptions();
             list.scrollTop = 0;
           });
           renderEditionOptions();
 
+          categoryEditionDialog.appendChild(filterRow);
           categoryEditionDialog.appendChild(list);
           categoryEditionDialog.appendChild(preview);
           categoryEditionDialog.appendChild(pagination);

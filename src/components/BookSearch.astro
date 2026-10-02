@@ -406,6 +406,28 @@ const { libraryBooks = [] } = Astro.props;
     color: var(--text-dark-muted);
     font-size: 0.8rem;
   }
+  :global(.edition-filter-row) {
+    display: grid;
+    flex: 0 0 auto;
+    grid-template-columns: minmax(0, 1fr) minmax(10rem, 14rem);
+    align-items: center;
+    gap: 0.75rem;
+  }
+  :global(.edition-filter-row .edition-summary) {
+    margin: 0;
+  }
+  :global(.edition-language-filter) {
+    width: 100%;
+    height: 2.35rem;
+    box-sizing: border-box;
+    padding: 0.35rem 0.65rem;
+    border: 1px solid var(--border-dark);
+    border-radius: 8px;
+    background: var(--surface-dark-2);
+    color: var(--text-dark);
+    font: inherit;
+    font-size: 0.78rem;
+  }
   :global(.edition-pagination) {
     display: flex;
     flex: 0 0 auto;
@@ -593,6 +615,10 @@ const { libraryBooks = [] } = Astro.props;
     }
     .search-hide-added {
       justify-self: start;
+    }
+    :global(.edition-filter-row) {
+      grid-template-columns: minmax(0, 1fr);
+      gap: 0.5rem;
     }
     .results-grid {
       grid-template-columns: minmax(0, 1fr);
@@ -1078,6 +1104,7 @@ const { libraryBooks = [] } = Astro.props;
       };
       const intlLanguageNames = new Intl.DisplayNames(['en'], { type: 'language', fallback: 'none' });
       const getLanguageName = (code: string) => {
+        if (['und', 'unknown', 'unknown language'].includes(code.toLowerCase())) return 'Unknown';
         if (languageNames[code]) return languageNames[code];
         try {
           return intlLanguageNames.of(code) || code.toUpperCase();
@@ -1097,7 +1124,12 @@ const { libraryBooks = [] } = Astro.props;
         ...localMatches.flatMap((book: any) => [book.editionLanguage, book.language]),
         ...matchingLibraryBooks.flatMap((book: any) => [book.editionLanguage, book.language]),
       ].map((code: any) => String(code || '').toLowerCase()).filter(Boolean)))
-        .sort((a, b) => getLanguageName(a).localeCompare(getLanguageName(b)));
+        .sort((first, second) => {
+          const firstUnknown = ['und', 'unknown', 'unknown language'].includes(first);
+          const secondUnknown = ['und', 'unknown', 'unknown language'].includes(second);
+          if (firstUnknown !== secondUnknown) return firstUnknown ? 1 : -1;
+          return getLanguageName(first).localeCompare(getLanguageName(second));
+        });
       searchLanguageSelect.innerHTML = '<option value="">All languages</option>';
       availableLanguages.forEach((code: string) => {
         const option = document.createElement('option');
@@ -1209,6 +1241,48 @@ const { libraryBooks = [] } = Astro.props;
           summary.className = 'edition-summary';
           editionDialog.appendChild(summary);
 
+          const filterRow = document.createElement('div');
+          filterRow.className = 'edition-filter-row';
+          const languageFilter = document.createElement('select');
+          languageFilter.className = 'edition-language-filter';
+          languageFilter.setAttribute('aria-label', 'Filter editions by language');
+          const allLanguagesOption = document.createElement('option');
+          allLanguagesOption.value = '';
+          allLanguagesOption.textContent = 'All languages';
+          languageFilter.appendChild(allLanguagesOption);
+          const editionLanguageNames = new Intl.DisplayNames(['en'], { type: 'language', fallback: 'none' });
+          const normalizeEditionLanguage = (code: string) =>
+            ['und', 'unknown', 'unknown language'].includes(code.trim().toLowerCase())
+              ? 'unknown'
+              : code.trim().toLowerCase();
+          const getEditionLanguageName = (code: string) => {
+            if (code === 'unknown') return 'Unknown';
+            try {
+              return editionLanguageNames.of(code) || code.toUpperCase();
+            } catch {
+              return code.toUpperCase();
+            }
+          };
+          const editionLanguages: string[] = [];
+          editions.forEach((edition: any) => {
+            const code = normalizeEditionLanguage(String(edition.language || ''));
+            if (code && !editionLanguages.includes(code)) editionLanguages.push(code);
+          });
+          editionLanguages.sort((first, second) => {
+            if (first === 'unknown') return 1;
+            if (second === 'unknown') return -1;
+            return getEditionLanguageName(first).localeCompare(getEditionLanguageName(second));
+          });
+          editionLanguages.forEach((code) => {
+            const option = document.createElement('option');
+            option.value = code;
+            option.textContent = getEditionLanguageName(code);
+            languageFilter.appendChild(option);
+          });
+          const preferredLanguage = normalizeEditionLanguage(String(currentLanguage || book.editionLanguage || ''));
+          languageFilter.value = editionLanguages.includes(preferredLanguage) ? preferredLanguage : '';
+          filterRow.append(summary, languageFilter);
+
           const list = document.createElement('div');
           list.className = 'edition-list';
           const pageSize = 12;
@@ -1228,13 +1302,24 @@ const { libraryBooks = [] } = Astro.props;
           pagination.append(previousPageButton, pageLabel, nextPageButton);
 
           const renderEditionOptions = () => {
-            const pageCount = Math.max(1, Math.ceil(editions.length / pageSize));
-            const visibleEditions = editions.slice((currentEditionPage - 1) * pageSize, currentEditionPage * pageSize);
+            const filteredEditions = editions.filter((edition: any) =>
+              !languageFilter.value || normalizeEditionLanguage(String(edition.language || '')) === languageFilter.value,
+            );
+            const pageCount = Math.max(1, Math.ceil(filteredEditions.length / pageSize));
+            const visibleEditions = filteredEditions.slice((currentEditionPage - 1) * pageSize, currentEditionPage * pageSize);
+            const languageName = languageFilter.value ? getEditionLanguageName(languageFilter.value) : '';
+            const languageCountLabel = languageName === 'Unknown'
+              ? `${filteredEditions.length} editions with unknown language`
+              : `${filteredEditions.length} ${languageName} editions`;
             summary.textContent = pageCount > 1
-              ? `Showing ${(currentEditionPage - 1) * pageSize + 1}–${Math.min(currentEditionPage * pageSize, editions.length)} of ${totalCount} editions.`
-              : editions.length === 1
-                ? '1 edition found.'
-                : `${editions.length} editions found.`;
+              ? `Showing ${(currentEditionPage - 1) * pageSize + 1}–${Math.min(currentEditionPage * pageSize, filteredEditions.length)} of ${languageFilter.value ? languageCountLabel : `${totalCount} editions`}.`
+              : languageName
+                ? languageName === 'Unknown'
+                  ? `${filteredEditions.length} editions with unknown language found.`
+                  : `${filteredEditions.length} ${languageName} ${filteredEditions.length === 1 ? 'edition' : 'editions'} found.`
+                : editions.length === 1
+                  ? '1 edition found.'
+                  : `${editions.length} editions found.`;
             pagination.hidden = pageCount <= 1;
             previousPageButton.disabled = currentEditionPage <= 1;
             nextPageButton.disabled = currentEditionPage >= pageCount;
@@ -1331,13 +1416,22 @@ const { libraryBooks = [] } = Astro.props;
             list.scrollTop = 0;
           });
           nextPageButton.addEventListener('click', () => {
-            if (currentEditionPage >= Math.ceil(editions.length / pageSize)) return;
+            const filteredCount = editions.filter((edition: any) =>
+              !languageFilter.value || normalizeEditionLanguage(String(edition.language || '')) === languageFilter.value,
+            ).length;
+            if (currentEditionPage >= Math.ceil(filteredCount / pageSize)) return;
             currentEditionPage++;
+            renderEditionOptions();
+            list.scrollTop = 0;
+          });
+          languageFilter.addEventListener('change', () => {
+            currentEditionPage = 1;
             renderEditionOptions();
             list.scrollTop = 0;
           });
           renderEditionOptions();
 
+          editionDialog.appendChild(filterRow);
           editionDialog.appendChild(list);
           editionDialog.appendChild(pagination);
           editionDialog.showModal();
