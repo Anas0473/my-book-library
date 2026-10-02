@@ -1972,6 +1972,7 @@ const splitAuthors = (author: string) =>
             const syncedBook = {
               ...previousSyncedBook,
               ...book,
+              isbn: book.isbn || previousSyncedBook?.isbn || null,
               dateAdded: book.dateAdded || previousSyncedBook?.dateAdded || Date.now(),
               openLibrarySyncUsername: username,
               openLibraryRemoved: false,
@@ -2178,7 +2179,7 @@ const splitAuthors = (author: string) =>
         const header = document.createElement("div");
         header.className = "edition-dialog-header";
         const heading = document.createElement("h3");
-        heading.textContent = title;
+        heading.textContent = "Book details";
         const closeButton = document.createElement("button");
         closeButton.type = "button";
         closeButton.className = "edition-dialog-close";
