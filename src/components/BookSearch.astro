@@ -1399,7 +1399,6 @@ const { libraryBooks = [] } = Astro.props;
 
         removeButton.addEventListener('click', () => {
           if (!hasLocalSavedBook) return;
-          if (!window.confirm(`Delete "${book.title}" from your reading lists?`)) return;
 
           const updatedBooks = getSavedBooks().filter((item: any) => !isSameBook(item, book));
           localStorage.setItem(savedBooksKey, JSON.stringify(updatedBooks));

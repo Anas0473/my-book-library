@@ -17,6 +17,15 @@ function jsonResponse(body: unknown, status = 200) {
   });
 }
 
+// Open Library sends logged_date as "YYYY/MM/DD, HH:MM:SS" in UTC.
+function parseLoggedDate(value: unknown) {
+  const match = String(value || '').match(/^(\d{4})\/(\d{2})\/(\d{2}),\s*(\d{2}):(\d{2}):(\d{2})$/);
+  if (!match) return null;
+  const [, year, month, day, hour, minute, second] = match.map(Number);
+  const timestamp = Date.UTC(year, month - 1, day, hour, minute, second);
+  return Number.isFinite(timestamp) ? timestamp : null;
+}
+
 export const GET: APIRoute = async ({ url }) => {
   const username = (url.searchParams.get('username') || '').trim();
   if (!/^[\w.-]{1,64}$/.test(username)) {
@@ -110,6 +119,7 @@ export const GET: APIRoute = async ({ url }) => {
               ? `https://covers.openlibrary.org/b/id/${work.cover_id}-M.jpg`
               : null,
             status: shelf.status,
+            dateAdded: parseLoggedDate(entry.logged_date),
           });
         }
 
