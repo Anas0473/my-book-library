@@ -1,5 +1,12 @@
 import type { APIRoute } from 'astro';
 
+function unavailableResponse() {
+  return new Response(JSON.stringify({ editions: [], searchUnavailable: true }), {
+    status: 503,
+    headers: { 'Content-Type': 'application/json' },
+  });
+}
+
 export const GET: APIRoute = async ({ url }) => {
   const work = url.searchParams.get('work')?.trim();
   const title = url.searchParams.get('title')?.trim();
@@ -25,6 +32,7 @@ export const GET: APIRoute = async ({ url }) => {
       const searchResponse = await fetch(`https://openlibrary.org/search.json?${searchParams}`, {
         headers: { 'User-Agent': 'my-book-library/0.0.1' },
       });
+      if (!searchResponse.ok) return unavailableResponse();
       const searchData = await searchResponse.json();
       workKey = searchData.docs?.[0]?.key?.replace(/^\/+/, '');
     }
@@ -45,10 +53,7 @@ export const GET: APIRoute = async ({ url }) => {
     });
 
     if (!response.ok) {
-      return new Response(JSON.stringify({ editions: [] }), {
-        status: 200,
-        headers: { 'Content-Type': 'application/json' },
-      });
+      return unavailableResponse();
     }
 
     const data = await response.json();
@@ -116,9 +121,6 @@ export const GET: APIRoute = async ({ url }) => {
       headers: { 'Content-Type': 'application/json' },
     });
   } catch {
-    return new Response(JSON.stringify({ editions: [] }), {
-      status: 200,
-      headers: { 'Content-Type': 'application/json' },
-    });
+    return unavailableResponse();
   }
 };

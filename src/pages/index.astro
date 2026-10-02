@@ -807,10 +807,15 @@ const splitAuthors = (author: string) =>
         font-size: 0.8rem;
         cursor: pointer;
       }
+      :global(.edition-dialog.saved-book-detail-dialog) {
+        width: min(48rem, calc(100% - 2rem));
+        max-height: min(84vh, 48rem);
+      }
       :global(.category-edition-preview-body) {
         display: grid;
         min-height: 0;
         grid-template-columns: minmax(8rem, 0.8fr) minmax(0, 1.2fr);
+        align-items: start;
         align-content: start;
         gap: 1.25rem;
         overflow-y: auto;
@@ -818,14 +823,17 @@ const splitAuthors = (author: string) =>
       :global(.category-edition-preview-cover) {
         display: block;
         width: 100%;
+        height: auto;
         max-height: min(56vh, 32rem);
-        aspect-ratio: 2 / 3;
+        align-self: start;
         border-radius: 6px;
-        background: var(--surface-dark-2);
+        background: transparent;
         object-fit: contain;
+        object-position: top center;
       }
       :global(.category-book-detail-no-cover) {
         display: flex;
+        aspect-ratio: 2 / 3;
         align-items: center;
         justify-content: center;
         box-sizing: border-box;
@@ -996,6 +1004,10 @@ const splitAuthors = (author: string) =>
         }
         :global(.category-edition-preview-body) {
           grid-template-columns: minmax(0, 1fr);
+        }
+        :global(.edition-dialog.saved-book-detail-dialog) {
+          width: calc(100% - 1rem);
+          max-height: calc(100vh - 1rem);
         }
         :global(.category-edition-preview-cover) {
           width: min(14rem, 100%);
@@ -1277,6 +1289,7 @@ const splitAuthors = (author: string) =>
                     data-content-book
                     data-status={book.data.status || ""}
                     data-isbn={book.data.isbn || ""}
+                    data-publisher={(book.data as any).publisher || ""}
                     data-edition-key={(book.data as any).editionKey || ""}
                     data-title={book.data.title.toLowerCase()}
                     data-subtitle={(book.data.subtitle || "").toLowerCase()}
@@ -1756,6 +1769,7 @@ const splitAuthors = (author: string) =>
         card.dataset.workKey = String(book.workKey || "");
         card.dataset.editionKey = String(book.editionKey || "");
         card.dataset.isbn = String(book.isbn || "");
+        card.dataset.publisher = String(book.publisher || "");
         card.dataset.title = String(book.title).toLowerCase();
         card.dataset.subtitle = String(book.subtitle || "").toLowerCase();
         card.dataset.author = String(book.author || "").toLowerCase();
@@ -1973,6 +1987,7 @@ const splitAuthors = (author: string) =>
               ...previousSyncedBook,
               ...book,
               isbn: book.isbn || previousSyncedBook?.isbn || null,
+              publisher: book.publisher || previousSyncedBook?.publisher || null,
               dateAdded: book.dateAdded || previousSyncedBook?.dateAdded || Date.now(),
               openLibrarySyncUsername: username,
               openLibraryRemoved: false,
@@ -2140,7 +2155,7 @@ const splitAuthors = (author: string) =>
       document.body.appendChild(coverLightbox);
 
       const savedBookDetailDialog = document.createElement("dialog");
-      savedBookDetailDialog.className = "edition-dialog";
+      savedBookDetailDialog.className = "edition-dialog saved-book-detail-dialog";
       savedBookDetailDialog.addEventListener("click", (event) => {
         if (event.target === savedBookDetailDialog) savedBookDetailDialog.close();
       });
@@ -2168,8 +2183,6 @@ const splitAuthors = (author: string) =>
         ).trim();
         const publisher = String(localBook?.publisher || card.dataset.publisher || "Not listed").trim();
         const isbn = String(localBook?.isbn || card.dataset.isbn || "Not listed").trim();
-        const status = String(localBook?.status || card.dataset.status || "");
-        const shelfLabel = shelfDefinitions.find((shelf) => shelf.status === status)?.label || status || "Not listed";
         const editionKey = String(localBook?.editionKey || card.dataset.editionKey || "");
         const editionId = normalizeEditionId(editionKey);
         const editionLink = localBook?.editionUrl ||
@@ -2238,7 +2251,6 @@ const splitAuthors = (author: string) =>
           ["Published", published],
           ["Publisher", publisher],
           ["ISBN", isbn],
-          ["Reading list", shelfLabel],
         ];
         metadataItems.forEach(([label, value]) => {
           const item = document.createElement("div");
@@ -2333,6 +2345,25 @@ const splitAuthors = (author: string) =>
       // Guards against a slower, earlier request overwriting a later click's results.
       let editionRequestId = 0;
 
+      function showCategoryEditionUnavailable(title: string) {
+        categoryEditionDialog.innerHTML = "";
+        const header = document.createElement("div");
+        header.className = "edition-dialog-header";
+        const heading = document.createElement("h3");
+        heading.textContent = `Editions of ${title}`;
+        const closeButton = document.createElement("button");
+        closeButton.type = "button";
+        closeButton.className = "edition-dialog-close";
+        closeButton.textContent = "Close";
+        closeButton.addEventListener("click", () => categoryEditionDialog.close());
+        header.append(heading, closeButton);
+        const notice = document.createElement("p");
+        notice.className = "edition-unavailable-notice";
+        notice.textContent = "Open Library is unavailable. Please try again later.";
+        categoryEditionDialog.append(header, notice);
+        categoryEditionDialog.showModal();
+      }
+
       async function openCategoryEditions(button: HTMLButtonElement) {
         const work = button.dataset.work || "";
         const title = button.dataset.title || "";
@@ -2353,6 +2384,10 @@ const splitAuthors = (author: string) =>
         try {
           const response = await fetch(`/api/book-editions.json?${params}`);
           const data = await response.json();
+          if (data.searchUnavailable) {
+            showCategoryEditionUnavailable(title);
+            return;
+          }
           const editions = Array.isArray(data.editions) ? data.editions : [];
           const editionCount = Number(data.totalCount) || editions.length || Number(button.dataset.editionCount) || 0;
           if (editionCount > 0) {
@@ -2416,8 +2451,7 @@ const splitAuthors = (author: string) =>
             option.textContent = getEditionLanguageName(code);
             languageFilter.appendChild(option);
           });
-          const preferredLanguage = normalizeEditionLanguage(String(language || ""));
-          languageFilter.value = editionLanguages.includes(preferredLanguage) ? preferredLanguage : "";
+          languageFilter.value = "";
           filterRow.append(summary, languageFilter);
 
           const list = document.createElement("div");
@@ -2615,6 +2649,8 @@ const splitAuthors = (author: string) =>
           categoryEditionDialog.appendChild(preview);
           categoryEditionDialog.appendChild(pagination);
           categoryEditionDialog.showModal();
+        } catch {
+          showCategoryEditionUnavailable(title);
         } finally {
           button.disabled = false;
         }

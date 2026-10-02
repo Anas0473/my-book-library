@@ -142,7 +142,7 @@ export const GET: APIRoute = async ({ url }) => {
       const editionIds = batch.map((book) => book.editionKey.split('/').pop());
       const params = new URLSearchParams({
         q: `edition_key:(${editionIds.join(' OR ')})`,
-        fields: 'key,title,isbn,editions,editions.key,editions.title,editions.subtitle,editions.publish_date,editions.cover_i,editions.language',
+        fields: 'key,title,isbn,publisher,editions,editions.key,editions.title,editions.subtitle,editions.publish_date,editions.cover_i,editions.language',
         limit: String(editionBatchSize),
       });
 
@@ -173,6 +173,7 @@ export const GET: APIRoute = async ({ url }) => {
               ? editionLanguage.split('/').pop()
               : editionLanguage?.key?.split('/').pop() || null;
             book.isbn = work.isbn?.[0] || book.isbn || null;
+            book.publisher = work.publisher?.[0] || book.publisher || null;
             if (edition.cover_i) {
               book.editionHeroImage = `https://covers.openlibrary.org/b/id/${edition.cover_i}-M.jpg`;
             }
