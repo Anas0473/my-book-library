@@ -2136,36 +2136,87 @@ const splitAuthors = (author: string) =>
 
           const list = document.createElement("div");
           list.className = "edition-list";
-          editions.forEach((edition: any) => {
-            const option = document.createElement("button");
-            option.type = "button";
-            option.className = "edition-option";
-            const image = document.createElement("img");
-            image.alt = "";
-            if (edition.coverImage) image.src = edition.coverImage;
-            const details = document.createElement("span");
-            const editionTitle = document.createElement("strong");
-            editionTitle.textContent = edition.title;
-            const metadata = document.createElement("span");
-            metadata.textContent = [edition.language, edition.pubDate, edition.publisher]
-              .filter(Boolean)
-              .join(" · ");
-            details.append(editionTitle, metadata);
-            const saved = localBooks.some((book) => book.editionKey === edition.key);
-            const status = document.createElement("span");
-            status.className = "edition-choice-label";
-            status.textContent = saved ? "✓ Added" : "Open";
-            option.append(image, details, status);
-            option.addEventListener("click", () => window.open(edition.url, "_blank", "noopener"));
-            list.appendChild(option);
-          });
+          const pageSize = 12;
+          let currentEditionPage = 1;
+          const pagination = document.createElement("div");
+          pagination.className = "edition-pagination";
+          pagination.hidden = true;
+          const previousPageButton = document.createElement("button");
+          previousPageButton.type = "button";
+          previousPageButton.textContent = "Previous";
+          previousPageButton.setAttribute("aria-label", "Previous editions page");
+          const pageLabel = document.createElement("span");
+          const nextPageButton = document.createElement("button");
+          nextPageButton.type = "button";
+          nextPageButton.textContent = "Next";
+          nextPageButton.setAttribute("aria-label", "Next editions page");
+          pagination.append(previousPageButton, pageLabel, nextPageButton);
 
-          if (editions.length === 0) {
-            const empty = document.createElement("p");
-            empty.textContent = "No editions found.";
-            list.appendChild(empty);
-          }
+          const renderEditionOptions = () => {
+            const pageCount = Math.max(1, Math.ceil(editions.length / pageSize));
+            const visibleEditions = editions.slice(
+              (currentEditionPage - 1) * pageSize,
+              currentEditionPage * pageSize,
+            );
+            summary.textContent = pageCount > 1
+              ? `Showing ${(currentEditionPage - 1) * pageSize + 1}–${Math.min(currentEditionPage * pageSize, editions.length)} of ${editionCount} editions.`
+              : editions.length === 1
+                ? "1 edition found."
+                : `${editions.length} editions found.`;
+            pagination.hidden = pageCount <= 1;
+            previousPageButton.disabled = currentEditionPage <= 1;
+            nextPageButton.disabled = currentEditionPage >= pageCount;
+            pageLabel.textContent = `Page ${currentEditionPage} of ${pageCount}`;
+            list.innerHTML = "";
+
+            if (visibleEditions.length === 0) {
+              const empty = document.createElement("p");
+              empty.textContent = "No editions found.";
+              list.appendChild(empty);
+              return;
+            }
+
+            visibleEditions.forEach((edition: any) => {
+              const option = document.createElement("button");
+              option.type = "button";
+              option.className = "edition-option";
+              const image = document.createElement("img");
+              image.alt = "";
+              if (edition.coverImage) image.src = edition.coverImage;
+              const details = document.createElement("span");
+              const editionTitle = document.createElement("strong");
+              editionTitle.textContent = edition.title;
+              const metadata = document.createElement("span");
+              metadata.textContent = [edition.language, edition.pubDate, edition.publisher]
+                .filter(Boolean)
+                .join(" · ");
+              details.append(editionTitle, metadata);
+              const saved = localBooks.some((book) => book.editionKey === edition.key);
+              const status = document.createElement("span");
+              status.className = "edition-choice-label";
+              status.textContent = saved ? "✓ Added" : "Open";
+              option.append(image, details, status);
+              option.addEventListener("click", () => window.open(edition.url, "_blank", "noopener"));
+              list.appendChild(option);
+            });
+          };
+
+          previousPageButton.addEventListener("click", () => {
+            if (currentEditionPage <= 1) return;
+            currentEditionPage--;
+            renderEditionOptions();
+            list.scrollTop = 0;
+          });
+          nextPageButton.addEventListener("click", () => {
+            if (currentEditionPage >= Math.ceil(editions.length / pageSize)) return;
+            currentEditionPage++;
+            renderEditionOptions();
+            list.scrollTop = 0;
+          });
+          renderEditionOptions();
+
           categoryEditionDialog.appendChild(list);
+          categoryEditionDialog.appendChild(pagination);
           categoryEditionDialog.showModal();
         } finally {
           button.disabled = false;

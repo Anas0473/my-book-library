@@ -1215,7 +1215,9 @@ const { libraryBooks = [] } = Astro.props;
             const visibleEditions = editions.slice((currentEditionPage - 1) * pageSize, currentEditionPage * pageSize);
             summary.textContent = pageCount > 1
               ? `Showing ${(currentEditionPage - 1) * pageSize + 1}–${Math.min(currentEditionPage * pageSize, editions.length)} of ${totalCount} editions.`
-              : `Showing all ${editions.length} editions.`;
+              : editions.length === 1
+                ? '1 edition found.'
+                : `${editions.length} editions found.`;
             pagination.hidden = pageCount <= 1;
             previousPageButton.disabled = currentEditionPage <= 1;
             nextPageButton.disabled = currentEditionPage >= pageCount;
