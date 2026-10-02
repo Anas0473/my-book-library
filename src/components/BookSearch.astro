@@ -3,6 +3,7 @@ interface Props {
   libraryBooks?: Array<{
     title: string;
     author?: string;
+    publisher?: string;
     isbn?: string;
     status?: string;
     editionKey?: string;
@@ -406,12 +407,25 @@ const { libraryBooks = [] } = Astro.props;
     color: var(--text-dark-muted);
     font-size: 0.8rem;
   }
+  :global(.edition-unavailable-notice) {
+    margin: 0;
+    padding: 0.65rem 0.75rem;
+    border-left: 3px solid var(--accent);
+    border-radius: 6px;
+    background: color-mix(in srgb, var(--accent) 14%, transparent);
+    color: var(--text-dark);
+    font-size: 0.82rem;
+  }
   :global(.edition-filter-row) {
     display: grid;
     flex: 0 0 auto;
     grid-template-columns: minmax(0, 1fr) minmax(10rem, 14rem);
     align-items: center;
     gap: 0.75rem;
+    margin-bottom: 0.75rem;
+  }
+  :global(.edition-filter-row[hidden]) {
+    display: none;
   }
   :global(.edition-filter-row .edition-summary) {
     margin: 0;
@@ -806,6 +820,7 @@ const { libraryBooks = [] } = Astro.props;
       title: book.title,
       subtitle: book.subtitle,
       author: book.author,
+      publisher: book.publisher,
       pubDate: book.pubDate,
       isbn: book.isbn,
       heroImage: book.heroImage,
@@ -823,6 +838,7 @@ const { libraryBooks = [] } = Astro.props;
         editionKey: existingBook.editionKey || savedBook.editionKey,
         editionUrl: existingBook.editionUrl || savedBook.editionUrl,
         editionHeroImage: existingBook.editionHeroImage || savedBook.editionHeroImage,
+        publisher: existingBook.publisher || savedBook.publisher,
         dateAdded: existingBook.dateAdded || savedBook.dateAdded,
         status,
       };
@@ -1210,6 +1226,24 @@ const { libraryBooks = [] } = Astro.props;
       async function openEditionPicker(book: any, card: HTMLElement, button: HTMLButtonElement) {
         button.disabled = true;
         button.textContent = 'Loading editions...';
+        const showUnavailableNotice = () => {
+          editionDialog.innerHTML = '';
+          const header = document.createElement('div');
+          header.className = 'edition-dialog-header';
+          const heading = document.createElement('h3');
+          heading.textContent = `Editions of ${book.title}`;
+          const closeButton = document.createElement('button');
+          closeButton.type = 'button';
+          closeButton.className = 'edition-dialog-close';
+          closeButton.textContent = 'Close';
+          closeButton.addEventListener('click', () => editionDialog.close());
+          header.append(heading, closeButton);
+          const notice = document.createElement('p');
+          notice.className = 'edition-unavailable-notice';
+          notice.textContent = 'Open Library is unavailable. Please try again later.';
+          editionDialog.append(header, notice);
+          editionDialog.showModal();
+        };
 
         try {
           const params = new URLSearchParams({ work: book.workKey });
@@ -1219,6 +1253,10 @@ const { libraryBooks = [] } = Astro.props;
           if (currentLanguage) params.set('language', currentLanguage);
           const response = await fetch(`/api/book-editions.json?${params}`);
           const data = await response.json();
+          if (data.searchUnavailable) {
+            showUnavailableNotice();
+            return;
+          }
           const editions = Array.isArray(data.editions) ? data.editions : [];
           const totalCount = Number(data.totalCount) || editions.length || book.editionCount || 0;
           book.editionCount = totalCount;
@@ -1279,8 +1317,7 @@ const { libraryBooks = [] } = Astro.props;
             option.textContent = getEditionLanguageName(code);
             languageFilter.appendChild(option);
           });
-          const preferredLanguage = normalizeEditionLanguage(String(currentLanguage || book.editionLanguage || ''));
-          languageFilter.value = editionLanguages.includes(preferredLanguage) ? preferredLanguage : '';
+          languageFilter.value = '';
           filterRow.append(summary, languageFilter);
 
           const list = document.createElement('div');
@@ -1371,6 +1408,7 @@ const { libraryBooks = [] } = Astro.props;
                 book.editionLanguage = edition.language;
                 book.title = edition.title;
                 book.subtitle = edition.subtitle;
+                book.publisher = edition.publisher;
                 book.pubDate = edition.pubDate;
                 book.isbn = edition.isbn;
                 book.heroImage = edition.coverImage;
@@ -1436,8 +1474,7 @@ const { libraryBooks = [] } = Astro.props;
           editionDialog.appendChild(pagination);
           editionDialog.showModal();
         } catch {
-          editionDialog.innerHTML = '<p>Unable to load editions.</p>';
-          editionDialog.showModal();
+          showUnavailableNotice();
         } finally {
           button.disabled = false;
           if (button.textContent === 'Loading editions...') button.textContent = 'Browse editions';

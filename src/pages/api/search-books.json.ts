@@ -158,7 +158,7 @@ async function fetchInternetArchiveFallback({
   if (language) queryParts.push(`language:${language}`);
   const params = new URLSearchParams({
     q: queryParts.join(' AND '),
-    'fl[]': 'identifier,title,creator,year,language,isbn',
+    'fl[]': 'identifier,title,creator,publisher,year,language,isbn',
     rows: '1000',
     page: '1',
     output: 'json',
@@ -196,6 +196,7 @@ async function fetchInternetArchiveFallback({
       title: item.title || 'Untitled',
       subtitle: null,
       author: Array.isArray(item.creator) ? item.creator.join(', ') : item.creator || 'Unknown Author',
+      publisher: Array.isArray(item.publisher) ? item.publisher[0] : item.publisher || null,
       authorKeys: [],
       editionKeys: [],
       editionCount: 0,
@@ -349,6 +350,7 @@ export const GET: APIRoute = async ({ url }) => {
         title: record.title || 'Untitled',
         subtitle: record.subtitle || null,
         author,
+        publisher: Array.isArray(record.publishers) ? record.publishers[0] || null : record.publishers || null,
         pubDate: record.publish_date || record.first_publish_year || 'Unknown',
         isbn: record.isbn_13?.[0] || record.isbn_10?.[0] || null,
         heroImage: coverId ? `https://covers.openlibrary.org/b/id/${coverId}-M.jpg` : null,
@@ -394,7 +396,7 @@ export const GET: APIRoute = async ({ url }) => {
           : '';
     const searchParams = new URLSearchParams({
       [searchField]: isIsbnSearch ? normalizedIsbn : authorKey || structuredQuery,
-      fields: 'title,subtitle,author_name,author_key,language,first_publish_year,cover_i,isbn,key,edition_key,edition_count',
+      fields: 'title,subtitle,author_name,author_key,language,first_publish_year,cover_i,isbn,publisher,key,edition_key,edition_count',
       limit: String(hasCompleteResultSet ? 1000 : limit),
       offset: String(hasCompleteResultSet || (useOpenLibrarySort && sort === 'title-desc') ? 0 : offset),
     });
@@ -656,6 +658,7 @@ export const GET: APIRoute = async ({ url }) => {
         title: edition?.title || doc.title,
         subtitle: edition?.subtitle || doc.subtitle || null,
         author: doc.author_name ? doc.author_name.join(', ') : 'Unknown Author',
+        publisher: edition?.publishers?.[0] || (Array.isArray(doc.publisher) ? doc.publisher[0] : doc.publisher) || null,
         authorKeys: doc.author_key || [],
         editionKeys: edition?.key ? [edition.key.replace(/^\/?books\//i, '')] : (doc.edition_key || []),
         editionCount: Number(doc.edition_count) || doc.edition_key?.length || 0,
