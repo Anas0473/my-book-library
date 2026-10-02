@@ -184,6 +184,10 @@ const splitAuthors = (author: string) =>
         border-radius: 50%;
         background: var(--faint);
       }
+      .open-library-button {
+        font-size: 0.78rem;
+        white-space: nowrap;
+      }
       .open-library-button.is-connected::before {
         background: var(--ok);
         box-shadow:
@@ -721,9 +725,8 @@ const splitAuthors = (author: string) =>
         border-radius: 6px;
       }
       :global(.card .cover-img) {
-        object-fit: cover;
-        background: var(--fill);
-        box-shadow: 0 8px 20px rgba(0, 0, 0, 0.28);
+        object-fit: contain;
+        background: var(--page-background, #1c1c1c);
       }
       :global(.card .cover-placeholder) {
         display: flex;
@@ -1290,7 +1293,9 @@ const splitAuthors = (author: string) =>
       const savedBooksKey = "my-book-library:books";
       const legacySavedBooksKey = "my-book-library:plan-to-read";
       const openLibraryUsernameKey = "my-book-library:openlibrary-username";
-      const openLibraryLastSyncKey = "my-book-library:openlibrary-last-sync";
+      // v2 forces one re-sync so earlier synced books get their real Open Library dates.
+      const openLibraryLastSyncKey = "my-book-library:openlibrary-last-sync-v2";
+      localStorage.removeItem("my-book-library:openlibrary-last-sync");
       const openLibraryLastSyncResultKey = "my-book-library:openlibrary-last-sync-result";
       const openLibrarySyncInterval = 12 * 60 * 60 * 1000;
       const openLibrarySyncButton = document.getElementById("open-library-sync-button") as HTMLButtonElement;
@@ -1587,7 +1592,6 @@ const splitAuthors = (author: string) =>
         removeOption.dataset.action = "remove";
         removeOption.textContent = "Delete from My Lists";
         removeOption.addEventListener("click", () => {
-          if (!window.confirm(`Delete "${book.title}" from your reading lists?`)) return;
           window.dispatchEvent(new CustomEvent("library:book-removed", { detail: book }));
         });
 
@@ -1776,7 +1780,6 @@ const splitAuthors = (author: string) =>
 
       function updateOpenLibrarySyncLabel() {
         const username = localStorage.getItem(openLibraryUsernameKey);
-        const lastSyncResult = localStorage.getItem(openLibraryLastSyncResultKey);
         openLibrarySyncButton.textContent = username
           ? "Open Library connected"
           : "Connect Open Library";
@@ -1788,10 +1791,7 @@ const splitAuthors = (author: string) =>
           "aria-label",
           username ? "Sync Open Library" : "Connect Open Library",
         );
-        openLibrarySyncStatus.hidden = !username;
-        if (username && !openLibrarySyncStatus.textContent) {
-          openLibrarySyncStatus.textContent = `Connected as ${username}${lastSyncResult ? `. ${lastSyncResult}` : ""}`;
-        }
+        openLibrarySyncStatus.hidden = true;
       }
 
       async function syncOpenLibrary(username: string) {
@@ -1862,7 +1862,7 @@ const splitAuthors = (author: string) =>
             const syncedBook = {
               ...previousSyncedBook,
               ...book,
-              dateAdded: previousSyncedBook?.dateAdded || Date.now(),
+              dateAdded: book.dateAdded || previousSyncedBook?.dateAdded || Date.now(),
               openLibrarySyncUsername: username,
               openLibraryRemoved: false,
             };
@@ -2444,8 +2444,8 @@ const splitAuthors = (author: string) =>
               if (dateAddedA && !dateAddedB) return -1;
               if (dateAddedA !== dateAddedB) {
                 return sortVal === "date-added-desc"
-                  ? dateAddedA - dateAddedB
-                  : dateAddedB - dateAddedA;
+                  ? dateAddedB - dateAddedA
+                  : dateAddedA - dateAddedB;
               }
             }
 
@@ -2666,18 +2666,19 @@ const splitAuthors = (author: string) =>
         removeButton.addEventListener("click", () => {
           const selectedBooks = getSelectedBooks();
           if (selectedBooks.length === 0) return;
-          if (!window.confirm(`Delete ${selectedBooks.length} selected book${selectedBooks.length === 1 ? "" : "s"} from your reading lists?`)) return;
+          if (selectedBooks.length > 1 && !window.confirm(`Delete ${selectedBooks.length} selected books from your reading lists?`)) return;
 
+          const undoBatchId = `delete-${Date.now()}-${Math.random().toString(36).slice(2)}`;
           setSelectionMode(false);
           selectedBooks.forEach((book) => {
-            window.dispatchEvent(new CustomEvent("library:book-removed", { detail: book }));
+            window.dispatchEvent(new CustomEvent("library:book-removed", { detail: { ...book, undoBatchId } }));
           });
         });
       });
 
       let shelfUndoTimer = 0;
       let activeUndoBatchId = "";
-      let shelfUndoActions: Array<{ book: any; previousBook: any }> = [];
+      let shelfUndoActions: Array<{ book: any; previousBook: any; deletedIndex?: number }> = [];
 
       function dismissShelfUndoToast() {
         window.clearTimeout(shelfUndoTimer);
@@ -2686,12 +2687,12 @@ const splitAuthors = (author: string) =>
         activeUndoBatchId = "";
       }
 
-      function showShelfUndoToast(book: any, previousBook: any, batchId = "") {
+      function showShelfUndoToast(book: any, previousBook: any, batchId = "", deletedIndex?: number) {
         if (batchId && batchId === activeUndoBatchId) {
-          shelfUndoActions.push({ book, previousBook });
+          shelfUndoActions.push({ book, previousBook, deletedIndex });
         } else {
           activeUndoBatchId = batchId;
-          shelfUndoActions = [{ book, previousBook }];
+          shelfUndoActions = [{ book, previousBook, deletedIndex }];
         }
 
         let toast = document.querySelector<HTMLElement>(".shelf-undo-toast");
@@ -2704,16 +2705,32 @@ const splitAuthors = (author: string) =>
         }
 
         const targetShelf = shelfDefinitions.find((shelf) => shelf.status === book.status);
+        const isDelete = deletedIndex !== undefined;
         const message = document.createElement("span");
-        message.textContent = shelfUndoActions.length > 1
-          ? `${shelfUndoActions.length} books moved to ${targetShelf?.label || book.status}.`
-          : `Moved "${book.title}" to ${targetShelf?.label || book.status}.`;
+        if (isDelete) {
+          message.textContent = shelfUndoActions.length > 1
+            ? `${shelfUndoActions.length} books deleted.`
+            : `Deleted "${previousBook.title}".`;
+        } else {
+          message.textContent = shelfUndoActions.length > 1
+            ? `${shelfUndoActions.length} books moved to ${targetShelf?.label || book.status}.`
+            : `Moved "${book.title}" to ${targetShelf?.label || book.status}.`;
+        }
         const undoButton = document.createElement("button");
         undoButton.type = "button";
         undoButton.textContent = "Undo";
         undoButton.addEventListener("click", () => {
           let restoredCount = 0;
-          [...shelfUndoActions].forEach(({ book: movedBook, previousBook: oldBook }) => {
+          // Restore deletions last-first so each saved index refers to the list as it was then.
+          [...shelfUndoActions].reverse().forEach(({ book: movedBook, previousBook: oldBook, deletedIndex: oldIndex }) => {
+            if (oldIndex !== undefined) {
+              if (localBooks.some((item) => isSameBook(item, oldBook))) return;
+              localBooks.splice(Math.min(oldIndex, localBooks.length), 0, oldBook);
+              removeMatchingContentBooks(oldBook);
+              renderLocalBook(oldBook);
+              restoredCount++;
+              return;
+            }
             const existingIndex = localBooks.findIndex((item) => isSameBook(item, movedBook));
             if (existingIndex < 0 || localBooks[existingIndex].status !== movedBook.status) return;
 
@@ -2789,11 +2806,11 @@ const splitAuthors = (author: string) =>
       });
 
       window.addEventListener("library:book-removed", (event) => {
-        const book = (event as CustomEvent).detail;
+        const { undoBatchId = "", ...book } = (event as CustomEvent).detail;
         const existingIndex = localBooks.findIndex((item) => isSameBook(item, book));
         if (existingIndex < 0) return;
 
-        localBooks.splice(existingIndex, 1);
+        const [deletedBook] = localBooks.splice(existingIndex, 1);
         localStorage.setItem(savedBooksKey, JSON.stringify(localBooks));
         document.querySelectorAll<HTMLElement>("[data-local-book-key]").forEach((card) => {
           const cardBook = {
@@ -2808,6 +2825,7 @@ const splitAuthors = (author: string) =>
         });
         updateShelfCounts();
         panelRefreshers.forEach((refreshPanel) => refreshPanel());
+        showShelfUndoToast(deletedBook, deletedBook, undoBatchId, existingIndex);
       });
 
       document.addEventListener("click", (event) => {
