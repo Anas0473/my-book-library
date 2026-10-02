@@ -782,6 +782,108 @@ const splitAuthors = (author: string) =>
       :global(.card .edition-link-text a:hover) {
         color: var(--accent);
       }
+      :global(.category-edition-preview) {
+        display: grid;
+        flex: 1 1 auto;
+        min-height: 0;
+        grid-template-rows: auto minmax(0, 1fr);
+        gap: 0.75rem;
+      }
+      :global(.category-edition-preview[hidden]) {
+        display: none;
+      }
+      :global(.edition-summary[hidden]),
+      :global(.edition-list[hidden]) {
+        display: none;
+      }
+      :global(.category-edition-preview-back) {
+        justify-self: start;
+        padding: 0.35rem 0.7rem;
+        border: 1px solid var(--border-dark);
+        border-radius: 8px;
+        background: var(--surface-dark-2);
+        color: var(--text-dark);
+        font: inherit;
+        font-size: 0.8rem;
+        cursor: pointer;
+      }
+      :global(.category-edition-preview-body) {
+        display: grid;
+        min-height: 0;
+        grid-template-columns: minmax(8rem, 0.8fr) minmax(0, 1.2fr);
+        align-content: start;
+        gap: 1.25rem;
+        overflow-y: auto;
+      }
+      :global(.category-edition-preview-cover) {
+        display: block;
+        width: 100%;
+        max-height: min(56vh, 32rem);
+        aspect-ratio: 2 / 3;
+        border-radius: 6px;
+        background: var(--surface-dark-2);
+        object-fit: contain;
+      }
+      :global(.category-book-detail-no-cover) {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        box-sizing: border-box;
+        padding: 1rem;
+        color: var(--text-dark-muted);
+        font-size: 0.75rem;
+        text-align: center;
+      }
+      :global(.category-book-detail-author) {
+        margin: 0.35rem 0 0;
+        color: var(--text-dark-muted);
+        font-size: 0.85rem;
+      }
+      :global(.category-edition-preview-details h4) {
+        margin: 0;
+        font-size: 1.15rem;
+        line-height: 1.3;
+      }
+      :global(.category-edition-preview-subtitle) {
+        margin: 0.35rem 0 0;
+        color: var(--text-dark-muted);
+        font-size: 0.85rem;
+      }
+      :global(.category-edition-preview-meta) {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 0.8rem;
+        margin: 1rem 0;
+      }
+      :global(.category-edition-preview-meta div) {
+        min-width: 0;
+      }
+      :global(.category-edition-preview-meta dt) {
+        color: var(--text-dark-muted);
+        font-size: 0.7rem;
+      }
+      :global(.category-edition-preview-meta dd) {
+        margin: 0.2rem 0 0;
+        overflow-wrap: anywhere;
+        font-size: 0.82rem;
+      }
+      :global(.category-edition-open-link) {
+        display: inline-flex;
+        align-items: center;
+        min-height: 2.2rem;
+        box-sizing: border-box;
+        padding: 0.4rem 0.7rem;
+        border: 1px solid var(--border-dark);
+        border-radius: 8px;
+        background: var(--surface-dark-2);
+        color: var(--text-dark);
+        font-size: 0.8rem;
+        text-decoration: none;
+      }
+      :global(.category-edition-open-link:hover) {
+        border-color: var(--accent);
+        color: var(--accent);
+      }
       :global(.card .open-library-removed) {
         display: inline-block;
         margin: 0.35rem 0 0;
@@ -891,6 +993,14 @@ const splitAuthors = (author: string) =>
           height: 2.25rem;
           padding: 0;
           border-radius: 50%;
+        }
+        :global(.category-edition-preview-body) {
+          grid-template-columns: minmax(0, 1fr);
+        }
+        :global(.category-edition-preview-cover) {
+          width: min(14rem, 100%);
+          max-height: min(42vh, 22rem);
+          justify-self: center;
         }
         .appearance-label,
         .appearance-value {
@@ -2028,11 +2138,146 @@ const splitAuthors = (author: string) =>
       coverLightbox.addEventListener("click", () => coverLightbox.close());
       document.body.appendChild(coverLightbox);
 
+      const savedBookDetailDialog = document.createElement("dialog");
+      savedBookDetailDialog.className = "edition-dialog";
+      savedBookDetailDialog.addEventListener("click", (event) => {
+        if (event.target === savedBookDetailDialog) savedBookDetailDialog.close();
+      });
+      document.body.appendChild(savedBookDetailDialog);
+
+      function openSavedBookDetails(card: HTMLElement, cover: HTMLImageElement) {
+        const localBook = card.dataset.localBookKey
+          ? localBooks.find((book) => String(getBookIdentity(book)) === card.dataset.localBookKey)
+          : null;
+        const title = String(localBook?.title || card.querySelector("h4")?.textContent || cover.alt).trim();
+        const subtitle = String(localBook?.subtitle || card.querySelector(".subtitle-text")?.textContent || "").trim();
+        const author = String(localBook?.author || card.querySelector(".author-text")?.textContent || "Not listed").trim();
+        const published = String(
+          localBook?.pubDate ||
+          card.querySelector(".pub-date-text")?.textContent?.replace(/^Published:\s*/, "") ||
+          card.dataset.year ||
+          "Not listed",
+        ).trim();
+        const language = String(
+          localBook?.editionLanguage ||
+          localBook?.language ||
+          card.dataset.language ||
+          editionLanguageCache[normalizeEditionId(localBook?.editionKey || card.dataset.editionKey || "")] ||
+          "Not listed",
+        ).trim();
+        const publisher = String(localBook?.publisher || card.dataset.publisher || "Not listed").trim();
+        const isbn = String(localBook?.isbn || card.dataset.isbn || "Not listed").trim();
+        const status = String(localBook?.status || card.dataset.status || "");
+        const shelfLabel = shelfDefinitions.find((shelf) => shelf.status === status)?.label || status || "Not listed";
+        const editionKey = String(localBook?.editionKey || card.dataset.editionKey || "");
+        const editionId = normalizeEditionId(editionKey);
+        const editionLink = localBook?.editionUrl ||
+          card.querySelector<HTMLAnchorElement>(".edition-link-text a")?.href ||
+          (editionId ? `https://openlibrary.org/books/${editionId}` : "");
+
+        const header = document.createElement("div");
+        header.className = "edition-dialog-header";
+        const heading = document.createElement("h3");
+        heading.textContent = title;
+        const closeButton = document.createElement("button");
+        closeButton.type = "button";
+        closeButton.className = "edition-dialog-close";
+        closeButton.textContent = "Close";
+        closeButton.addEventListener("click", () => savedBookDetailDialog.close());
+        header.append(heading, closeButton);
+
+        const body = document.createElement("div");
+        body.className = "category-edition-preview-body";
+        if (cover.src) {
+          const image = document.createElement("img");
+          image.className = "category-edition-preview-cover";
+          image.alt = `Cover of ${title}`;
+          image.referrerPolicy = "no-referrer";
+          const largeSrc = cover.src
+            .replace(/-M\.jpg(?=\?|$)/, "-L.jpg")
+            .replace(
+              /^https:\/\/archive\.org\/services\/img\/([^/?#]+)$/,
+              "https://archive.org/download/$1/page/cover_w800.jpg",
+            );
+          if (largeSrc !== cover.src) {
+            image.onerror = () => {
+              image.onerror = null;
+              image.src = cover.src;
+            };
+          }
+          image.src = largeSrc;
+          body.appendChild(image);
+        } else {
+          const placeholder = document.createElement("div");
+          placeholder.className = "category-edition-preview-cover category-book-detail-no-cover";
+          placeholder.textContent = "No cover available";
+          body.appendChild(placeholder);
+        }
+
+        const details = document.createElement("div");
+        details.className = "category-edition-preview-details";
+        const bookTitle = document.createElement("h4");
+        bookTitle.textContent = title;
+        details.appendChild(bookTitle);
+        if (subtitle) {
+          const subtitleText = document.createElement("p");
+          subtitleText.className = "category-edition-preview-subtitle";
+          subtitleText.textContent = subtitle;
+          details.appendChild(subtitleText);
+        }
+        const authorText = document.createElement("p");
+        authorText.className = "category-book-detail-author";
+        authorText.textContent = author;
+        details.appendChild(authorText);
+
+        const metadata = document.createElement("dl");
+        metadata.className = "category-edition-preview-meta";
+        const metadataItems: Array<[string, string]> = [
+          ["Language", language],
+          ["Published", published],
+          ["Publisher", publisher],
+          ["ISBN", isbn],
+          ["Reading list", shelfLabel],
+        ];
+        metadataItems.forEach(([label, value]) => {
+          const item = document.createElement("div");
+          const term = document.createElement("dt");
+          term.textContent = label;
+          const description = document.createElement("dd");
+          description.textContent = value;
+          item.append(term, description);
+          metadata.appendChild(item);
+        });
+        details.appendChild(metadata);
+
+        if (editionLink) {
+          const openLink = document.createElement("a");
+          openLink.className = "category-edition-open-link";
+          openLink.href = editionLink;
+          openLink.target = "_blank";
+          openLink.rel = "noopener noreferrer";
+          openLink.textContent = "Open in Open Library";
+          details.appendChild(openLink);
+        }
+        body.appendChild(details);
+        savedBookDetailDialog.replaceChildren(header, body);
+        savedBookDetailDialog.showModal();
+      }
+
       document.addEventListener("click", (event) => {
-        const cover = (event.target as HTMLElement).closest<HTMLImageElement>(
-          ".search-card img, .card .cover-img",
-        );
-        if (!cover?.src || cover.closest(".selection-mode")) return;
+        const target = event.target as HTMLElement;
+        const savedCover = target.closest<HTMLImageElement>(".card .cover-img");
+        if (savedCover && !savedCover.closest(".selection-mode")) {
+          const card = savedCover.closest<HTMLElement>(".card");
+          if (!card) return;
+          event.preventDefault();
+          event.stopPropagation();
+          openSavedBookDetails(card, savedCover);
+          return;
+        }
+
+        const cover = target.closest<HTMLImageElement>(".search-card img");
+        if (!cover?.src) return;
 
         event.preventDefault();
         event.stopPropagation();
@@ -2151,6 +2396,96 @@ const splitAuthors = (author: string) =>
           nextPageButton.textContent = "Next";
           nextPageButton.setAttribute("aria-label", "Next editions page");
           pagination.append(previousPageButton, pageLabel, nextPageButton);
+          const preview = document.createElement("section");
+          preview.className = "category-edition-preview";
+          preview.hidden = true;
+          let listScrollPosition = 0;
+
+          const showEditionPreview = (edition: any) => {
+            const backButton = document.createElement("button");
+            backButton.type = "button";
+            backButton.className = "category-edition-preview-back";
+            backButton.textContent = "Back to editions";
+            backButton.addEventListener("click", () => {
+              preview.hidden = true;
+              summary.hidden = false;
+              list.hidden = false;
+              renderEditionOptions();
+              list.scrollTop = listScrollPosition;
+            });
+
+            const body = document.createElement("div");
+            body.className = "category-edition-preview-body";
+            const coverUrl = String(edition.coverImage || "");
+            if (coverUrl) {
+              const cover = document.createElement("img");
+              cover.className = "category-edition-preview-cover";
+              cover.src = coverUrl.replace(/-M\.jpg$/, "-L.jpg");
+              cover.alt = `Cover of ${edition.title}`;
+              cover.referrerPolicy = "no-referrer";
+              cover.onerror = () => {
+                cover.onerror = null;
+                cover.src = coverUrl;
+              };
+              body.appendChild(cover);
+            } else {
+              const placeholder = document.createElement("div");
+              placeholder.className = "cover-placeholder";
+              placeholder.textContent = "NO COVER AVAILABLE";
+              body.appendChild(placeholder);
+            }
+
+            const details = document.createElement("div");
+            details.className = "category-edition-preview-details";
+            const editionTitle = document.createElement("h4");
+            editionTitle.textContent = edition.title;
+            details.appendChild(editionTitle);
+            if (edition.subtitle) {
+              const subtitle = document.createElement("p");
+              subtitle.className = "category-edition-preview-subtitle";
+              subtitle.textContent = edition.subtitle;
+              details.appendChild(subtitle);
+            }
+
+            const metadata = document.createElement("dl");
+            metadata.className = "category-edition-preview-meta";
+            const pubDate = Array.isArray(edition.pubDate)
+              ? edition.pubDate.filter(Boolean).join(", ")
+              : String(edition.pubDate || "Unknown");
+            const metadataItems: Array<[string, string]> = [
+              ["Language", String(edition.language || "Unknown")],
+              ["Published", pubDate],
+              ["Publisher", String(edition.publisher || "Unknown")],
+              ["ISBN", String(edition.isbn || "Not listed")],
+              ["Digital copy", edition.hasDigitalCopy ? "Available" : "Not listed"],
+            ];
+            metadataItems.forEach(([label, value]) => {
+              const item = document.createElement("div");
+              const term = document.createElement("dt");
+              term.textContent = label;
+              const description = document.createElement("dd");
+              description.textContent = value;
+              item.append(term, description);
+              metadata.appendChild(item);
+            });
+            details.appendChild(metadata);
+
+            const openLink = document.createElement("a");
+            openLink.className = "category-edition-open-link";
+            openLink.href = edition.url;
+            openLink.target = "_blank";
+            openLink.rel = "noopener noreferrer";
+            openLink.textContent = "Open in Open Library";
+            details.appendChild(openLink);
+            body.appendChild(details);
+
+            preview.replaceChildren(backButton, body);
+            listScrollPosition = list.scrollTop;
+            summary.hidden = true;
+            list.hidden = true;
+            pagination.hidden = true;
+            preview.hidden = false;
+          };
 
           const renderEditionOptions = () => {
             const pageCount = Math.max(1, Math.ceil(editions.length / pageSize));
@@ -2194,9 +2529,9 @@ const splitAuthors = (author: string) =>
               const saved = localBooks.some((book) => book.editionKey === edition.key);
               const status = document.createElement("span");
               status.className = "edition-choice-label";
-              status.textContent = saved ? "✓ Added" : "Open";
+              status.textContent = saved ? "✓ Added" : "View details";
               option.append(image, details, status);
-              option.addEventListener("click", () => window.open(edition.url, "_blank", "noopener"));
+              option.addEventListener("click", () => showEditionPreview(edition));
               list.appendChild(option);
             });
           };
@@ -2216,6 +2551,7 @@ const splitAuthors = (author: string) =>
           renderEditionOptions();
 
           categoryEditionDialog.appendChild(list);
+          categoryEditionDialog.appendChild(preview);
           categoryEditionDialog.appendChild(pagination);
           categoryEditionDialog.showModal();
         } finally {
@@ -2893,6 +3229,10 @@ const splitAuthors = (author: string) =>
         if (event.key !== "Escape") return;
         if (coverLightbox.open) {
           coverLightbox.close();
+          return;
+        }
+        if (savedBookDetailDialog.open) {
+          savedBookDetailDialog.close();
           return;
         }
         document.querySelectorAll<HTMLElement>(".category-panel.selection-mode").forEach((panel) => {
