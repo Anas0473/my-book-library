@@ -260,8 +260,8 @@ export const GET: APIRoute = async ({ url }) => {
   const sort = url.searchParams.get('sort') || '';
   const shouldSort = ['title-asc', 'title-desc', 'year-desc', 'year-asc'].includes(sort);
   const page = Math.max(1, parseInt(url.searchParams.get('page') || '1', 10));
-  const requestedLimit = parseInt(url.searchParams.get('limit') || '14', 10);
-  const limit = requestedLimit === 14 || requestedLimit === 15 ? requestedLimit : 16;
+  const requestedLimit = parseInt(url.searchParams.get('limit') || '18', 10);
+  const limit = [14, 15, 18].includes(requestedLimit) ? requestedLimit : 16;
   const offset = (page - 1) * limit;
 
   const jsonHeaders = { 'Content-Type': 'application/json' };

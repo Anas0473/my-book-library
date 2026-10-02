@@ -567,6 +567,9 @@ const { libraryBooks = [] } = Astro.props;
     margin: 0.25rem 0;
     border-top: 1px solid var(--border-dark);
   }
+  :global(.shelf-menu-divider:has(+ button[hidden])) {
+    display: none;
+  }
   :global(.shelf-menu button[data-action="remove"]) {
     color: var(--danger);
   }
@@ -676,7 +679,7 @@ const { libraryBooks = [] } = Astro.props;
       && !searchLanguageSelect.value
       && !hideAddedToggle.checked;
   }
-  const pageSize = 14;
+  const pageSize = 18;
   const savedBooksKey = 'my-book-library:books';
   const legacySavedBooksKey = 'my-book-library:plan-to-read';
   const shelfLabels: Record<string, string> = {

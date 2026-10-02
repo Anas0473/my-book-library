@@ -617,6 +617,11 @@ const splitAuthors = (author: string) =>
       .search-input::placeholder {
         color: var(--faint);
       }
+      /* Selects use translucent fills, which some browsers' native option lists can't show. */
+      :global(select option) {
+        background-color: var(--page-background, #1c1c1c);
+        color: var(--fg);
+      }
       .sort-select:disabled,
       .language-select:disabled {
         opacity: 0.55;
