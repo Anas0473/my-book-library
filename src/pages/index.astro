@@ -1051,8 +1051,10 @@ const splitAuthors = (author: string) =>
         display: none;
       }
       :global(.search-card img),
+      :global(.search-card .search-cover-placeholder),
+      :global(.search-card h5[role="button"]),
       :global(.card .cover-img) {
-        cursor: zoom-in;
+        cursor: pointer;
       }
       :global(.selection-mode .card .cover-img) {
         cursor: pointer;
@@ -2349,10 +2351,15 @@ const splitAuthors = (author: string) =>
       });
       document.body.appendChild(savedBookDetailDialog);
 
-      function openSavedBookDetails(card: HTMLElement, cover: HTMLImageElement) {
-        const localBook = card.dataset.localBookKey
+      window.addEventListener("library:book-details", (event) => {
+        const { card, cover, book } = (event as CustomEvent).detail;
+        openSavedBookDetails(card, cover || document.createElement("img"), book);
+      });
+
+      function openSavedBookDetails(card: HTMLElement, cover: HTMLImageElement, searchBook: any = null) {
+        const localBook = searchBook || (card.dataset.localBookKey
           ? localBooks.find((book) => String(getBookIdentity(book)) === card.dataset.localBookKey)
-          : null;
+          : null);
         const title = String(localBook?.title || card.querySelector("h4")?.textContent || cover.alt).trim();
         const subtitle = String(localBook?.subtitle || card.querySelector(".subtitle-text")?.textContent || "").trim();
         const author = String(localBook?.author || card.querySelector(".author-text")?.textContent || "Not listed").trim();
@@ -2478,12 +2485,6 @@ const splitAuthors = (author: string) =>
           return;
         }
 
-        const cover = target.closest<HTMLImageElement>(".search-card img");
-        if (!cover?.src) return;
-
-        event.preventDefault();
-        event.stopPropagation();
-        openCoverLightbox(cover);
       });
 
       document.addEventListener("click", (event) => {
@@ -2541,6 +2542,10 @@ const splitAuthors = (author: string) =>
         categoryEditionDialog.append(header, notice);
         categoryEditionDialog.showModal();
       }
+
+      window.addEventListener("library:browse-editions", (event) => {
+        openCategoryEditions((event as CustomEvent).detail.button);
+      });
 
       async function openCategoryEditions(button: HTMLButtonElement) {
         const work = button.dataset.work || "";
