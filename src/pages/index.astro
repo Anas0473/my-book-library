@@ -1028,6 +1028,7 @@ const splitAuthors = (author: string) =>
         max-height: 90vh;
         padding: 0;
         border: 0;
+        outline: none;
         border-radius: 8px;
         background: transparent;
         overflow: visible;
@@ -2290,6 +2291,20 @@ const splitAuthors = (author: string) =>
         largeImage.src = largeSrc;
       }
 
+      function createCoverZoomButton(image: HTMLImageElement) {
+        const zoomButton = document.createElement("button");
+        zoomButton.type = "button";
+        zoomButton.className = "book-detail-cover-zoom";
+        zoomButton.setAttribute("aria-label", `View full-size ${image.alt.replace(/^Cover/, "cover")}`);
+        zoomButton.title = "View full-size cover";
+        zoomButton.addEventListener("mousedown", (event) => {
+          if (event.button === 0) event.preventDefault();
+        });
+        zoomButton.addEventListener("click", () => openCoverLightbox(image));
+        zoomButton.appendChild(image);
+        return zoomButton;
+      }
+
       const savedBookDetailDialog = document.createElement("dialog");
       savedBookDetailDialog.className = "edition-dialog saved-book-detail-dialog";
       savedBookDetailDialog.addEventListener("click", (event) => {
@@ -2357,17 +2372,7 @@ const splitAuthors = (author: string) =>
             };
           }
           image.src = largeSrc;
-          const zoomButton = document.createElement("button");
-          zoomButton.type = "button";
-          zoomButton.className = "book-detail-cover-zoom";
-          zoomButton.setAttribute("aria-label", `View full-size cover of ${title}`);
-          zoomButton.title = "View full-size cover";
-          zoomButton.addEventListener("mousedown", (event) => {
-            if (event.button === 0) event.preventDefault();
-          });
-          zoomButton.addEventListener("click", () => openCoverLightbox(image));
-          zoomButton.appendChild(image);
-          body.appendChild(zoomButton);
+          body.appendChild(createCoverZoomButton(image));
         } else {
           const placeholder = document.createElement("div");
           placeholder.className = "category-edition-preview-cover category-book-detail-no-cover";
@@ -2655,6 +2660,7 @@ const splitAuthors = (author: string) =>
               cover.className = "category-edition-preview-cover";
               cover.alt = `Cover of ${edition.title}`;
               cover.referrerPolicy = "no-referrer";
+              const zoomButton = createCoverZoomButton(cover);
               let triedStandardCover = false;
               cover.onerror = () => {
                 if (!triedStandardCover && cover.src !== coverUrl) {
@@ -2665,10 +2671,10 @@ const splitAuthors = (author: string) =>
                 const placeholder = document.createElement("div");
                 placeholder.className = "category-edition-preview-cover category-book-detail-no-cover";
                 placeholder.textContent = "No cover available";
-                cover.replaceWith(placeholder);
+                zoomButton.replaceWith(placeholder);
               };
               cover.src = coverUrl.replace(/-M\.jpg$/, "-L.jpg");
-              body.appendChild(cover);
+              body.appendChild(zoomButton);
             } else {
               const placeholder = document.createElement("div");
               placeholder.className = "category-edition-preview-cover category-book-detail-no-cover";
