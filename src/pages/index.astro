@@ -811,6 +811,61 @@ const splitAuthors = (author: string) =>
         line-height: 1.2;
         cursor: pointer;
       }
+      :global(.category-edition-preview-details .shelf-primary) {
+        flex: 1;
+        min-width: 0;
+        padding: 0.4rem 0.65rem;
+      }
+      :global(.category-edition-actions) {
+        display: flex;
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 0.5rem;
+        width: min(16.5rem, 100%);
+        max-width: 100%;
+        margin-top: 0.75rem;
+      }
+      :global(.category-edition-shelf-actions) {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 0.5rem;
+        width: 100%;
+        max-width: 100%;
+      }
+      :global(.category-edition-actions .category-edition-open-link),
+      :global(.category-edition-actions .shelf-control) {
+        width: min(9.75rem, 100%);
+        max-width: 100%;
+        height: 2.25rem;
+        box-sizing: border-box;
+      }
+      :global(.category-edition-actions .shelf-control > button) {
+        min-height: 0;
+        height: 100%;
+        box-sizing: border-box;
+      }
+      :global(.category-edition-delete) {
+        min-height: 0;
+        height: 2.25rem;
+        box-sizing: border-box;
+        padding: 0 0.65rem;
+        border: 1px solid var(--border-dark);
+        border-radius: 8px;
+        background: var(--surface-dark-2);
+        color: var(--danger);
+        font: inherit;
+        font-size: 0.78rem;
+        white-space: nowrap;
+        cursor: pointer;
+      }
+      :global(.category-edition-delete:hover) {
+        border-color: color-mix(in srgb, var(--danger) 55%, var(--border-dark));
+        background: color-mix(in srgb, var(--danger) 10%, var(--surface-dark-2));
+      }
+      :global(.category-edition-delete[hidden]) {
+        display: none;
+      }
       :global(.edition-dialog.saved-book-detail-dialog) {
         width: min(48rem, calc(100% - 2rem));
         max-height: min(84vh, 48rem);
@@ -1269,8 +1324,8 @@ const splitAuthors = (author: string) =>
                     <label class="batch-move-control">
                       Move to
                       <select class="batch-destination" disabled>
-                        <option value="Plan to Read">Want to Read</option>
-                        <option value="Reading">Currently Reading</option>
+                        <option value="Plan to Read">Plan to Read</option>
+                        <option value="Reading">Reading</option>
                         <option value="Read">Read</option>
                       </select>
                     </label>
@@ -1359,9 +1414,9 @@ const splitAuthors = (author: string) =>
                       )}
                       <span class="shelf-indicator">
                         ✓ {book.data.status === "Plan to Read"
-                          ? "Want to Read"
+                          ? "Plan to Read"
                           : book.data.status === "Reading"
-                            ? "Currently Reading"
+                            ? "Reading"
                             : "Read"}
                       </span>
                       <button
@@ -1372,6 +1427,8 @@ const splitAuthors = (author: string) =>
                         data-edition-key={(book.data as any).editionKey || ""}
                         data-edition-count={(book.data as any).editionCount || ""}
                         data-edition-language={(book.data as any).editionLanguage || ""}
+                        data-status={book.data.status || ""}
+                        data-hero-image={book.data.heroImage || ""}
                       >
                         {`Browse editions${(book.data as any).editionCount ? ` (${(book.data as any).editionCount})` : ""}`}
                       </button>
@@ -1524,8 +1581,8 @@ const splitAuthors = (author: string) =>
         }
       });
       const shelfDefinitions = [
-        { id: "plan-to-read", status: "Plan to Read", label: "Want to Read" },
-        { id: "reading", status: "Reading", label: "Currently Reading" },
+        { id: "plan-to-read", status: "Plan to Read", label: "Plan to Read" },
+        { id: "reading", status: "Reading", label: "Reading" },
         { id: "read", status: "Read", label: "Read" },
       ];
       const serverShelfCounts = new Map<string, number>();
@@ -1534,6 +1591,21 @@ const splitAuthors = (author: string) =>
       const editionLanguageCacheKey = "my-book-library:edition-languages";
       function normalizeEditionId(value: string) {
         return String(value || "").match(/OL\d+M/i)?.[0].toUpperCase() || "";
+      }
+      const detailLanguageNames = new Intl.DisplayNames(["en"], { type: "language", fallback: "none" });
+      const customDetailLanguageNames: Record<string, string> = {
+        cpf: "French-based Creole", mul: "Multiple languages", tib: "Tibetan", tlh: "Klingon",
+        zxx: "No linguistic content",
+      };
+      function getDetailLanguageName(value: string) {
+        const code = String(value || "").trim().toLowerCase();
+        if (!code || ["und", "unknown", "unknown language"].includes(code)) return "Unknown";
+        if (customDetailLanguageNames[code]) return customDetailLanguageNames[code];
+        try {
+          return detailLanguageNames.of(code) || value;
+        } catch {
+          return value;
+        }
       }
       function isKnownEditionLanguage(value: unknown): value is string {
         return typeof value === "string" && Boolean(value.trim()) && value.trim().toLowerCase() !== "unknown";
@@ -1870,6 +1942,8 @@ const splitAuthors = (author: string) =>
         editionButton.dataset.editionKey = book.editionKey || "";
         editionButton.dataset.editionCount = String(Number(book.editionCount) || 0);
         editionButton.dataset.editionLanguage = book.editionLanguage || "";
+        editionButton.dataset.status = book.status || "";
+        editionButton.dataset.heroImage = book.heroImage || "";
         editionButton.textContent = `Browse editions${book.editionCount ? ` (${book.editionCount})` : ""}`;
         details.appendChild(editionButton);
         if (book.openLibraryRemoved) {
@@ -2258,7 +2332,7 @@ const splitAuthors = (author: string) =>
         const metadata = document.createElement("dl");
         metadata.className = "category-edition-preview-meta";
         const metadataItems: Array<[string, string]> = [
-          ["Language", language],
+          ["Language", getDetailLanguageName(language)],
           ["Published", published],
           ["Publisher", publisher],
           ["ISBN", isbn],
@@ -2503,6 +2577,11 @@ const splitAuthors = (author: string) =>
           preview.hidden = true;
           let listScrollPosition = 0;
 
+          const isEditionInLists = (editionKey: string) =>
+            localBooks.some((book) => book.editionKey === editionKey) ||
+            Array.from(document.querySelectorAll<HTMLElement>("[data-content-book][data-edition-key]"))
+              .some((card) => card.dataset.editionKey === editionKey);
+
           const showEditionPreview = (edition: any) => {
             const backButton = document.createElement("button");
             backButton.type = "button";
@@ -2564,7 +2643,7 @@ const splitAuthors = (author: string) =>
               ? edition.pubDate.filter(Boolean).join(", ")
               : String(edition.pubDate || "Unknown");
             const metadataItems: Array<[string, string]> = [
-              ["Language", String(edition.language || "Unknown")],
+              ["Language", getDetailLanguageName(String(edition.language || ""))],
               ["Published", pubDate],
               ["Publisher", String(edition.publisher || "Unknown")],
               ["ISBN", String(edition.isbn || "Not listed")],
@@ -2582,12 +2661,135 @@ const splitAuthors = (author: string) =>
             details.appendChild(metadata);
 
             const openLink = document.createElement("a");
+            const editionActions = document.createElement("div");
+            editionActions.className = "category-edition-actions";
             openLink.className = "category-edition-open-link";
             openLink.href = edition.url;
             openLink.target = "_blank";
             openLink.rel = "noopener noreferrer";
             openLink.textContent = "Open in Open Library";
-            details.appendChild(openLink);
+            editionActions.appendChild(openLink);
+
+            const editionBook = {
+              key: edition.key,
+              workKey: work,
+              editionKey: edition.key,
+              editionUrl: edition.url,
+              title: edition.title || title,
+              subtitle: edition.subtitle || "",
+              author,
+              pubDate: Array.isArray(edition.pubDate)
+                ? edition.pubDate.filter(Boolean).join(", ")
+                : String(edition.pubDate || ""),
+              publisher: edition.publisher || "",
+              isbn: edition.isbn || "",
+              editionLanguage: edition.language || "",
+              editionHeroImage: edition.coverImage || "",
+              heroImage: button.dataset.heroImage || edition.coverImage || "",
+              editionCount,
+            };
+            const savedEdition = localBooks.find((book) =>
+              normalizeEditionId(book.editionKey || "") === normalizeEditionId(edition.key),
+            );
+            const contentEdition = Array.from(document.querySelectorAll<HTMLElement>(
+              "[data-content-book][data-edition-key]",
+            )).find((card) =>
+              normalizeEditionId(card.dataset.editionKey || "") === normalizeEditionId(edition.key),
+            );
+            let currentStatus = savedEdition?.status || contentEdition?.dataset.status || null;
+            let hasLocalSavedEdition = Boolean(savedEdition);
+            const shelfControl = document.createElement("div");
+            shelfControl.className = `shelf-control${currentStatus ? " is-saved" : ""}`;
+            const primaryButton = document.createElement("button");
+            primaryButton.type = "button";
+            primaryButton.className = "shelf-primary";
+            const toggleButton = document.createElement("button");
+            toggleButton.type = "button";
+            toggleButton.className = "shelf-toggle";
+            toggleButton.setAttribute("aria-label", "Choose a reading list");
+            toggleButton.setAttribute("aria-haspopup", "menu");
+            toggleButton.setAttribute("aria-expanded", "false");
+            toggleButton.textContent = "▾";
+            const shelfMenu = document.createElement("div");
+            shelfMenu.className = "shelf-menu";
+            shelfMenu.setAttribute("role", "menu");
+            shelfMenu.hidden = true;
+            const updateEditionShelfControl = (status: string | null) => {
+              currentStatus = status;
+              const shelf = shelfDefinitions.find((item) => item.status === status);
+              primaryButton.textContent = `${status ? "✓ " : ""}${shelf?.label || "Plan to Read"}`;
+              shelfControl.classList.toggle("is-saved", Boolean(status));
+              shelfMenu.querySelectorAll<HTMLButtonElement>("[data-status]").forEach((option) => {
+                if (option.dataset.status === status) option.setAttribute("aria-current", "true");
+                else option.removeAttribute("aria-current");
+              });
+            };
+            const saveEditionToShelf = (status: string) => {
+              if (!isShelfStatus(status)) return;
+              window.dispatchEvent(new CustomEvent("library:book-shelf-changed", {
+                detail: { ...editionBook, status, dateAdded: Date.now() },
+              }));
+              hasLocalSavedEdition = true;
+              deleteButton.hidden = false;
+              updateEditionShelfControl(status);
+              shelfMenu.hidden = true;
+              toggleButton.setAttribute("aria-expanded", "false");
+            };
+            shelfDefinitions.forEach((shelf) => {
+              const option = document.createElement("button");
+              option.type = "button";
+              option.setAttribute("role", "menuitem");
+              option.dataset.status = shelf.status;
+              option.textContent = shelf.label;
+              option.addEventListener("click", () => saveEditionToShelf(shelf.status));
+              shelfMenu.appendChild(option);
+            });
+            const deleteButton = document.createElement("button");
+            deleteButton.type = "button";
+            deleteButton.className = "category-edition-delete";
+            deleteButton.textContent = "Delete";
+            deleteButton.setAttribute("aria-label", "Delete from My Lists");
+            deleteButton.title = "Delete from My Lists";
+            deleteButton.hidden = !hasLocalSavedEdition;
+            deleteButton.addEventListener("click", () => {
+              if (!hasLocalSavedEdition) return;
+              window.dispatchEvent(new CustomEvent("library:book-removed", { detail: editionBook }));
+              hasLocalSavedEdition = false;
+              deleteButton.hidden = true;
+              updateEditionShelfControl(contentEdition?.dataset.status || null);
+              shelfMenu.hidden = true;
+              toggleButton.setAttribute("aria-expanded", "false");
+            });
+            const toggleEditionShelfMenu = () => {
+              const shouldOpen = shelfMenu.hidden;
+              document.querySelectorAll<HTMLElement>(".shelf-menu").forEach((menu) => {
+                menu.hidden = true;
+              });
+              document.querySelectorAll<HTMLButtonElement>(".shelf-toggle").forEach((toggle) => {
+                toggle.setAttribute("aria-expanded", "false");
+              });
+              shelfMenu.hidden = !shouldOpen;
+              toggleButton.setAttribute("aria-expanded", String(shouldOpen));
+            };
+            primaryButton.addEventListener("click", (event) => {
+              if (!currentStatus) {
+                saveEditionToShelf("Plan to Read");
+                return;
+              }
+              event.stopPropagation();
+              toggleEditionShelfMenu();
+            });
+            toggleButton.addEventListener("click", (event) => {
+              event.stopPropagation();
+              toggleEditionShelfMenu();
+            });
+            shelfControl.append(primaryButton, toggleButton, shelfMenu);
+            updateEditionShelfControl(currentStatus);
+            const shelfActions = document.createElement("div");
+            shelfActions.className = "category-edition-shelf-actions";
+            shelfActions.append(shelfControl, deleteButton);
+            editionActions.appendChild(shelfActions);
+            details.appendChild(editionActions);
             body.appendChild(details);
 
             heading.replaceWith(backButton);
@@ -2664,7 +2866,7 @@ const splitAuthors = (author: string) =>
                 .filter(Boolean)
                 .join(" · ");
               details.append(editionTitle, metadata);
-              const saved = localBooks.some((book) => book.editionKey === edition.key);
+              const saved = isEditionInLists(edition.key);
               const status = document.createElement("span");
               status.className = "edition-choice-label";
               status.textContent = saved ? "✓ Added" : "View details";
