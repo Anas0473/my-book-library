@@ -46,6 +46,8 @@ Any static assets, like images, can be placed in the `public/` directory.
 Click an unsaved book's status button to add it to Plan to Read. Click a yellow
 status button to remove the book from My Lists; use the arrow to choose a different
 list. Up to two separate Undo notifications are shown for the latest actions.
+Edition previews scale to the window height and expand while the list menu is open,
+so all list options stay visible without scrolling.
 Each individual removal has its own Undo button and expires after six seconds,
 independently of the other notification. Notifications include the book's subtitle
 when available so books with the same title can be distinguished. Adding a removed book again dismisses

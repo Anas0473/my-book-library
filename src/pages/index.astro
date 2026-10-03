@@ -798,11 +798,20 @@ const splitAuthors = (author: string) =>
         display: grid;
         flex: 1 1 auto;
         min-height: 0;
-        grid-template-rows: auto minmax(0, 1fr);
-        gap: 0.75rem;
+        grid-template-rows: minmax(0, 1fr);
       }
       :global(.category-edition-preview[hidden]) {
         display: none;
+      }
+      :global(.edition-dialog:has(.category-edition-preview:not([hidden]))) {
+        max-height: calc(100dvh - 1rem);
+      }
+      :global(.category-edition-preview-details) {
+        padding-bottom: 0;
+      }
+      /* Grow the box only while the reading-list menu is open so its options stay visible. */
+      :global(.category-edition-preview-details:has(.shelf-menu:not([hidden]))) {
+        padding-bottom: calc(7.2 * var(--preview-unit, 1rem) + 8px);
       }
       :global(.edition-summary[hidden]),
       :global(.edition-list[hidden]) {
@@ -894,9 +903,93 @@ const splitAuthors = (author: string) =>
       @media (min-width: 701px) {
         :global(.edition-dialog:has(.category-edition-preview:not([hidden]))),
         :global(.edition-dialog.saved-book-detail-dialog) {
-          /* Preserve the cover's share of the original 42rem dialog. */
-          --preview-cover-width: calc((42rem - 2.2rem - 2px - 1.25rem) * 0.4);
-          width: min(calc(var(--preview-cover-width) + 21.15rem + 2px), calc(100% - 2rem));
+          /*
+           * Preserve the cover's share of the original 42rem dialog. The edition preview
+           * scales --preview-unit with the viewport height so the whole box, including the
+           * reading-list menu, fits on screen without scrolling.
+           */
+          --preview-unit: 1rem;
+          --preview-cover-width: calc((42 - 2.2 - 1.25) * 0.4 * var(--preview-unit) - 0.8px);
+          width: min(calc(var(--preview-cover-width) + 21.15 * var(--preview-unit) + 2px), calc(100% - 2rem));
+        }
+        :global(.edition-dialog:has(.category-edition-preview:not([hidden]))) {
+          --preview-unit: clamp(0.75rem, calc((100dvh - 1rem - 2px) / 32.5), 1rem);
+          padding: calc(1.1 * var(--preview-unit));
+        }
+        :global(.edition-dialog:has(.category-edition-preview:not([hidden])) .edition-dialog-header) {
+          margin-bottom: calc(0.75 * var(--preview-unit));
+        }
+        :global(.edition-dialog .category-edition-preview-back),
+        :global(.edition-dialog:has(.category-edition-preview:not([hidden])) .edition-dialog-close) {
+          height: calc(2.25 * var(--preview-unit));
+          padding: calc(0.4 * var(--preview-unit)) calc(0.75 * var(--preview-unit));
+          font-size: calc(0.85 * var(--preview-unit));
+        }
+        :global(.category-edition-preview .category-edition-preview-body) {
+          gap: calc(1.25 * var(--preview-unit));
+        }
+        :global(.category-edition-preview .category-edition-preview-cover) {
+          max-height: calc(32 * var(--preview-unit));
+        }
+        :global(.category-edition-preview .category-edition-preview-details h4) {
+          font-size: calc(1.15 * var(--preview-unit));
+        }
+        :global(.category-edition-preview .category-edition-preview-subtitle),
+        :global(.category-edition-preview .category-book-detail-author) {
+          margin-top: calc(0.35 * var(--preview-unit));
+          font-size: calc(0.85 * var(--preview-unit));
+        }
+        :global(.category-edition-preview:not([hidden]) .category-edition-preview-body .category-edition-preview-meta) {
+          gap: calc(0.8 * var(--preview-unit));
+          column-gap: calc(1.5 * var(--preview-unit));
+          margin: var(--preview-unit) 0;
+        }
+        :global(.category-edition-preview .category-edition-preview-body .category-edition-preview-meta dt) {
+          font-size: calc(0.8 * var(--preview-unit));
+        }
+        :global(.category-edition-preview .category-edition-preview-body .category-edition-preview-meta dd) {
+          margin-top: calc(0.2 * var(--preview-unit));
+          font-size: calc(0.95 * var(--preview-unit));
+        }
+        :global(.category-edition-preview .category-edition-actions) {
+          width: min(calc(16.5 * var(--preview-unit)), 100%);
+          gap: calc(0.5 * var(--preview-unit));
+          margin-top: calc(0.75 * var(--preview-unit));
+        }
+        :global(.category-edition-preview .category-edition-shelf-actions) {
+          gap: calc(0.5 * var(--preview-unit));
+        }
+        :global(.category-edition-preview .category-edition-actions .category-edition-open-link),
+        :global(.category-edition-preview .category-edition-actions .shelf-control) {
+          width: min(calc(9.75 * var(--preview-unit)), 100%);
+          height: calc(2.25 * var(--preview-unit));
+        }
+        :global(.category-edition-preview .category-edition-open-link) {
+          min-height: 0;
+          padding: calc(0.4 * var(--preview-unit)) calc(0.7 * var(--preview-unit));
+          font-size: calc(0.8 * var(--preview-unit));
+        }
+        :global(.category-edition-preview .shelf-control .shelf-primary) {
+          padding: calc(0.4 * var(--preview-unit)) calc(0.65 * var(--preview-unit));
+          font-size: calc(0.78 * var(--preview-unit));
+        }
+        :global(.category-edition-preview .shelf-control .shelf-toggle) {
+          width: calc(1.75 * var(--preview-unit));
+          flex-basis: calc(1.75 * var(--preview-unit));
+          font-size: calc(0.78 * var(--preview-unit));
+        }
+        :global(.category-edition-preview .category-edition-delete) {
+          height: calc(2.25 * var(--preview-unit));
+          padding: 0 calc(0.65 * var(--preview-unit));
+          font-size: calc(0.78 * var(--preview-unit));
+        }
+        :global(.category-edition-preview .shelf-control .shelf-menu) {
+          padding: calc(0.3 * var(--preview-unit));
+        }
+        :global(.category-edition-preview .shelf-control .shelf-menu button) {
+          min-height: calc(2.1 * var(--preview-unit));
+          padding: calc(0.45 * var(--preview-unit)) calc(0.6 * var(--preview-unit));
+          font-size: calc(0.8 * var(--preview-unit));
         }
         :global(.edition-dialog.saved-book-detail-dialog) {
           /* Keep saved-book covers at their original 48rem-dialog size. */
@@ -909,7 +1002,7 @@ const splitAuthors = (author: string) =>
         }
         :global(.edition-dialog:has(.category-edition-preview:not([hidden]) .category-book-detail-no-cover)),
         :global(.saved-book-detail-dialog:has(.category-book-detail-no-cover)) {
-          --preview-cover-width: 16rem;
+          --preview-cover-width: calc(16 * var(--preview-unit));
         }
         :global(.category-edition-preview-body > .category-edition-preview-cover.category-book-detail-no-cover) {
           width: 100%;
@@ -1375,7 +1468,7 @@ const splitAuthors = (author: string) =>
                   <input
                     type="text"
                     class="search-input"
-                    placeholder="Filter by title, subtitle, author, or ISBN..."
+                    placeholder="Filter by title, subtitle, author, or ISBN"
                   />
                   <button type="button" class="filter-clear-button" aria-label="Clear filter" title="Clear filter" hidden>×</button>
                 </div>
