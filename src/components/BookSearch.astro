@@ -1623,8 +1623,20 @@ const { libraryBooks = [] } = Astro.props;
 
         updateShelfControl(currentStatus || 'Plan to Read');
 
-        primaryButton.addEventListener('click', () => {
-          const updatedBook = saveBookToShelf(book, currentStatus || 'Plan to Read');
+        const toggleShelfMenu = () => {
+          const shouldOpen = menu.hidden;
+          closeShelfMenus();
+          menu.hidden = !shouldOpen;
+          toggleButton.setAttribute('aria-expanded', String(shouldOpen));
+        };
+
+        primaryButton.addEventListener('click', (event) => {
+          if (hasSavedShelf) {
+            event.stopPropagation();
+            toggleShelfMenu();
+            return;
+          }
+          const updatedBook = saveBookToShelf(book, 'Plan to Read');
           currentStatus = updatedBook.status;
           hasSavedShelf = true;
           hasLocalSavedBook = true;
@@ -1633,10 +1645,7 @@ const { libraryBooks = [] } = Astro.props;
 
         toggleButton.addEventListener('click', (event) => {
           event.stopPropagation();
-          const shouldOpen = menu.hidden;
-          closeShelfMenus();
-          menu.hidden = !shouldOpen;
-          toggleButton.setAttribute('aria-expanded', String(shouldOpen));
+          toggleShelfMenu();
         });
 
         menu.querySelectorAll<HTMLButtonElement>('[data-status]').forEach((option) => {
