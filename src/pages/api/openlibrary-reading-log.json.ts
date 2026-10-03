@@ -1,4 +1,5 @@
 import type { APIRoute } from 'astro';
+import { findMatchingEdition } from '../../lib/editions';
 
 const shelves = [
   { id: 'want-to-read', status: 'Plan to Read' },
@@ -103,6 +104,7 @@ export const GET: APIRoute = async ({ url }) => {
             key: work.key,
             workKey: work.key,
             editionKey,
+            loggedEditionKey: editionKey,
             editionUrl: editionKey ? `https://openlibrary.org${editionKey}` : null,
             editionHeroImage: editionId
               ? `https://covers.openlibrary.org/b/olid/${editionId}-M.jpg?default=false`
@@ -132,6 +134,7 @@ export const GET: APIRoute = async ({ url }) => {
     }
 
     const editionsToEnrich = Array.from(books.values()).filter((book) => book.editionKey);
+    const editionsWithCovers = new Set<string>();
     for (let offset = 0; offset < editionsToEnrich.length; offset += editionBatchSize) {
       if (requestCount > 0) {
         await new Promise((resolve) => setTimeout(resolve, requestDelayMs));
@@ -176,6 +179,7 @@ export const GET: APIRoute = async ({ url }) => {
             book.publisher = work.publisher?.[0] || book.publisher || null;
             if (edition.cover_i) {
               book.editionHeroImage = `https://covers.openlibrary.org/b/id/${edition.cover_i}-M.jpg`;
+              editionsWithCovers.add(book.loggedEditionKey);
             }
           }
         }
@@ -184,6 +188,35 @@ export const GET: APIRoute = async ({ url }) => {
       } finally {
         clearTimeout(timeout);
       }
+    }
+
+    // Logged editions without a cover are displayed as the work's newest edition that has one.
+    const coverlessBooks = editionsToEnrich.filter(
+      (book) => !editionsWithCovers.has(book.loggedEditionKey),
+    );
+    for (const book of coverlessBooks) {
+      if (requestCount > 0) {
+        await new Promise((resolve) => setTimeout(resolve, requestDelayMs));
+      }
+      requestCount++;
+
+      const workPath = book.workKey.replace(/^\/+/, '');
+      const hasCover = (edition: any) =>
+        Array.isArray(edition?.covers) && edition.covers.some((coverId: any) => Number(coverId) > 0);
+      const edition = await findMatchingEdition(workPath, '', undefined, 5000, true);
+      if (!hasCover(edition)) continue;
+
+      const coverId = edition.covers.find((id: any) => Number(id) > 0);
+      book.editionKey = edition.key;
+      book.editionUrl = `https://openlibrary.org${edition.key}`;
+      book.editionHeroImage = `https://covers.openlibrary.org/b/id/${coverId}-M.jpg`;
+      book.title = edition.title || book.title;
+      book.subtitle = edition.subtitle || null;
+      book.pubDate = edition.publish_date || book.pubDate;
+      book.isbn = edition.isbn_13?.[0] || edition.isbn_10?.[0] || null;
+      book.publisher = edition.publishers?.[0] || null;
+      const editionLanguage = edition.languages?.[0]?.key?.split('/').pop();
+      if (editionLanguage) book.editionLanguage = editionLanguage;
     }
 
     return jsonResponse({

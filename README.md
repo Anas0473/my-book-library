@@ -63,6 +63,9 @@ Click a result's cover, title, or non-interactive area to view its details.
 Browse editions opens the edition list; selecting an edition shows its details
 and lets you add that specific edition to a list without changing the search result.
 
+When syncing from Open Library, a logged edition without a cover is shown as the
+work's newest edition that has one. Editions you pick in this app are kept as chosen.
+
 ## Optional Search Fallback
 
 Search uses Open Library first, then Internet Archive's cataloged books when Open Library is unavailable. No API key is required for the Internet Archive fallback.

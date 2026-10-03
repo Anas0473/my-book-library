@@ -2202,8 +2202,10 @@ const splitAuthors = (author: string) =>
           );
 
           function matchesSyncedBook(existingBook: any, syncedBook: any) {
-            if (existingBook.editionKey && syncedBook.editionKey) {
-              return existingBook.editionKey === syncedBook.editionKey;
+            const existingEditionKey = existingBook.loggedEditionKey || existingBook.editionKey;
+            const syncedEditionKey = syncedBook.loggedEditionKey || syncedBook.editionKey;
+            if (existingEditionKey && syncedEditionKey) {
+              return existingEditionKey === syncedEditionKey;
             }
             if (existingBook.openLibrarySyncUsername || syncedBook.openLibrarySyncUsername) {
               const existingWorkKey = existingBook.workKey || existingBook.key;

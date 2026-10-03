@@ -317,9 +317,8 @@ const { libraryBooks = [] } = Astro.props;
     border-radius: 6px;
   }
   :global(.search-card img) {
-    object-fit: cover;
-    background: var(--fill);
-    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.28);
+    object-fit: contain;
+    background: var(--page-background, #1c1c1c);
   }
   :global(.search-cover-placeholder) {
     display: flex;
