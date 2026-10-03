@@ -751,6 +751,13 @@ const { libraryBooks = [] } = Astro.props;
     const image = event.target;
     if (!(image instanceof HTMLImageElement) || !image.matches('.search-card img')) return;
 
+    const fallback = image.dataset.fallbackImage;
+    if (fallback && image.getAttribute('src') !== fallback) {
+      delete image.dataset.fallbackImage;
+      image.src = fallback;
+      return;
+    }
+
     const placeholder = document.createElement('div');
     placeholder.className = 'search-cover-placeholder';
     placeholder.textContent = 'NO IMAGE';
@@ -769,8 +776,6 @@ const { libraryBooks = [] } = Astro.props;
   let currentAuthorOnly = false;
   let currentAuthorKey = '';
   let currentAuthorExact = false;
-  let savedFirstResultsKey = '';
-  let savedFirstResults: any = null;
   function updateSearchClearButton() {
     clearSearchButton.hidden = searchInput.value.length === 0;
   }
@@ -1017,7 +1022,6 @@ const { libraryBooks = [] } = Astro.props;
     const excludeIsbnParams = excludedIsbns
       .map((isbn: string) => `&exclude_isbn=${encodeURIComponent(isbn)}`)
       .join('');
-    const searchCacheKey = JSON.stringify([query, authorOnly, authorKey, authorExact, sort, language, hideAdded]);
 
     resultsContainer.innerHTML = '<p>Searching...</p>';
     summaryContainer.innerHTML = '';
@@ -1032,24 +1036,15 @@ const { libraryBooks = [] } = Astro.props;
       const authorExactParam = authorExact ? '&author_exact=1' : '';
       const sortParam = `&sort=${encodeURIComponent(sort)}`;
       const languageParam = language ? `&language=${encodeURIComponent(language)}` : '';
-      let data: any;
-      if (savedFirstResultsKey === searchCacheKey && savedFirstResults) {
-        data = savedFirstResults;
-      } else {
-        const res = await fetch(`/api/search-books.json?q=${encodeURIComponent(query)}${authorParam}${authorKeyParam}${authorExactParam}${sortParam}${languageParam}${excludeWorkKeyParams}${excludeIsbnParams}&discover_languages=1&page=${page}&limit=${pageSize}`);
-        data = await res.json();
-        if (data.allResults) {
-          savedFirstResultsKey = searchCacheKey;
-          savedFirstResults = data;
-        }
-      }
+      const res = await fetch(`/api/search-books.json?q=${encodeURIComponent(query)}${authorParam}${authorKeyParam}${authorExactParam}${sortParam}${languageParam}${excludeWorkKeyParams}${excludeIsbnParams}&discover_languages=1&page=${page}&limit=${pageSize}`);
+      const data = await res.json();
 
       if (requestId !== searchRequestId) return;
 
       const { books = [], totalResults = 0, totalPages = 0, languages = [] } = data;
       const searchUnavailable = data.searchUnavailable === true;
       const isInternetArchive = data.searchProvider === 'internet-archive';
-      const localMatches = savedBooks.filter((book: any) => {
+      const localMatches = isInternetArchive || searchUnavailable ? [] : savedBooks.filter((book: any) => {
         const title = String(book.title || '').toLowerCase();
         const subtitle = String(book.subtitle || '').toLowerCase();
         const author = String(book.author || '').toLowerCase();
@@ -1103,7 +1098,7 @@ const { libraryBooks = [] } = Astro.props;
       const localOnlyMatches = !searchUnavailable && !hideAdded && page === 1
         ? localMatches.filter((book: any) => !book.workKey && !localMatchesOnPage.includes(book))
         : [];
-      const useLocalResults = !searchUnavailable && hasLocalMatches && books.length === 0;
+      const useLocalResults = !searchUnavailable && !isInternetArchive && hasLocalMatches && books.length === 0;
       const prioritizedLocalMatches = !searchUnavailable && !hideAdded && (data.allResults || useLocalResults)
         ? localMatches
         : hideAdded ? [] : [...localMatchesOnPage, ...localOnlyMatches];
@@ -1151,7 +1146,7 @@ const { libraryBooks = [] } = Astro.props;
         ? orderedResults.slice((page - 1) * pageSize, page * pageSize)
         : orderedResults;
           const searchNotice = isInternetArchive
-            ? 'Open Library is temporarily unavailable. Please try again later.'
+            ? 'Open Library is temporarily unavailable. Showing Internet Archive results instead.'
             : searchUnavailable
               ? 'Open Library search is temporarily unavailable. Please try again later.'
             : totalResults === 0 && localMatches.length > 0
@@ -1226,7 +1221,7 @@ const { libraryBooks = [] } = Astro.props;
       }
 
       resultsContainer.innerHTML = displayBooks.map((book: any, index: number) => {
-        const matchedSavedBook = savedBooks.find((item: any) => isSameBook(item, book));
+        const matchedSavedBook = isInternetArchive ? undefined : savedBooks.find((item: any) => isSameBook(item, book));
         const firstEditionKey = Array.isArray(book.editionKeys) ? book.editionKeys[0] : null;
         const savedEditionKey = matchedSavedBook?.editionKey || book.editionKey || firstEditionKey;
         const savedEditionId = String(savedEditionKey || '').match(/OL\d+M/i)?.[0];
@@ -1276,6 +1271,9 @@ const { libraryBooks = [] } = Astro.props;
       }).join('');
 
       resultsContainer.querySelectorAll<HTMLElement>('.search-card').forEach((card, index) => {
+        const image = card.querySelector<HTMLImageElement>('img');
+        const fallback = displayBooks[index].heroImage;
+        if (image && fallback) image.dataset.fallbackImage = fallback;
         const title = card.querySelector<HTMLElement>('h5');
         if (title) {
           title.tabIndex = 0;

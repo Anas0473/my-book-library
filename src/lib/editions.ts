@@ -5,6 +5,7 @@ export async function findMatchingEdition(
   language?: string,
   timeoutMs = 5000,
   preferNewest = false,
+  requireAvailable = false,
 ) {
   try {
     const controller = new AbortController();
@@ -22,7 +23,12 @@ export async function findMatchingEdition(
     } finally {
       clearTimeout(timeout);
     }
-    if (!response.ok) return null;
+    if (!response.ok) {
+      if (requireAvailable && response.status !== 404) {
+        throw new Error(`Open Library editions returned ${response.status}`);
+      }
+      return null;
+    }
 
     const data = await response.json();
     const entries = (data.entries || []).filter((edition: any) => /^\/books\/OL\d+M$/i.test(edition.key || ''));
@@ -63,7 +69,8 @@ export async function findMatchingEdition(
       newestWithCover(titleMatches) ||
       null
     );
-  } catch {
+  } catch (error) {
+    if (requireAvailable) throw error;
     return null;
   }
 }

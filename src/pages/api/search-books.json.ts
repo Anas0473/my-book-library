@@ -1,14 +1,15 @@
 import type { APIRoute } from 'astro';
-import { findMatchingEdition } from '../../lib/editions';
+import { findMatchingEdition as lookupMatchingEdition } from '../../lib/editions';
+
+const findMatchingEdition = (
+  ...args: Parameters<typeof lookupMatchingEdition>
+) => lookupMatchingEdition(args[0], args[1], args[2], args[3], args[4], true);
 
 const languageEditionCache = new Map<string, { expiresAt: number; edition: any | null }>();
 const searchResponseCache = new Map<string, { expiresAt: number; data: any }>();
 const selectedEditionCache = new Map<string, { expiresAt: number; edition: any | null }>();
 
 async function fetchOpenLibrarySearch(apiUrl: string) {
-  const cached = searchResponseCache.get(apiUrl);
-  if (cached && cached.expiresAt > Date.now()) return cached.data;
-
   for (let attempt = 0; attempt < 2; attempt++) {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 15000);
@@ -19,7 +20,6 @@ async function fetchOpenLibrarySearch(apiUrl: string) {
       });
       if (response.ok) {
         const data = await response.json();
-        searchResponseCache.set(apiUrl, { expiresAt: Date.now() + 10 * 60 * 1000, data });
         return data;
       }
     } catch {
@@ -47,8 +47,9 @@ async function fetchSelectedEdition(editionKey: string) {
       headers: { 'User-Agent': 'my-book-library/0.0.1' },
     });
     if (response.ok) edition = await response.json();
-  } catch {
-    // Keep the work-level result usable when edition details are unavailable.
+    else if (response.status !== 404) {
+      throw new Error(`Open Library edition returned ${response.status}`);
+    }
   } finally {
     clearTimeout(timeout);
   }
@@ -221,6 +222,18 @@ export const GET: APIRoute = async ({ url }) => {
     || (directIdMatch?.[1].toUpperCase().endsWith('M') ? 'books' : directIdMatch ? 'works' : null);
   const directId = directUrlMatch?.[2] || directIdMatch?.[1];
 
+  const unavailableResponse = async () => {
+    const fallback = await fetchInternetArchiveFallback({
+      query, authorOnly, isIsbnSearch, normalizedIsbn, language, sort, page, limit,
+    });
+    return new Response(
+      JSON.stringify(fallback || {
+        books: [], totalResults: 0, page, totalPages: 0, searchUnavailable: true,
+      }),
+      { status: 200, headers: jsonHeaders },
+    );
+  };
+
   try {
     if (directType && directId) {
       const controller = new AbortController();
@@ -236,6 +249,7 @@ export const GET: APIRoute = async ({ url }) => {
       }
 
       if (!directResponse.ok) {
+        if (directResponse.status !== 404) return unavailableResponse();
         return new Response(
           JSON.stringify({ books: [], totalResults: 0, page: 1, totalPages: 0 }),
           { status: 200, headers: jsonHeaders },
@@ -353,24 +367,7 @@ export const GET: APIRoute = async ({ url }) => {
     let data = await fetchOpenLibrarySearch(apiUrl);
 
     if (!data) {
-      const fallbackParams = {
-        query,
-        authorOnly,
-        isIsbnSearch,
-        normalizedIsbn,
-        language,
-        sort,
-        page,
-        limit,
-      };
-      const fallback = await fetchInternetArchiveFallback(fallbackParams);
-      if (fallback) {
-        return new Response(JSON.stringify(fallback), { status: 200, headers: jsonHeaders });
-      }
-      return new Response(
-        JSON.stringify({ books: [], totalResults: 0, page, totalPages: 0, searchUnavailable: true }),
-        { status: 200, headers: jsonHeaders }
-      );
+      return unavailableResponse();
     }
     if (useOpenLibrarySort && sort === 'title-desc') {
       const reverseCount = Math.max(0, Math.min(limit, (Number(data.numFound) || 0) - offset));
@@ -380,10 +377,7 @@ export const GET: APIRoute = async ({ url }) => {
         searchParams.set('limit', String(reverseCount));
         data = await fetchOpenLibrarySearch(`https://openlibrary.org/search.json?${searchParams}`);
         if (!data) {
-          return new Response(
-            JSON.stringify({ books: [], totalResults: 0, page, totalPages: 0, searchUnavailable: true }),
-            { status: 200, headers: jsonHeaders }
-          );
+          return unavailableResponse();
         }
       }
       data = { ...data, docs: [...(data.docs || [])].reverse() };
@@ -398,8 +392,9 @@ export const GET: APIRoute = async ({ url }) => {
           headers: { 'User-Agent': 'my-book-library/0.0.1' },
         });
         if (isbnResponse.ok) isbnEdition = await isbnResponse.json();
-      } catch {
-        // Keep the ISBN work result usable if edition lookup is unavailable.
+        else if (isbnResponse.status !== 404) {
+          throw new Error(`Open Library ISBN lookup returned ${isbnResponse.status}`);
+        }
       } finally {
         clearTimeout(isbnTimeout);
       }
@@ -461,9 +456,11 @@ export const GET: APIRoute = async ({ url }) => {
         });
       }
     }
+    const languageDiscoveryUrl = `https://openlibrary.org/search.json?${languageSearchParams}`;
     const languageDiscoveryData = discoverLanguages
-      ? await fetchOpenLibrarySearch(`https://openlibrary.org/search.json?${languageSearchParams}`)
+      ? languageDiscoveryUrl === apiUrl ? data : await fetchOpenLibrarySearch(languageDiscoveryUrl)
       : null;
+    if (discoverLanguages && !languageDiscoveryData) return unavailableResponse();
     const languageOptionDocs = languageDiscoveryData?.docs || authorMatchingDocs;
     const languageOptionMatchingDocs = authorExact
       ? languageOptionDocs.filter((doc: any) =>
@@ -624,9 +621,6 @@ export const GET: APIRoute = async ({ url }) => {
     );
   } catch (error) {
     console.error('API Fetch error:', error);
-    return new Response(
-      JSON.stringify({ books: [], totalResults: 0, page, totalPages: 0, searchUnavailable: true }),
-      { status: 200, headers: jsonHeaders }
-    );
+    return unavailableResponse();
   }
 };
