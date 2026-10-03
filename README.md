@@ -52,8 +52,9 @@ when available so books with the same title can be distinguished. Adding a remov
 its outdated notification. Batch deletions use one notification to undo the
 entire batch.
 
-In Book details, click the cover (or focus it and press Enter) to open the
-full-size cover viewer. Click the viewer or press Escape to return to Book details.
+In Book details or an edition preview, click the cover (or focus it and press Enter)
+to open the full-size cover viewer. Click the viewer or press Escape to return
+to the details.
 
 ## Optional Search Fallback
 
