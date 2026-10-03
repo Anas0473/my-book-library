@@ -1610,6 +1610,7 @@ const { libraryBooks = [] } = Astro.props;
         function updateShelfControl(status: string) {
           const label = shelfLabels[status] || shelfLabels['Plan to Read'];
           primaryButton.textContent = `${hasSavedShelf ? '✓ ' : ''}${label}`;
+          primaryButton.title = hasSavedShelf ? 'Remove from My Lists' : 'Add to Plan to Read';
           control.classList.toggle('is-saved', hasSavedShelf);
           removeButton.hidden = !hasLocalSavedBook;
           menu.querySelectorAll<HTMLButtonElement>('[data-status]').forEach((option) => {
@@ -1633,7 +1634,7 @@ const { libraryBooks = [] } = Astro.props;
         primaryButton.addEventListener('click', (event) => {
           if (hasSavedShelf) {
             event.stopPropagation();
-            toggleShelfMenu();
+            removeBookFromShelf();
             return;
           }
           const updatedBook = saveBookToShelf(book, 'Plan to Read');
@@ -1660,18 +1661,23 @@ const { libraryBooks = [] } = Astro.props;
           });
         });
 
-        removeButton.addEventListener('click', () => {
+        const removeBookFromShelf = () => {
           if (!hasLocalSavedBook) return;
-
-          const updatedBooks = getSavedBooks().filter((item: any) => !isSameBook(item, book));
-          localStorage.setItem(savedBooksKey, JSON.stringify(updatedBooks));
+          window.dispatchEvent(new CustomEvent('library:book-removed', { detail: book }));
           currentStatus = collectionBook?.status || null;
           hasSavedShelf = Boolean(collectionBook);
           hasLocalSavedBook = false;
           updateShelfControl('Plan to Read');
           menu.hidden = true;
           toggleButton.setAttribute('aria-expanded', 'false');
-          window.dispatchEvent(new CustomEvent('library:book-removed', { detail: book }));
+        };
+        removeButton.addEventListener('click', removeBookFromShelf);
+        control.addEventListener('library:shelf-sync', () => {
+          const saved = getSavedBooks().find((item: any) => isSameBook(item, book));
+          currentStatus = saved?.status || collectionBook?.status || null;
+          hasSavedShelf = Boolean(saved || collectionBook);
+          hasLocalSavedBook = Boolean(saved);
+          updateShelfControl(currentStatus || 'Plan to Read');
         });
       });
 

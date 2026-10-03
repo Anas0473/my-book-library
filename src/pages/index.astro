@@ -309,19 +309,27 @@ const splitAuthors = (author: string) =>
       .theme-rgb-input:focus {
         border-color: var(--accent);
       }
-      :global(.shelf-undo-toast) {
+      :global(.shelf-undo-stack) {
         position: fixed;
         bottom: 1rem;
         left: 50%;
         z-index: 20;
         display: flex;
+        flex-direction: column;
+        gap: 0.5rem;
+        width: min(32rem, calc(100vw - 2rem));
+        transform: translateX(-50%);
+        pointer-events: none;
+      }
+      :global(.shelf-undo-toast) {
+        display: flex;
         align-items: center;
         justify-content: space-between;
         gap: 1rem;
-        width: min(32rem, calc(100vw - 2rem));
+        width: 100%;
         box-sizing: border-box;
         padding: 0.75rem 1rem;
-        transform: translateX(-50%);
+        pointer-events: auto;
         border: 1px solid var(--border-dark);
         border-radius: 12px;
         background: var(--surface-dark);
@@ -340,11 +348,15 @@ const splitAuthors = (author: string) =>
         font-weight: 600;
         cursor: pointer;
       }
+      :global(.shelf-undo-toast span) {
+        min-width: 0;
+        overflow-wrap: anywhere;
+      }
       :global(.shelf-undo-toast button:hover) {
         background: var(--accent-strong);
       }
       @media (max-width: 700px) {
-        :global(.shelf-undo-toast) {
+        :global(.shelf-undo-stack) {
           bottom: 5.5rem;
         }
       }
@@ -1745,7 +1757,10 @@ const splitAuthors = (author: string) =>
         primaryButton.type = "button";
         primaryButton.className = "shelf-primary";
         primaryButton.textContent = `✓ ${currentShelf.label}`;
-        primaryButton.addEventListener("click", () => toggleShelfMenu());
+        primaryButton.title = "Remove from My Lists";
+        primaryButton.addEventListener("click", () => {
+          window.dispatchEvent(new CustomEvent("library:book-removed", { detail: book }));
+        });
 
         const toggleButton = document.createElement("button");
         toggleButton.type = "button";
@@ -2725,6 +2740,7 @@ const splitAuthors = (author: string) =>
               currentStatus = status;
               const shelf = shelfDefinitions.find((item) => item.status === status);
               primaryButton.textContent = `${status ? "✓ " : ""}${shelf?.label || "Plan to Read"}`;
+              primaryButton.title = status ? "Remove from My Lists" : "Add to Plan to Read";
               shelfControl.classList.toggle("is-saved", Boolean(status));
               shelfMenu.querySelectorAll<HTMLButtonElement>("[data-status]").forEach((option) => {
                 if (option.dataset.status === status) option.setAttribute("aria-current", "true");
@@ -2758,7 +2774,7 @@ const splitAuthors = (author: string) =>
             deleteButton.setAttribute("aria-label", "Delete from My Lists");
             deleteButton.title = "Delete from My Lists";
             deleteButton.hidden = !hasLocalSavedEdition;
-            deleteButton.addEventListener("click", () => {
+            const removeEditionFromShelf = () => {
               if (!hasLocalSavedEdition) return;
               window.dispatchEvent(new CustomEvent("library:book-removed", { detail: editionBook }));
               hasLocalSavedEdition = false;
@@ -2766,6 +2782,13 @@ const splitAuthors = (author: string) =>
               updateEditionShelfControl(contentEdition?.dataset.status || null);
               shelfMenu.hidden = true;
               toggleButton.setAttribute("aria-expanded", "false");
+            };
+            deleteButton.addEventListener("click", removeEditionFromShelf);
+            shelfControl.addEventListener("library:shelf-sync", () => {
+              const saved = localBooks.find((book) => isSameBook(book, editionBook));
+              hasLocalSavedEdition = Boolean(saved);
+              deleteButton.hidden = !hasLocalSavedEdition;
+              updateEditionShelfControl(saved?.status || (contentEdition?.isConnected ? contentEdition.dataset.status : null) || null);
             });
             const toggleEditionShelfMenu = () => {
               const shouldOpen = shelfMenu.hidden;
@@ -2784,7 +2807,7 @@ const splitAuthors = (author: string) =>
                 return;
               }
               event.stopPropagation();
-              toggleEditionShelfMenu();
+              removeEditionFromShelf();
             });
             toggleButton.addEventListener("click", (event) => {
               event.stopPropagation();
@@ -3433,45 +3456,78 @@ const splitAuthors = (author: string) =>
         });
       });
 
-      let shelfUndoTimer = 0;
-      let activeUndoBatchId = "";
-      let shelfUndoActions: Array<{ book: any; previousBook: any; deletedIndex?: number }> = [];
+      type ShelfUndoAction = { book: any; previousBook: any; deletedIndex?: number };
+      type ShelfUndoNotification = {
+        batchId: string;
+        actions: ShelfUndoAction[];
+        toast: HTMLDivElement;
+        timer: number;
+      };
+      const shelfUndoNotifications: ShelfUndoNotification[] = [];
+      const shelfUndoStack = document.createElement("div");
+      shelfUndoStack.className = "shelf-undo-stack";
+      document.body.appendChild(shelfUndoStack);
+      document.addEventListener("close", () => {
+        if (!shelfUndoStack.closest("dialog[open]")) document.body.appendChild(shelfUndoStack);
+      }, true);
 
-      function dismissShelfUndoToast() {
-        window.clearTimeout(shelfUndoTimer);
-        document.querySelector<HTMLElement>(".shelf-undo-toast")?.remove();
-        shelfUndoActions = [];
-        activeUndoBatchId = "";
+      function syncShelfControls() {
+        document.querySelectorAll<HTMLElement>(".shelf-control").forEach((control) => {
+          control.dispatchEvent(new Event("library:shelf-sync"));
+        });
+      }
+
+      function dismissShelfUndoToast(notification: ShelfUndoNotification) {
+        window.clearTimeout(notification.timer);
+        notification.toast.remove();
+        const index = shelfUndoNotifications.indexOf(notification);
+        if (index >= 0) shelfUndoNotifications.splice(index, 1);
+      }
+
+      function invalidateShelfUndo(book: any) {
+        [...shelfUndoNotifications].forEach((notification) => {
+          if (notification.actions.some((action) => isSameBook(action.book, book))) {
+            dismissShelfUndoToast(notification);
+          }
+        });
       }
 
       function showShelfUndoToast(book: any, previousBook: any, batchId = "", deletedIndex?: number) {
-        if (batchId && batchId === activeUndoBatchId) {
-          shelfUndoActions.push({ book, previousBook, deletedIndex });
-        } else {
-          activeUndoBatchId = batchId;
-          shelfUndoActions = [{ book, previousBook, deletedIndex }];
-        }
-
-        let toast = document.querySelector<HTMLElement>(".shelf-undo-toast");
-        if (!toast) {
-          toast = document.createElement("div");
+        let notification = batchId
+          ? shelfUndoNotifications.find((item) => item.batchId === batchId)
+          : undefined;
+        if (!notification) {
+          const toast = document.createElement("div");
           toast.className = "shelf-undo-toast";
           toast.setAttribute("role", "status");
           toast.setAttribute("aria-live", "polite");
-          document.body.appendChild(toast);
+          notification = { batchId, actions: [], toast, timer: 0 };
+          shelfUndoNotifications.push(notification);
+          shelfUndoStack.appendChild(toast);
+          if (shelfUndoNotifications.length > 2) dismissShelfUndoToast(shelfUndoNotifications[0]);
         }
+        const currentNotification = notification;
+        const { toast, actions } = currentNotification;
+        actions.push({ book, previousBook, deletedIndex });
+        const openDialog = document.querySelector<HTMLDialogElement>("dialog[open]");
+        (openDialog || document.body).appendChild(shelfUndoStack);
 
         const targetShelf = shelfDefinitions.find((shelf) => shelf.status === book.status);
         const isDelete = deletedIndex !== undefined;
         const message = document.createElement("span");
+        const notificationBook = isDelete ? previousBook : book;
+        const subtitle = String(notificationBook.subtitle || "").trim();
+        const displayTitle = subtitle
+          ? `${notificationBook.title}: ${subtitle}`
+          : notificationBook.title;
         if (isDelete) {
-          message.textContent = shelfUndoActions.length > 1
-            ? `${shelfUndoActions.length} books deleted.`
-            : `Deleted "${previousBook.title}".`;
+          message.textContent = actions.length > 1
+            ? `${actions.length} books deleted.`
+            : `Deleted "${displayTitle}".`;
         } else {
-          message.textContent = shelfUndoActions.length > 1
-            ? `${shelfUndoActions.length} books moved to ${targetShelf?.label || book.status}.`
-            : `Moved "${book.title}" to ${targetShelf?.label || book.status}.`;
+          message.textContent = actions.length > 1
+            ? `${actions.length} books moved to ${targetShelf?.label || book.status}.`
+            : `Moved "${displayTitle}" to ${targetShelf?.label || book.status}.`;
         }
         const undoButton = document.createElement("button");
         undoButton.type = "button";
@@ -3479,7 +3535,7 @@ const splitAuthors = (author: string) =>
         undoButton.addEventListener("click", () => {
           let restoredCount = 0;
           // Restore deletions last-first so each saved index refers to the list as it was then.
-          [...shelfUndoActions].reverse().forEach(({ book: movedBook, previousBook: oldBook, deletedIndex: oldIndex }) => {
+          [...actions].reverse().forEach(({ book: movedBook, previousBook: oldBook, deletedIndex: oldIndex }) => {
             if (oldIndex !== undefined) {
               if (localBooks.some((item) => isSameBook(item, oldBook))) return;
               localBooks.splice(Math.min(oldIndex, localBooks.length), 0, oldBook);
@@ -3512,18 +3568,20 @@ const splitAuthors = (author: string) =>
             localStorage.setItem(savedBooksKey, JSON.stringify(localBooks));
             updateShelfCounts();
             panelRefreshers.forEach((refreshPanel) => refreshPanel());
+            syncShelfControls();
           }
-          dismissShelfUndoToast();
+          dismissShelfUndoToast(currentNotification);
         });
         toast.replaceChildren(message, undoButton);
-        window.clearTimeout(shelfUndoTimer);
-        shelfUndoTimer = window.setTimeout(dismissShelfUndoToast, 6000);
+        window.clearTimeout(currentNotification.timer);
+        currentNotification.timer = window.setTimeout(() => dismissShelfUndoToast(currentNotification), 6000);
       }
 
       window.addEventListener("library:book-shelf-changed", (event) => {
         const detail = (event as CustomEvent).detail;
         if (!detail?.title || !isShelfStatus(detail.status)) return;
         const { undoBatchId = "", ...book } = detail;
+        invalidateShelfUndo(book);
 
         const existingIndex = localBooks.findIndex((item) => isSameBook(item, book));
         const previousBook = existingIndex >= 0 ? localBooks[existingIndex] : null;
@@ -3557,6 +3615,7 @@ const splitAuthors = (author: string) =>
         renderLocalBook(updatedBook);
         updateShelfCounts();
         panelRefreshers.forEach((refreshPanel) => refreshPanel());
+        syncShelfControls();
         if (previousBook && previousBook.status !== updatedBook.status) {
           showShelfUndoToast(updatedBook, previousBook, undoBatchId);
         }
@@ -3566,6 +3625,7 @@ const splitAuthors = (author: string) =>
         const { undoBatchId = "", ...book } = (event as CustomEvent).detail;
         const existingIndex = localBooks.findIndex((item) => isSameBook(item, book));
         if (existingIndex < 0) return;
+        invalidateShelfUndo(book);
 
         const [deletedBook] = localBooks.splice(existingIndex, 1);
         localStorage.setItem(savedBooksKey, JSON.stringify(localBooks));
@@ -3582,6 +3642,7 @@ const splitAuthors = (author: string) =>
         });
         updateShelfCounts();
         panelRefreshers.forEach((refreshPanel) => refreshPanel());
+        syncShelfControls();
         showShelfUndoToast(deletedBook, deletedBook, undoBatchId, existingIndex);
       });
 
