@@ -255,26 +255,29 @@ const { libraryBooks = [] } = Astro.props;
     gap: 1rem;
     margin-top: 2rem;
   }
-  .page-jump {
+  :global(.page-jump) {
     display: flex;
     align-items: center;
-    gap: 0.4rem;
+    gap: 0.35rem;
     margin: 0;
     color: var(--muted);
     font-size: 0.82rem;
   }
-  .page-jump input {
-    width: 4.25rem;
-    height: 2.25rem;
+  :global(.page-jump input) {
+    width: 3.5rem;
+    height: 1.85rem;
     box-sizing: border-box;
-    padding: 0.3rem;
-    border: 1px solid var(--line);
-    border-radius: 8px;
-    background: var(--fill);
-    color: var(--fg);
+    padding: 0.25rem;
+    border: 1px solid var(--border-dark);
+    border-radius: 7px;
+    background: var(--surface-dark-2);
+    color: var(--text-dark);
     font: inherit;
+    font-size: 0.8rem;
   }
   :global(.pagination button) {
+    height: 2rem;
+    box-sizing: border-box;
     padding: 0.45rem 0.9rem;
     border: 1px solid var(--line);
     border-radius: 8px;
@@ -459,6 +462,11 @@ const { libraryBooks = [] } = Astro.props;
     display: none;
   }
   :global(.edition-pagination button),
+  :global(.edition-page-jump input) {
+    height: 2rem;
+    box-sizing: border-box;
+  }
+  :global(.edition-pagination button),
   :global(.edition-dialog-close) {
     padding: 0.35rem 0.7rem;
     border: 1px solid var(--border-dark);
@@ -472,6 +480,22 @@ const { libraryBooks = [] } = Astro.props;
   :global(.edition-pagination button:disabled) {
     opacity: 0.45;
     cursor: not-allowed;
+  }
+  :global(.edition-page-jump) {
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+    margin: 0;
+    white-space: nowrap;
+  }
+  :global(.edition-page-jump input) {
+    width: calc(3ch + 1.5rem);
+    padding: 0.25rem;
+    border: 1px solid var(--border-dark);
+    border-radius: 7px;
+    background: var(--surface-dark-2);
+    color: var(--text-dark);
+    font: inherit;
   }
   :global(.edition-list) {
     display: grid;
@@ -504,6 +528,21 @@ const { libraryBooks = [] } = Astro.props;
     border-radius: 4px;
     object-fit: cover;
     background: #1c1c1c;
+  }
+  :global(.edition-option-no-cover) {
+    display: grid;
+    width: 3.5rem;
+    height: 4.5rem;
+    box-sizing: border-box;
+    place-items: center;
+    padding: 0.25rem;
+    border: 1px solid var(--border-dark);
+    border-radius: 4px;
+    background: var(--surface-dark);
+    color: var(--text-dark-muted);
+    font-size: 0.58rem;
+    line-height: 1.2;
+    text-align: center;
   }
   :global(.edition-option strong),
   :global(.edition-option span) {
@@ -673,9 +712,13 @@ const { libraryBooks = [] } = Astro.props;
       gap: 0.5rem;
       flex-wrap: wrap;
     }
+    :global(.edition-pagination) {
+      flex-wrap: wrap;
+      gap: 0.45rem;
+    }
     :global(.pagination button),
     :global(.pagination span),
-    .page-jump {
+    :global(.page-jump) {
       font-size: 0.72rem;
     }
     :global(.pagination button) {
@@ -1342,12 +1385,28 @@ const { libraryBooks = [] } = Astro.props;
           previousPageButton.type = 'button';
           previousPageButton.textContent = 'Previous';
           previousPageButton.setAttribute('aria-label', 'Previous editions page');
-          const pageLabel = document.createElement('span');
+          const pageJump = document.createElement('form');
+          pageJump.className = 'edition-page-jump';
+          const pageInputLabel = document.createElement('label');
+          pageInputLabel.htmlFor = 'search-edition-page-input';
+          pageInputLabel.textContent = 'Go to page';
+          const pageInput = document.createElement('input');
+          pageInput.id = 'search-edition-page-input';
+          pageInput.type = 'number';
+          pageInput.min = '1';
+          pageInput.step = '1';
+          pageInput.inputMode = 'numeric';
+          const pageCountLabel = document.createElement('span');
+          const pageJumpButton = document.createElement('button');
+          pageJumpButton.type = 'submit';
+          pageJumpButton.textContent = 'Go';
+          pageJumpButton.formNoValidate = true;
+          pageJump.append(pageInputLabel, pageInput, pageCountLabel, pageJumpButton);
           const nextPageButton = document.createElement('button');
           nextPageButton.type = 'button';
           nextPageButton.textContent = 'Next';
           nextPageButton.setAttribute('aria-label', 'Next editions page');
-          pagination.append(previousPageButton, pageLabel, nextPageButton);
+          pagination.append(previousPageButton, pageJump, nextPageButton);
 
           const renderEditionOptions = () => {
             const filteredEditions = editions.filter((edition: any) =>
@@ -1371,7 +1430,9 @@ const { libraryBooks = [] } = Astro.props;
             pagination.hidden = pageCount <= 1;
             previousPageButton.disabled = currentEditionPage <= 1;
             nextPageButton.disabled = currentEditionPage >= pageCount;
-            pageLabel.textContent = `Page ${currentEditionPage} of ${pageCount}`;
+            pageInput.max = String(pageCount);
+            pageInput.value = String(currentEditionPage);
+            pageCountLabel.textContent = `of ${pageCount}`;
             list.innerHTML = '';
             if (visibleEditions.length === 0) {
               const emptyMessage = document.createElement('p');
@@ -1384,9 +1445,22 @@ const { libraryBooks = [] } = Astro.props;
               const option = document.createElement('button');
               option.type = 'button';
               option.className = 'edition-option';
-              const image = document.createElement('img');
-              image.alt = '';
-              if (edition.coverImage) image.src = edition.coverImage;
+              const cover = edition.coverImage
+                ? document.createElement('img')
+                : document.createElement('div');
+              if (edition.coverImage) {
+                (cover as HTMLImageElement).alt = '';
+                (cover as HTMLImageElement).addEventListener('error', () => {
+                  const placeholder = document.createElement('div');
+                  placeholder.className = 'edition-option-no-cover';
+                  placeholder.textContent = 'No cover';
+                  cover.replaceWith(placeholder);
+                }, { once: true });
+                (cover as HTMLImageElement).src = edition.coverImage;
+              } else {
+                cover.className = 'edition-option-no-cover';
+                cover.textContent = 'No cover';
+              }
               const details = document.createElement('span');
               const title = document.createElement('strong');
               title.textContent = edition.title;
@@ -1410,7 +1484,7 @@ const { libraryBooks = [] } = Astro.props;
               chooseLabel.textContent = isSelectedEdition
                 ? 'Selected'
                 : editionAlreadyAdded ? '✓ Added' : 'Choose';
-              option.append(image, details, chooseLabel);
+              option.append(cover, details, chooseLabel);
               option.addEventListener('click', () => {
                 book.key = edition.key;
                 book.editionKey = edition.key;
@@ -1475,6 +1549,18 @@ const { libraryBooks = [] } = Astro.props;
           });
           languageFilter.addEventListener('change', () => {
             currentEditionPage = 1;
+            renderEditionOptions();
+            list.scrollTop = 0;
+          });
+          pageJump.addEventListener('submit', (event) => {
+            event.preventDefault();
+            if (!pageInput.value.trim()) return;
+            const requestedPage = Number(pageInput.value);
+            const filteredCount = editions.filter((edition: any) =>
+              !languageFilter.value || normalizeEditionLanguage(String(edition.language || '')) === languageFilter.value,
+            ).length;
+            const pageCount = Math.max(1, Math.ceil(filteredCount / pageSize));
+            currentEditionPage = Math.max(1, Math.min(pageCount, Math.trunc(requestedPage)));
             renderEditionOptions();
             list.scrollTop = 0;
           });

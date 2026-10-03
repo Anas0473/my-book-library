@@ -842,6 +842,13 @@ const splitAuthors = (author: string) =>
         font-size: 0.75rem;
         text-align: center;
       }
+      :global(.category-edition-preview-cover.category-book-detail-no-cover) {
+        width: min(12rem, 100%);
+        justify-self: center;
+        border: 1px dashed var(--border-dark);
+        border-radius: 6px;
+        background: var(--surface-dark-2);
+      }
       :global(.category-book-detail-author) {
         margin: 0.35rem 0 0;
         color: var(--text-dark-muted);
@@ -2465,12 +2472,28 @@ const splitAuthors = (author: string) =>
           previousPageButton.type = "button";
           previousPageButton.textContent = "Previous";
           previousPageButton.setAttribute("aria-label", "Previous editions page");
-          const pageLabel = document.createElement("span");
+          const pageJump = document.createElement("form");
+          pageJump.className = "edition-page-jump";
+          const pageInputLabel = document.createElement("label");
+          pageInputLabel.htmlFor = "shelf-edition-page-input";
+          pageInputLabel.textContent = "Go to page";
+          const pageInput = document.createElement("input");
+          pageInput.id = "shelf-edition-page-input";
+          pageInput.type = "number";
+          pageInput.min = "1";
+          pageInput.step = "1";
+          pageInput.inputMode = "numeric";
+          const pageCountLabel = document.createElement("span");
+          const pageJumpButton = document.createElement("button");
+          pageJumpButton.type = "submit";
+          pageJumpButton.textContent = "Go";
+          pageJumpButton.formNoValidate = true;
+          pageJump.append(pageInputLabel, pageInput, pageCountLabel, pageJumpButton);
           const nextPageButton = document.createElement("button");
           nextPageButton.type = "button";
           nextPageButton.textContent = "Next";
           nextPageButton.setAttribute("aria-label", "Next editions page");
-          pagination.append(previousPageButton, pageLabel, nextPageButton);
+          pagination.append(previousPageButton, pageJump, nextPageButton);
           const preview = document.createElement("section");
           preview.className = "category-edition-preview";
           preview.hidden = true;
@@ -2495,18 +2518,26 @@ const splitAuthors = (author: string) =>
             if (coverUrl) {
               const cover = document.createElement("img");
               cover.className = "category-edition-preview-cover";
-              cover.src = coverUrl.replace(/-M\.jpg$/, "-L.jpg");
               cover.alt = `Cover of ${edition.title}`;
               cover.referrerPolicy = "no-referrer";
+              let triedStandardCover = false;
               cover.onerror = () => {
-                cover.onerror = null;
-                cover.src = coverUrl;
+                if (!triedStandardCover && cover.src !== coverUrl) {
+                  triedStandardCover = true;
+                  cover.src = coverUrl;
+                  return;
+                }
+                const placeholder = document.createElement("div");
+                placeholder.className = "category-edition-preview-cover category-book-detail-no-cover";
+                placeholder.textContent = "No cover available";
+                cover.replaceWith(placeholder);
               };
+              cover.src = coverUrl.replace(/-M\.jpg$/, "-L.jpg");
               body.appendChild(cover);
             } else {
               const placeholder = document.createElement("div");
-              placeholder.className = "cover-placeholder";
-              placeholder.textContent = "NO COVER AVAILABLE";
+              placeholder.className = "category-edition-preview-cover category-book-detail-no-cover";
+              placeholder.textContent = "No cover available";
               body.appendChild(placeholder);
             }
 
@@ -2587,7 +2618,9 @@ const splitAuthors = (author: string) =>
             pagination.hidden = pageCount <= 1;
             previousPageButton.disabled = currentEditionPage <= 1;
             nextPageButton.disabled = currentEditionPage >= pageCount;
-            pageLabel.textContent = `Page ${currentEditionPage} of ${pageCount}`;
+            pageInput.max = String(pageCount);
+            pageInput.value = String(currentEditionPage);
+            pageCountLabel.textContent = `of ${pageCount}`;
             list.innerHTML = "";
 
             if (visibleEditions.length === 0) {
@@ -2601,9 +2634,22 @@ const splitAuthors = (author: string) =>
               const option = document.createElement("button");
               option.type = "button";
               option.className = "edition-option";
-              const image = document.createElement("img");
-              image.alt = "";
-              if (edition.coverImage) image.src = edition.coverImage;
+              const cover = edition.coverImage
+                ? document.createElement("img")
+                : document.createElement("div");
+              if (edition.coverImage) {
+                (cover as HTMLImageElement).alt = "";
+                (cover as HTMLImageElement).addEventListener("error", () => {
+                  const placeholder = document.createElement("div");
+                  placeholder.className = "edition-option-no-cover";
+                  placeholder.textContent = "No cover";
+                  cover.replaceWith(placeholder);
+                }, { once: true });
+                (cover as HTMLImageElement).src = edition.coverImage;
+              } else {
+                cover.className = "edition-option-no-cover";
+                cover.textContent = "No cover";
+              }
               const details = document.createElement("span");
               const editionTitle = document.createElement("strong");
               editionTitle.textContent = edition.title;
@@ -2616,7 +2662,7 @@ const splitAuthors = (author: string) =>
               const status = document.createElement("span");
               status.className = "edition-choice-label";
               status.textContent = saved ? "✓ Added" : "View details";
-              option.append(image, details, status);
+              option.append(cover, details, status);
               option.addEventListener("click", () => showEditionPreview(edition));
               list.appendChild(option);
             });
@@ -2639,6 +2685,18 @@ const splitAuthors = (author: string) =>
           });
           languageFilter.addEventListener("change", () => {
             currentEditionPage = 1;
+            renderEditionOptions();
+            list.scrollTop = 0;
+          });
+          pageJump.addEventListener("submit", (event) => {
+            event.preventDefault();
+            if (!pageInput.value.trim()) return;
+            const requestedPage = Number(pageInput.value);
+            const filteredCount = editions.filter((edition: any) =>
+              !languageFilter.value || normalizeEditionLanguage(String(edition.language || "")) === languageFilter.value,
+            ).length;
+            const pageCount = Math.max(1, Math.ceil(filteredCount / pageSize));
+            currentEditionPage = Math.max(1, Math.min(pageCount, Math.trunc(requestedPage)));
             renderEditionOptions();
             list.scrollTop = 0;
           });
