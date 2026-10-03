@@ -56,6 +56,11 @@ In Book details or an edition preview, click the cover (or focus it and press En
 to open the full-size cover viewer. Click the viewer or press Escape to return
 to the details.
 
+Search results use the same Book details and edition previews as My Lists.
+Click a result's cover, title, or non-interactive area to view its details.
+Browse editions opens the edition list; selecting an edition shows its details
+and lets you add that specific edition to a list without changing the search result.
+
 ## Optional Search Fallback
 
 Search uses Open Library first, then Internet Archive's cataloged books when Open Library is unavailable. No API key is required for the Internet Archive fallback.
