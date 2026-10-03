@@ -956,6 +956,7 @@ const splitAuthors = (author: string) =>
       :global(.category-edition-open-link) {
         display: inline-flex;
         align-items: center;
+        justify-content: center;
         min-height: 2.2rem;
         box-sizing: border-box;
         padding: 0.4rem 0.7rem;
@@ -1031,6 +1032,19 @@ const splitAuthors = (author: string) =>
         background: transparent;
         overflow: visible;
         cursor: zoom-out;
+      }
+      :global(.book-detail-cover-zoom) {
+        min-width: 0;
+        padding: 0;
+        border: 0;
+        border-radius: 6px;
+        background: transparent;
+        align-self: start;
+        cursor: zoom-in;
+      }
+      :global(.book-detail-cover-zoom:focus-visible) {
+        outline: 2px solid var(--accent);
+        outline-offset: 4px;
       }
       :global(.cover-lightbox::backdrop) {
         background: rgba(0, 0, 0, 0.8);
@@ -2254,6 +2268,28 @@ const splitAuthors = (author: string) =>
       coverLightbox.addEventListener("click", () => coverLightbox.close());
       document.body.appendChild(coverLightbox);
 
+      function openCoverLightbox(cover: HTMLImageElement) {
+        const largeSrc = cover.src
+          .replace(/-M\.jpg(?=\?|$)/, "-L.jpg")
+          .replace(
+            /^https:\/\/archive\.org\/services\/img\/([^/?#]+)$/,
+            "https://archive.org/download/$1/page/cover_w800.jpg",
+          );
+        coverLightboxImage.onerror = null;
+        coverLightboxImage.src = cover.src;
+        coverLightboxImage.alt = cover.alt;
+        coverLightbox.showModal();
+
+        const requestId = ++coverLightboxRequest;
+        if (largeSrc === cover.src) return;
+        const largeImage = new Image();
+        largeImage.referrerPolicy = "no-referrer";
+        largeImage.onload = () => {
+          if (requestId === coverLightboxRequest) coverLightboxImage.src = largeSrc;
+        };
+        largeImage.src = largeSrc;
+      }
+
       const savedBookDetailDialog = document.createElement("dialog");
       savedBookDetailDialog.className = "edition-dialog saved-book-detail-dialog";
       savedBookDetailDialog.addEventListener("click", (event) => {
@@ -2297,6 +2333,7 @@ const splitAuthors = (author: string) =>
         closeButton.type = "button";
         closeButton.className = "edition-dialog-close";
         closeButton.textContent = "Close";
+        closeButton.autofocus = true;
         closeButton.addEventListener("click", () => savedBookDetailDialog.close());
         header.append(heading, closeButton);
 
@@ -2320,7 +2357,17 @@ const splitAuthors = (author: string) =>
             };
           }
           image.src = largeSrc;
-          body.appendChild(image);
+          const zoomButton = document.createElement("button");
+          zoomButton.type = "button";
+          zoomButton.className = "book-detail-cover-zoom";
+          zoomButton.setAttribute("aria-label", `View full-size cover of ${title}`);
+          zoomButton.title = "View full-size cover";
+          zoomButton.addEventListener("mousedown", (event) => {
+            if (event.button === 0) event.preventDefault();
+          });
+          zoomButton.addEventListener("click", () => openCoverLightbox(image));
+          zoomButton.appendChild(image);
+          body.appendChild(zoomButton);
         } else {
           const placeholder = document.createElement("div");
           placeholder.className = "category-edition-preview-cover category-book-detail-no-cover";
@@ -2394,25 +2441,7 @@ const splitAuthors = (author: string) =>
 
         event.preventDefault();
         event.stopPropagation();
-        const largeSrc = cover.src
-          .replace(/^(https:\/\/covers\.openlibrary\.org\/b\/.+)-M\.jpg/, "$1-L.jpg")
-          .replace(
-            /^https:\/\/archive\.org\/services\/img\/([^/?#]+)$/,
-            "https://archive.org/download/$1/page/cover_w800.jpg",
-          );
-        coverLightboxImage.onerror = null;
-        coverLightboxImage.src = cover.src;
-        coverLightboxImage.alt = cover.alt;
-        coverLightbox.showModal();
-
-        const requestId = ++coverLightboxRequest;
-        if (largeSrc === cover.src) return;
-        const largeImage = new Image();
-        largeImage.referrerPolicy = "no-referrer";
-        largeImage.onload = () => {
-          if (requestId === coverLightboxRequest) coverLightboxImage.src = largeSrc;
-        };
-        largeImage.src = largeSrc;
+        openCoverLightbox(cover);
       });
 
       document.addEventListener("click", (event) => {
@@ -3659,6 +3688,7 @@ const splitAuthors = (author: string) =>
       document.addEventListener("keydown", (event) => {
         if (event.key !== "Escape") return;
         if (coverLightbox.open) {
+          event.preventDefault();
           coverLightbox.close();
           return;
         }
