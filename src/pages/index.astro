@@ -796,15 +796,19 @@ const splitAuthors = (author: string) =>
       :global(.edition-list[hidden]) {
         display: none;
       }
-      :global(.category-edition-preview-back) {
+      :global(.category-edition-preview-back),
+      :global(.edition-dialog-header .edition-dialog-close) {
         justify-self: start;
-        padding: 0.35rem 0.7rem;
+        height: 2.25rem;
+        box-sizing: border-box;
+        padding: 0.4rem 0.75rem;
         border: 1px solid var(--border-dark);
         border-radius: 8px;
         background: var(--surface-dark-2);
         color: var(--text-dark);
         font: inherit;
-        font-size: 0.8rem;
+        font-size: 0.85rem;
+        line-height: 1.2;
         cursor: pointer;
       }
       :global(.edition-dialog.saved-book-detail-dialog) {
@@ -2505,6 +2509,7 @@ const splitAuthors = (author: string) =>
             backButton.className = "category-edition-preview-back";
             backButton.textContent = "Back to editions";
             backButton.addEventListener("click", () => {
+              backButton.replaceWith(heading);
               preview.hidden = true;
               filterRow.hidden = false;
               list.hidden = false;
@@ -2585,7 +2590,8 @@ const splitAuthors = (author: string) =>
             details.appendChild(openLink);
             body.appendChild(details);
 
-            preview.replaceChildren(backButton, body);
+            heading.replaceWith(backButton);
+            preview.replaceChildren(body);
             listScrollPosition = list.scrollTop;
             filterRow.hidden = true;
             list.hidden = true;
