@@ -891,6 +891,40 @@ const splitAuthors = (author: string) =>
         gap: 1.25rem;
         overflow-y: auto;
       }
+      @media (min-width: 701px) {
+        :global(.edition-dialog:has(.category-edition-preview:not([hidden]))),
+        :global(.edition-dialog.saved-book-detail-dialog) {
+          /* Preserve the cover's share of the original 42rem dialog. */
+          --preview-cover-width: calc((42rem - 2.2rem - 2px - 1.25rem) * 0.4);
+          width: min(calc(var(--preview-cover-width) + 21.15rem + 2px), calc(100% - 2rem));
+        }
+        :global(.edition-dialog.saved-book-detail-dialog) {
+          /* Keep saved-book covers at their original 48rem-dialog size. */
+          --preview-cover-width: calc((48rem - 2.2rem - 2px - 1.25rem) * 0.4);
+        }
+        :global(.category-edition-preview:not([hidden]) .category-edition-preview-meta),
+        :global(.saved-book-detail-dialog .category-edition-preview-meta) {
+          grid-template-columns: minmax(0, 1fr) max-content;
+          column-gap: 1.5rem;
+        }
+        :global(.edition-dialog:has(.category-edition-preview:not([hidden]) .category-book-detail-no-cover)),
+        :global(.saved-book-detail-dialog:has(.category-book-detail-no-cover)) {
+          --preview-cover-width: 16rem;
+        }
+        :global(.category-edition-preview-body > .category-edition-preview-cover.category-book-detail-no-cover) {
+          width: 100%;
+        }
+        :global(.category-edition-preview-body .category-edition-preview-meta dt) {
+          font-size: 0.8rem;
+        }
+        :global(.category-edition-preview-body .category-edition-preview-meta dd) {
+          font-size: 0.95rem;
+        }
+        :global(.category-edition-preview:not([hidden]) .category-edition-preview-body),
+        :global(.saved-book-detail-dialog .category-edition-preview-body) {
+          grid-template-columns: minmax(0, var(--preview-cover-width)) minmax(0, 1fr);
+        }
+      }
       :global(.category-edition-preview-cover) {
         display: block;
         width: 100%;
@@ -915,7 +949,7 @@ const splitAuthors = (author: string) =>
       }
       :global(.category-edition-preview-cover.category-book-detail-no-cover) {
         width: min(12rem, 100%);
-        justify-self: center;
+        justify-self: start;
         border: 1px dashed var(--border-dark);
         border-radius: 6px;
         background: var(--surface-dark-2);
@@ -1105,6 +1139,9 @@ const splitAuthors = (author: string) =>
         :global(.category-edition-preview-cover) {
           width: min(14rem, 100%);
           max-height: min(42vh, 22rem);
+          justify-self: center;
+        }
+        :global(.category-edition-preview-cover.category-book-detail-no-cover) {
           justify-self: center;
         }
         .appearance-label,
@@ -2693,6 +2730,11 @@ const splitAuthors = (author: string) =>
               subtitle.textContent = edition.subtitle;
               details.appendChild(subtitle);
             }
+
+            const authorText = document.createElement("p");
+            authorText.className = "category-book-detail-author";
+            authorText.textContent = author || "Not listed";
+            details.appendChild(authorText);
 
             const metadata = document.createElement("dl");
             metadata.className = "category-edition-preview-meta";
