@@ -2425,6 +2425,13 @@ const splitAuthors = (author: string) =>
 
       const categoryEditionDialog = document.createElement("dialog");
       categoryEditionDialog.className = "edition-dialog";
+      categoryEditionDialog.addEventListener("click", (event) => {
+        if (event.target !== categoryEditionDialog) return;
+        const rect = categoryEditionDialog.getBoundingClientRect();
+        const isOutside = event.clientX < rect.left || event.clientX > rect.right ||
+          event.clientY < rect.top || event.clientY > rect.bottom;
+        if (isOutside) categoryEditionDialog.close();
+      });
       document.body.appendChild(categoryEditionDialog);
 
       // Guards against a slower, earlier request overwriting a later click's results.

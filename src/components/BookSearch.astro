@@ -748,6 +748,13 @@ const { libraryBooks = [] } = Astro.props;
   const paginationContainer = document.getElementById('pagination-controls') as HTMLElement;
   const editionDialog = document.createElement('dialog');
   editionDialog.className = 'edition-dialog search-edition-dialog';
+  editionDialog.addEventListener('click', (event) => {
+    if (event.target !== editionDialog) return;
+    const rect = editionDialog.getBoundingClientRect();
+    const isOutside = event.clientX < rect.left || event.clientX > rect.right ||
+      event.clientY < rect.top || event.clientY > rect.bottom;
+    if (isOutside) editionDialog.close();
+  });
   document.body.appendChild(editionDialog);
   resultsContainer.addEventListener('error', (event) => {
     const image = event.target;
