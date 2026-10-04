@@ -364,6 +364,7 @@ const splitAuthors = (author: string) =>
         }
       }
       #open-library-sync-dialog {
+        box-sizing: border-box;
         width: min(30rem, calc(100vw - 2rem));
         max-width: none;
         padding: 1.75rem 1.9rem;
@@ -374,8 +375,30 @@ const splitAuthors = (author: string) =>
         font-family: var(--font-sans);
         box-shadow: 0 20px 48px rgba(0, 0, 0, 0.45);
       }
+      #open-library-sync-dialog:focus {
+        outline: none;
+      }
       #open-library-sync-dialog::backdrop {
         background: rgba(0, 0, 0, 0.6);
+      }
+      @media (max-width: 700px) {
+        #open-library-sync-dialog {
+          width: calc(100vw - 1.5rem);
+          max-height: calc(100dvh - 1.5rem);
+          padding: 1.4rem 1.25rem;
+        }
+        .open-library-sync-form {
+          gap: 1.2rem;
+        }
+        .open-library-sync-form h2 {
+          font-size: 1.55rem;
+        }
+        .open-library-mode-switch span {
+          padding: 0.5rem 0.4rem;
+        }
+        .open-library-sync-form .open-library-method-toggle {
+          padding: 0.45rem 0;
+        }
       }
       .open-library-sync-form {
         display: grid;
@@ -1758,7 +1781,7 @@ const splitAuthors = (author: string) =>
     <!-- Avoids "back to top" class/label text that ad blockers (e.g. Brave Shields) hide. -->
     <button type="button" class="shelf-jump-button" aria-label="Jump to start of list" title="Jump to start of list" hidden>↑</button>
 
-    <dialog id="open-library-sync-dialog" aria-labelledby="open-library-sync-title">
+    <dialog id="open-library-sync-dialog" aria-labelledby="open-library-sync-title" tabindex="-1">
       <form class="open-library-sync-form" id="open-library-sync-form">
         <h2 id="open-library-sync-title">Connect Open Library</h2>
         <div class="open-library-mode-switch" id="open-library-mode-switch" role="radiogroup" aria-label="How to sync">
@@ -2836,6 +2859,11 @@ const splitAuthors = (author: string) =>
         }
       }
 
+      // On touch screens, focusing a text field pops up the keyboard and covers the dialog.
+      function canAutoFocusTextFields() {
+        return window.matchMedia("(hover: hover) and (pointer: fine)").matches;
+      }
+
       function openOpenLibrarySyncDialog() {
         const username = localStorage.getItem(openLibraryUsernameKey) || "";
         openLibraryUsernameInput.value = username;
@@ -2845,6 +2873,7 @@ const splitAuthors = (author: string) =>
         openLibrarySyncMessage.textContent = openLibrarySyncInProgress ? "Syncing your reading log…" : "";
         openLibrarySyncDialog.showModal();
         if (getOpenLibraryPushUser()) openLibrarySyncSubmit.focus();
+        else if (!canAutoFocusTextFields()) openLibrarySyncDialog.focus();
         else if (mode === "username") openLibraryUsernameInput.focus();
         else getOpenLibraryLoginInput().focus();
       }
@@ -2870,14 +2899,16 @@ const splitAuthors = (author: string) =>
         input.addEventListener("change", () => {
           openLibrarySyncMessage.textContent = "";
           updateOpenLibraryAccountView();
-          (getOpenLibraryDialogMode() === "login" ? getOpenLibraryLoginInput() : openLibraryUsernameInput).focus();
+          if (canAutoFocusTextFields()) {
+            (getOpenLibraryDialogMode() === "login" ? getOpenLibraryLoginInput() : openLibraryUsernameInput).focus();
+          }
         });
       });
       openLibraryMethodToggle.addEventListener("click", () => {
         localStorage.setItem(openLibraryLoginMethodKey, usesOpenLibraryKeys() ? "password" : "keys");
         openLibrarySyncMessage.textContent = "";
         updateOpenLibraryLoginMethod();
-        getOpenLibraryLoginInput().focus();
+        if (canAutoFocusTextFields()) getOpenLibraryLoginInput().focus();
       });
       openLibraryLogoutButton.addEventListener("click", logOutOfOpenLibrary);
       openLibrarySyncCancel.addEventListener("click", () => {
