@@ -1841,6 +1841,7 @@ const splitAuthors = (author: string) =>
 
     <script>
       import { createTheme } from "../lib/theme";
+      import { createSyncBookIndex } from "../lib/sync-book-index";
       import {
         diffShelves,
         isLocalOnlyEdition,
@@ -2227,7 +2228,7 @@ const splitAuthors = (author: string) =>
         container.appendChild(author);
       }
 
-      function renderLocalBook(book: any) {
+      function renderLocalBook(book: any, target?: DocumentFragment) {
         if (!book?.title || !isShelfStatus(book.status)) return;
         const shelf = shelfDefinitions.find((item) => item.status === book.status)!;
         const panel = document.getElementById(shelf.id);
@@ -2346,12 +2347,20 @@ const splitAuthors = (author: string) =>
 
         card.appendChild(details);
         card.appendChild(createShelfControl(book));
-        grid.appendChild(card);
+        (target || grid).appendChild(card);
       }
 
+      const initialShelfCards = new Map<string, DocumentFragment>();
+      shelfDefinitions.forEach((shelf) => {
+        initialShelfCards.set(shelf.status, document.createDocumentFragment());
+      });
       localBooks.forEach((book) => {
         removeMatchingContentBooks(book);
-        renderLocalBook(book);
+        renderLocalBook(book, initialShelfCards.get(book.status));
+      });
+      shelfDefinitions.forEach((shelf) => {
+        document.getElementById(shelf.id)?.querySelector(".cards-grid")
+          ?.appendChild(initialShelfCards.get(shelf.status)!);
       });
 
       function updateShelfCounts() {
@@ -2751,19 +2760,20 @@ const splitAuthors = (author: string) =>
             return isSameBook(existingBook, syncedBook);
           }
 
+          const syncedBookIndex = createSyncBookIndex(syncedBooks, (syncedBook, existingBook) =>
+            matchesSyncedBook(existingBook, syncedBook),
+          );
+          const previousBookIndex = createSyncBookIndex(previousSyncedBooks, matchesSyncedBook);
+          const syncedWorkIds = new Set(syncedBooks.map((book: any) => workIdOf(book)).filter(Boolean));
           const nextBooks = localBooks.flatMap((book) => {
             if (!book.openLibrarySyncUsername) return [book];
             if (book.openLibrarySyncUsername !== username) return [];
             if (incompleteStatuses.has(book.status)) return [book];
 
-            const isStillOnOpenLibrary = syncedBooks.some((syncedBook: any) =>
-              matchesSyncedBook(book, syncedBook),
-            );
+            const isStillOnOpenLibrary = syncedBookIndex.findIndex(book) >= 0;
             if (isStillOnOpenLibrary) return [];
             // Open Library holds one edition per work; when it has another edition of this one, keep this copy here only.
-            const otherEditionOnOpenLibrary = syncedBooks.some((syncedBook: any) =>
-              workIdOf(syncedBook) && workIdOf(syncedBook) === workIdOf(book),
-            );
+            const otherEditionOnOpenLibrary = syncedWorkIds.has(workIdOf(book));
             if (otherEditionOnOpenLibrary) {
               const { openLibrarySyncUsername, openLibraryRemoved, loggedEditionKey, ...localBook } = book;
               return [{ ...localBook, openLibraryLocalOnly: true }];
@@ -2771,10 +2781,9 @@ const splitAuthors = (author: string) =>
             return [{ ...book, openLibraryRemoved: true }];
           });
 
+          const nextBookIndex = createSyncBookIndex(nextBooks, matchesSyncedBook);
           syncedBooks.forEach((book: any) => {
-            const previousSyncedBook = previousSyncedBooks.find((savedBook) =>
-              matchesSyncedBook(savedBook, { ...book, openLibrarySyncUsername: username }),
-            );
+            const previousSyncedBook = previousBookIndex.find({ ...book, openLibrarySyncUsername: username });
             const syncedBook = {
               ...previousSyncedBook,
               ...book,
@@ -2784,9 +2793,7 @@ const splitAuthors = (author: string) =>
               openLibrarySyncUsername: username,
               openLibraryRemoved: false,
             };
-            const existingIndex = nextBooks.findIndex((savedBook) =>
-              matchesSyncedBook(savedBook, syncedBook),
-            );
+            const existingIndex = nextBookIndex.findIndex(syncedBook);
 
             if (existingIndex >= 0) {
               const { openLibraryLocalOnly, ...existingBook } = nextBooks[existingIndex];
@@ -2794,8 +2801,10 @@ const splitAuthors = (author: string) =>
                 ...existingBook,
                 ...syncedBook,
               };
+              nextBookIndex.set(existingIndex, nextBooks[existingIndex]);
             } else {
               nextBooks.push(syncedBook);
+              nextBookIndex.set(nextBooks.length - 1, syncedBook);
             }
           });
 
@@ -2864,10 +2873,10 @@ const splitAuthors = (author: string) =>
         return window.matchMedia("(hover: hover) and (pointer: fine)").matches;
       }
 
-      function openOpenLibrarySyncDialog() {
+      function openOpenLibrarySyncDialog(preferImportOnly = false) {
         const username = localStorage.getItem(openLibraryUsernameKey) || "";
         openLibraryUsernameInput.value = username;
-        const mode = !getOpenLibraryPushUser() && username ? "username" : "login";
+        const mode = preferImportOnly || (!getOpenLibraryPushUser() && username) ? "username" : "login";
         openLibraryModeInputs.forEach((input) => { input.checked = input.value === mode; });
         updateOpenLibraryAccountView();
         openLibrarySyncMessage.textContent = openLibrarySyncInProgress ? "Syncing your reading log…" : "";
@@ -2892,8 +2901,8 @@ const splitAuthors = (author: string) =>
               : "Connect and sync";
       }
 
-      openLibrarySyncButton.addEventListener("click", openOpenLibrarySyncDialog);
-      mobileOpenLibrarySyncButton.addEventListener("click", openOpenLibrarySyncDialog);
+      openLibrarySyncButton.addEventListener("click", () => openOpenLibrarySyncDialog());
+      mobileOpenLibrarySyncButton.addEventListener("click", () => openOpenLibrarySyncDialog(true));
       openLibraryUsernameInput.addEventListener("input", updateOpenLibrarySyncSubmitLabel);
       openLibraryModeInputs.forEach((input) => {
         input.addEventListener("change", () => {
@@ -3895,6 +3904,7 @@ const splitAuthors = (author: string) =>
           };
           const sortVal = sortSelect.value;
           const cards = Array.from(grid.querySelectorAll<HTMLElement>(".card"));
+          const originalOrder = cards.slice();
           cards.forEach((card) => {
             if (isKnownEditionLanguage(card.dataset.language)) return;
             const cachedLanguage = editionLanguageCache[normalizeEditionId(card.dataset.editionKey || "")];
@@ -3989,10 +3999,10 @@ const splitAuthors = (author: string) =>
             const matches = matchesText && matchesLanguage;
 
             if (matches) {
-              card.style.display = "flex";
+              if (card.style.display !== "flex") card.style.display = "flex";
               visibleCount++;
             } else {
-              card.style.display = "none";
+              if (card.style.display !== "none") card.style.display = "none";
             }
           });
 
@@ -4048,7 +4058,11 @@ const splitAuthors = (author: string) =>
             return 0;
           });
 
-          cards.forEach((card) => grid.appendChild(card));
+          if (cards.some((card, index) => card !== originalOrder[index])) {
+            const sortedCards = document.createDocumentFragment();
+            cards.forEach((card) => sortedCards.appendChild(card));
+            grid.appendChild(sortedCards);
+          }
         }
 
         async function loadMissingEditionLanguages() {
@@ -4274,6 +4288,25 @@ const splitAuthors = (author: string) =>
         if (index >= 0) shelfUndoNotifications.splice(index, 1);
       }
 
+      document.addEventListener("keydown", (event) => {
+        if (
+          event.defaultPrevented || event.repeat || event.shiftKey || event.altKey
+          || !(event.ctrlKey || event.metaKey) || event.key.toLowerCase() !== "z"
+        ) return;
+        const editing = event.composedPath().some((target) =>
+          target instanceof HTMLElement && (
+            target.isContentEditable
+            || target.matches("input:not([type='checkbox']):not([type='radio']), textarea, select")
+          ),
+        );
+        if (editing) return;
+        const latest = shelfUndoNotifications.at(-1);
+        const undoButton = latest?.toast.querySelector<HTMLButtonElement>("button");
+        if (!undoButton) return;
+        event.preventDefault();
+        undoButton.click();
+      });
+
       function invalidateShelfUndo(book: any) {
         [...shelfUndoNotifications].forEach((notification) => {
           if (notification.actions.some((action) => isSameBook(action.book, book))) {
@@ -4322,6 +4355,7 @@ const splitAuthors = (author: string) =>
         const undoButton = document.createElement("button");
         undoButton.type = "button";
         undoButton.textContent = "Undo";
+        undoButton.title = "Undo (Ctrl+Z / Command+Z)";
         undoButton.addEventListener("click", () => {
           let restoredCount = 0;
           // Restore deletions last-first so each saved index refers to the list as it was then.

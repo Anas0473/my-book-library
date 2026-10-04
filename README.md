@@ -58,6 +58,10 @@ independently of the other notification. Notifications include the book's subtit
 when available so books with the same title can be distinguished. Adding a removed book again dismisses
 its outdated notification. Batch deletions use one notification to undo the
 entire batch.
+Press Ctrl+Z (Command+Z on Mac) to trigger the latest available Undo notification.
+The same six-second expiry and two-notification limit apply. Typing in an input,
+textarea or editable area keeps the browser's normal text undo; the shortcut does
+not override text editing or add redo.
 
 In Book details or an edition preview, click the cover (or focus it and press Enter)
 to open the full-size cover viewer. Click the viewer or press Escape to return
@@ -91,6 +95,12 @@ Every sync still refreshes all books, with the same request pacing, timeouts and
 failure checks; no saved metadata is used to hide a failed lookup.
 Click outside the Open Library connection dialog, press Escape, or choose Cancel
 to close it without starting a sync.
+On mobile, the Sync/Connect button opens Import only by default; you can still
+choose Two-way. Already logged-in accounts keep their connected-account view.
+List cards are inserted and reordered in batches, without moving them when the
+order is unchanged. Sync matching uses indexed candidates with the same edition,
+work and fallback matching rules. Edition sorting computes publication dates once
+per request without changing the order or featured picks.
 
 To sync both ways, log in with your Open Library email and password in that
 dialog. If you signed up for Open Library with Google, you have no password, so

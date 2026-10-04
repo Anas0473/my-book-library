@@ -109,6 +109,10 @@ export const GET: APIRoute = async ({ url }) => {
       const year = String(dates[0] || '').match(/\b\d{4}\b/)?.[0];
       return year ? Date.UTC(Number(year), 0, 1) : 0;
     };
+    const publicationTimes = new Map<object, number>();
+    for (const edition of allEditions) {
+      publicationTimes.set(edition, publicationTime(edition));
+    }
     const compareEditions = (first: any, second: any) => {
       const firstHasCover = Boolean(first.coverImage);
       const secondHasCover = Boolean(second.coverImage);
@@ -117,7 +121,7 @@ export const GET: APIRoute = async ({ url }) => {
       const firstInLanguage = language && first.language === language;
       const secondInLanguage = language && second.language === language;
       if (firstInLanguage !== secondInLanguage) return firstInLanguage ? -1 : 1;
-      return publicationTime(second) - publicationTime(first)
+      return publicationTimes.get(second)! - publicationTimes.get(first)!
         || first.title.localeCompare(second.title, undefined, { sensitivity: 'base' });
     };
     const selectedEdition = allEditions.find(
