@@ -74,8 +74,9 @@ per row show 2 rows per page, and narrower layouts show 3 rows (always at least
 book you were viewing on screen.
 
 Before you search, Search books shows trending books from Open Library, with
-tabs for Today, This week and This month. It fills the same number of rows as a
-search results page, and the selected tab is remembered. With "Hide books in my
+tabs for Today, This week and This month. It opens on Today and fills the same
+number of rows as a search results page; Show more trending books adds more rows.
+With "Hide books in my
 lists" turned on, books you've already added are skipped and replaced by the
 next trending ones.
 

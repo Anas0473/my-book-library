@@ -50,13 +50,16 @@ const { libraryBooks = [] } = Astro.props;
     <div class="trending-header">
       <h3 id="trending-books-heading">Trending books</h3>
       <div class="trending-tabs" role="group" aria-label="Trending period">
-        <button type="button" data-period="daily" aria-pressed="false">Today</button>
-        <button type="button" data-period="weekly" aria-pressed="true">This week</button>
+        <button type="button" data-period="daily" aria-pressed="true">Today</button>
+        <button type="button" data-period="weekly" aria-pressed="false">This week</button>
         <button type="button" data-period="monthly" aria-pressed="false">This month</button>
       </div>
     </div>
     <p id="trending-status" class="trending-status" role="status"></p>
     <div id="trending-results" class="results-grid"></div>
+    <div class="trending-more">
+      <button type="button" id="trending-show-more" class="trending-more-button" hidden>Show more trending books</button>
+    </div>
   </section>
   <div id="search-results" class="results-grid"></div>
   <div id="pagination-controls" class="pagination"></div>
@@ -320,6 +323,32 @@ const { libraryBooks = [] } = Astro.props;
   }
   .trending-books .results-grid {
     margin-top: 1.25rem;
+  }
+  .trending-more {
+    display: flex;
+    justify-content: center;
+    margin-top: 1.75rem;
+  }
+  .trending-more-button {
+    padding: 0.6rem 1.4rem;
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    background: var(--panel);
+    color: var(--fg);
+    font: inherit;
+    font-size: 0.88rem;
+    font-weight: 600;
+    cursor: pointer;
+  }
+  .trending-more-button:hover {
+    background: var(--fill);
+  }
+  .trending-more-button:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+  }
+  .trending-more-button[hidden] {
+    display: none;
   }
   .pagination {
     display: flex;
@@ -826,10 +855,13 @@ const { libraryBooks = [] } = Astro.props;
   const trendingContainer = document.getElementById('trending-results') as HTMLElement;
   const trendingStatus = document.getElementById('trending-status') as HTMLElement;
   const trendingTabs = Array.from(trendingSection.querySelectorAll<HTMLButtonElement>('.trending-tabs button'));
-  const trendingPeriodKey = 'my-book-library:trending-period';
+  const trendingShowMoreButton = document.getElementById('trending-show-more') as HTMLButtonElement;
   const trendingPeriodLabels: Record<string, string> = { daily: 'today', weekly: 'this week', monthly: 'this month' };
-  let trendingPeriod = localStorage.getItem(trendingPeriodKey) || 'weekly';
-  if (!trendingPeriodLabels[trendingPeriod]) trendingPeriod = 'weekly';
+  localStorage.removeItem('my-book-library:trending-period');
+  // Trending always opens on Today.
+  let trendingPeriod = 'daily';
+  // How many screenfuls of trending books are shown; Show more adds one.
+  let trendingScreens = 1;
   let trendingBooks: any[] = [];
   let trendingLoadedPeriod = '';
   let trendingRequestId = 0;
@@ -1749,7 +1781,8 @@ const { libraryBooks = [] } = Astro.props;
 
   function renderTrending() {
     const available = currentHideAdded ? trendingBooks.filter((book) => !isInMyLists(book)) : trendingBooks;
-    const books = available.slice(0, searchPageSize);
+    const books = available.slice(0, searchPageSize * trendingScreens);
+    trendingShowMoreButton.hidden = available.length <= books.length;
     // Skip identical re-renders so resizing never makes the covers blink.
     const renderKey = `${trendingLoadedPeriod}|${currentHideAdded}|${books.map((book) => book.key).join(',')}`;
     if (renderKey === trendingRenderedKey) return;
@@ -1770,6 +1803,8 @@ const { libraryBooks = [] } = Astro.props;
     trendingTabs.forEach((tab) => tab.setAttribute('aria-pressed', String(tab.dataset.period === period)));
     trendingStatus.textContent = 'Loading trending books...';
     trendingContainer.innerHTML = '';
+    trendingShowMoreButton.hidden = true;
+    trendingScreens = 1;
     trendingRenderedKey = '';
     try {
       const response = await fetch(`/api/trending-books.json?period=${encodeURIComponent(period)}&v=2`);
@@ -1796,12 +1831,16 @@ const { libraryBooks = [] } = Astro.props;
 
   trendingTabs.forEach((tab) => {
     tab.addEventListener('click', () => {
-      const period = tab.dataset.period || 'weekly';
+      const period = tab.dataset.period || 'daily';
       if (period === trendingPeriod && trendingLoadedPeriod === period) return;
       trendingPeriod = period;
-      localStorage.setItem(trendingPeriodKey, period);
       loadTrending(period);
     });
+  });
+
+  trendingShowMoreButton.addEventListener('click', () => {
+    trendingScreens++;
+    renderTrending();
   });
 
   updateTrendingVisibility();
