@@ -68,6 +68,11 @@ Click a result's cover, title, or non-interactive area to view its details.
 Browse editions opens the edition list; selecting an edition shows its details
 and lets you add that specific edition to a list without changing the search result.
 
+Search results are paged to fit the window: wide layouts with 7 or more books
+per row show 2 rows per page, and narrower layouts show 3 rows (always at least
+12 books). Resizing the window recalculates the page size and keeps the first
+book you were viewing on screen.
+
 When syncing from Open Library, a logged edition without a cover is shown as the
 work's newest edition that has one. Editions you pick in this app are kept as chosen.
 Sync reads edition records in batches from Open Library's Books API rather than

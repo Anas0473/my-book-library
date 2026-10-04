@@ -1,5 +1,6 @@
 import type { APIRoute } from 'astro';
 import { findMatchingEdition as lookupMatchingEdition } from '../../lib/editions';
+import { DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE } from '../../lib/responsive-page-size';
 
 const matchingEditionCache = new Map<string, { expiresAt: number; edition: any }>();
 const findSearchMatchingEdition = async (
@@ -247,8 +248,10 @@ export const GET: APIRoute = async ({ url }) => {
   const sort = url.searchParams.get('sort') || '';
   const shouldSort = ['title-asc', 'title-desc', 'year-desc', 'year-asc'].includes(sort);
   const page = Math.max(1, parseInt(url.searchParams.get('page') || '1', 10));
-  const requestedLimit = parseInt(url.searchParams.get('limit') || '18', 10);
-  const limit = [14, 15, 18].includes(requestedLimit) ? requestedLimit : 16;
+  const requestedLimit = parseInt(url.searchParams.get('limit') || String(DEFAULT_PAGE_SIZE), 10);
+  const limit = Number.isFinite(requestedLimit)
+    ? Math.min(MAX_PAGE_SIZE, Math.max(1, requestedLimit))
+    : DEFAULT_PAGE_SIZE;
   const offset = (page - 1) * limit;
 
   const jsonHeaders = { 'Content-Type': 'application/json' };

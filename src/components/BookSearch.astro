@@ -730,6 +730,8 @@ const { libraryBooks = [] } = Astro.props;
 </style>
 
 <script>
+  import { observeGridPageSize, pageForNewSize } from '../lib/responsive-page-size';
+
   const searchContainer = document.querySelector('.search-container') as HTMLElement;
   const searchInput = document.getElementById('global-book-search') as HTMLInputElement;
   const searchInputCompactQuery = window.matchMedia('(max-width: 700px)');
@@ -786,7 +788,17 @@ const { libraryBooks = [] } = Astro.props;
       && !searchLanguageSelect.value
       && !hideAddedToggle.checked;
   }
-  const pageSize = 18;
+  let pageSizeRefreshTimer: ReturnType<typeof setTimeout>;
+  let searchPageSize = observeGridPageSize(resultsContainer, (nextPageSize, previousPageSize) => {
+    searchPageSize = nextPageSize;
+    if (!currentQuery) return;
+    clearTimeout(pageSizeRefreshTimer);
+    const targetPage = pageForNewSize(currentPage, previousPageSize, nextPageSize);
+    // Wait for the resize to settle so dragging the window edge doesn't fire a search per step.
+    pageSizeRefreshTimer = setTimeout(() => {
+      performSearch(currentQuery, targetPage, currentAuthorOnly, currentAuthorKey, currentAuthorExact, currentSort, currentLanguage);
+    }, 300);
+  });
   const savedBooksKey = 'my-book-library:books';
   const legacySavedBooksKey = 'my-book-library:plan-to-read';
   const shelfLabels: Record<string, string> = {
@@ -959,6 +971,8 @@ const { libraryBooks = [] } = Astro.props;
     language = currentLanguage,
     hideAdded = currentHideAdded,
   ) {
+    clearTimeout(pageSizeRefreshTimer);
+    const pageSize = searchPageSize;
     currentQuery = query;
     currentPage = page;
     currentSort = sort;
