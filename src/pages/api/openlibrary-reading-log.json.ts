@@ -1,5 +1,6 @@
 import type { APIRoute } from 'astro';
 import { findMatchingEdition } from '../../lib/editions';
+import { getSession, sessionHeaders } from '../../lib/openlibrary-session';
 
 const shelves = [
   { id: 'want-to-read', status: 'Plan to Read' },
@@ -27,11 +28,16 @@ function parseLoggedDate(value: unknown) {
   return Number.isFinite(timestamp) ? timestamp : null;
 }
 
-export const GET: APIRoute = async ({ url }) => {
+export const GET: APIRoute = async ({ url, cookies }) => {
   const username = (url.searchParams.get('username') || '').trim();
   if (!/^[\w.-]{1,64}$/.test(username)) {
     return jsonResponse({ error: 'Enter a valid Open Library username.' }, 400);
   }
+  // A logged-in owner can read their own log even when it is private.
+  const session = getSession(cookies);
+  const requestHeaders = session?.username.toLowerCase() === username.toLowerCase()
+    ? sessionHeaders(session.session)
+    : { 'User-Agent': 'my-book-library/0.0.1' };
 
   const books = new Map<string, any>();
   const incompleteShelves: Array<{ status: string }> = [];
@@ -61,7 +67,7 @@ export const GET: APIRoute = async ({ url }) => {
         try {
           response = await fetch(apiUrl, {
             signal: controller.signal,
-            headers: { 'User-Agent': 'my-book-library/0.0.1' },
+            headers: requestHeaders,
           });
         } finally {
           clearTimeout(timeout);

@@ -88,6 +88,16 @@ your saved books.
 Click outside the Open Library connection dialog, press Escape, or choose Cancel
 to close it without starting a sync.
 
+To sync both ways, log in with your Open Library email and password in that
+dialog. Your password is sent only to Open Library to log in and is never stored.
+The site keeps Open Library's login session in an HTTP-only cookie. While you're
+logged in, adding, moving or deleting a book here also does it on Open Library, and
+changes made on Open Library come here every 15 minutes or when you choose Sync now.
+Right after logging in, books that are only in this app are added to Open Library
+unless Open Library already has that work. Changes made while offline or logged out
+wait and are sent once you're back online or log in again. Books without an Open
+Library work, such as fallback search results, stay only in this app.
+
 ## Optional Search Fallback
 
 Press Enter in the search field to search immediately or retry the unchanged

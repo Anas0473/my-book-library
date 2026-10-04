@@ -364,9 +364,9 @@ const splitAuthors = (author: string) =>
         }
       }
       #open-library-sync-dialog {
-        width: min(28rem, calc(100vw - 2rem));
+        width: min(30rem, calc(100vw - 2rem));
         max-width: none;
-        padding: 1.4rem;
+        padding: 1.75rem 1.9rem;
         border: 1px solid var(--border-dark);
         border-radius: 14px;
         background: var(--surface-dark);
@@ -379,7 +379,7 @@ const splitAuthors = (author: string) =>
       }
       .open-library-sync-form {
         display: grid;
-        gap: 0.75rem;
+        gap: 1.4rem;
       }
       .open-library-sync-form h2 {
         margin: 0;
@@ -388,11 +388,129 @@ const splitAuthors = (author: string) =>
         font-weight: 400;
         line-height: 1.1;
       }
+      .open-library-mode-switch {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 0.35rem;
+        padding: 0.3rem;
+        border: 1px solid var(--border-dark);
+        border-radius: 11px;
+        background: var(--surface-dark-2);
+      }
+      .open-library-mode-switch[hidden],
+      .open-library-mode-panel[hidden],
+      .open-library-account-card[hidden] {
+        display: none;
+      }
+      .open-library-sync-form .open-library-mode-switch label {
+        margin: 0;
+        cursor: pointer;
+      }
+      .open-library-sync-form .open-library-mode-switch input {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        padding: 0;
+        opacity: 0;
+        pointer-events: none;
+      }
+      .open-library-mode-switch span {
+        display: grid;
+        gap: 0.1rem;
+        padding: 0.5rem 0.65rem;
+        border-radius: 8px;
+        text-align: center;
+        transition: background-color 0.15s ease, color 0.15s ease;
+      }
+      .open-library-mode-switch strong {
+        font-size: 0.88rem;
+      }
+      .open-library-mode-switch small {
+        color: var(--text-dark-muted);
+        font-size: 0.74rem;
+        font-weight: 400;
+      }
+      .open-library-mode-switch input:checked + span {
+        background: var(--accent);
+        color: var(--accent-ink);
+      }
+      .open-library-mode-switch input:checked + span small {
+        color: inherit;
+        opacity: 0.8;
+      }
+      .open-library-mode-switch input:focus-visible + span {
+        outline: 2px solid var(--accent);
+        outline-offset: 2px;
+      }
+      .open-library-mode-panel {
+        display: grid;
+        gap: 0.5rem;
+        margin-top: -0.6rem;
+      }
+      .open-library-mode-panel > p:first-child {
+        margin-bottom: 0.6rem;
+      }
+      .open-library-sync-form .open-library-mode-panel label {
+        margin-top: 0.5rem;
+      }
+      .open-library-sync-form .open-library-mode-panel label:first-of-type {
+        margin-top: 0;
+      }
+      .open-library-sync-form .open-library-note {
+        margin-top: 0.35rem;
+        font-size: 0.8rem;
+        line-height: 1.6;
+      }
+      .open-library-account-card {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+        padding: 0.85rem 0.95rem;
+        border: 1px solid var(--border-dark);
+        border-radius: 11px;
+        background: var(--surface-dark-2);
+      }
+      .open-library-account-card > div {
+        display: grid;
+        flex: 1;
+        gap: 0.15rem;
+        min-width: 0;
+      }
+      .open-library-account-card strong {
+        font-size: 0.9rem;
+        overflow-wrap: anywhere;
+      }
+      .open-library-account-card small {
+        color: var(--text-dark-muted);
+        font-size: 0.76rem;
+        line-height: 1.4;
+      }
+      .open-library-account-dot {
+        flex: none;
+        width: 0.55rem;
+        height: 0.55rem;
+        border-radius: 50%;
+        background: #4caf72;
+      }
+      .open-library-link-button {
+        flex: none;
+        padding: 0.3rem 0.1rem;
+        border: 0;
+        background: none;
+        color: var(--text-dark-muted);
+        font: inherit;
+        font-size: 0.8rem;
+        text-decoration: underline;
+        cursor: pointer;
+      }
+      .open-library-link-button:hover {
+        color: var(--text-dark);
+      }
       .open-library-sync-form p {
         margin: 0;
         color: var(--text-dark-muted);
         font-size: 0.86rem;
-        line-height: 1.55;
+        line-height: 1.65;
       }
       .open-library-sync-form label {
         margin-top: 0.35rem;
@@ -417,11 +535,14 @@ const splitAuthors = (author: string) =>
       .open-library-sync-message {
         min-height: 1.25rem;
       }
+      .open-library-sync-message:empty {
+        display: none;
+      }
       .open-library-sync-actions {
         display: flex;
         justify-content: flex-end;
-        gap: 0.5rem;
-        margin-top: 0.35rem;
+        gap: 0.6rem;
+        margin-top: 0.4rem;
       }
       .open-library-sync-actions button {
         min-height: 2.4rem;
@@ -1618,10 +1739,38 @@ const splitAuthors = (author: string) =>
     <dialog id="open-library-sync-dialog" aria-labelledby="open-library-sync-title">
       <form class="open-library-sync-form" id="open-library-sync-form">
         <h2 id="open-library-sync-title">Connect Open Library</h2>
-        <p>Enter your Open Library username. Your reading log must be public to sync, and no password is needed.</p>
-        <p>Only one account can be synced at a time. Switching accounts replaces its synced books, while books added only here stay.</p>
-        <label for="open-library-username">Open Library username</label>
-        <input id="open-library-username" name="username" type="text" autocomplete="username" required />
+        <div class="open-library-mode-switch" id="open-library-mode-switch" role="radiogroup" aria-label="How to sync">
+          <label>
+            <input type="radio" name="open-library-mode" value="username" />
+            <span><strong>Import only</strong><small>Just your username</small></span>
+          </label>
+          <label>
+            <input type="radio" name="open-library-mode" value="login" checked />
+            <span><strong>Two-way</strong><small>Changes go both ways</small></span>
+          </label>
+        </div>
+        <div class="open-library-mode-panel" id="open-library-username-fields" hidden>
+          <p>Enter your Open Library username to bring your public reading log here. No password is needed, but changes you make here won't be sent to Open Library.</p>
+          <label for="open-library-username">Open Library username</label>
+          <input id="open-library-username" name="username" type="text" autocomplete="username" />
+          <p class="open-library-note">Only one account can be synced at a time. Switching accounts replaces its synced books, while books added only here stay.</p>
+        </div>
+        <div class="open-library-mode-panel" id="open-library-login-fields">
+          <p>Log in to also send your changes here to Open Library, such as adding, moving or deleting books, so you only have to update one place.</p>
+          <label for="open-library-email">Email</label>
+          <input id="open-library-email" type="email" autocomplete="email" />
+          <label for="open-library-password">Password</label>
+          <input id="open-library-password" type="password" autocomplete="current-password" />
+          <p class="open-library-note">Your password goes only to Open Library to log in and is never stored. This site keeps just the login session, in a secure cookie.</p>
+        </div>
+        <div class="open-library-account-card" id="open-library-logged-in" hidden>
+          <span class="open-library-account-dot" aria-hidden="true"></span>
+          <div>
+            <strong id="open-library-logged-in-text"></strong>
+            <small>Changes sync both ways. Open Library changes arrive every 15 minutes.</small>
+          </div>
+          <button type="button" class="open-library-link-button" id="open-library-logout">Log out</button>
+        </div>
         <p class="open-library-sync-message" id="open-library-sync-message" role="status" aria-live="polite"></p>
         <div class="open-library-sync-actions">
           <button type="button" id="open-library-sync-cancel">Cancel</button>
@@ -1632,6 +1781,13 @@ const splitAuthors = (author: string) =>
 
     <script>
       import { createTheme } from "../lib/theme";
+      import {
+        diffShelves,
+        mergePendingChanges,
+        shelfSnapshot,
+        workIdOf,
+        type ShelfChange,
+      } from "../lib/openlibrary-push";
 
       const buttons = document.querySelectorAll(
         ".category-btn, .mobile-nav-button",
@@ -1657,6 +1813,16 @@ const splitAuthors = (author: string) =>
       const openLibrarySyncMessage = document.getElementById("open-library-sync-message") as HTMLElement;
       const openLibrarySyncSubmit = document.getElementById("open-library-sync-submit") as HTMLButtonElement;
       const openLibrarySyncCancel = document.getElementById("open-library-sync-cancel") as HTMLButtonElement;
+      const openLibraryLoginFields = document.getElementById("open-library-login-fields") as HTMLElement;
+      const openLibraryLoggedIn = document.getElementById("open-library-logged-in") as HTMLElement;
+      const openLibraryLoggedInText = document.getElementById("open-library-logged-in-text") as HTMLElement;
+      const openLibraryEmailInput = document.getElementById("open-library-email") as HTMLInputElement;
+      const openLibraryPasswordInput = document.getElementById("open-library-password") as HTMLInputElement;
+      const openLibraryLogoutButton = document.getElementById("open-library-logout") as HTMLButtonElement;
+      const openLibraryAccountMessage = openLibrarySyncMessage;
+      const openLibraryUsernameFields = document.getElementById("open-library-username-fields") as HTMLElement;
+      const openLibraryModeSwitch = document.getElementById("open-library-mode-switch") as HTMLElement;
+      const openLibraryModeInputs = document.querySelectorAll<HTMLInputElement>('input[name="open-library-mode"]');
       // v2: the old key auto-saved white on every load, so it can't tell a real choice from the old default.
       const backgroundPreferenceKey = "my-book-library:page-background-v2";
       localStorage.removeItem("my-book-library:page-background");
@@ -2143,6 +2309,253 @@ const splitAuthors = (author: string) =>
 
       updateShelfCounts();
 
+      const openLibraryPushUserKey = "my-book-library:openlibrary-push-user";
+      const openLibraryPendingKey = "my-book-library:openlibrary-pending";
+      const openLibraryLoggedInSyncInterval = 15 * 60 * 1000;
+      let openLibraryShelfSnapshot = shelfSnapshot(localBooks);
+      let openLibraryFlush: Promise<void> | null = null;
+      let openLibraryRetryTimer = 0;
+
+      function getOpenLibraryPushUser() {
+        return localStorage.getItem(openLibraryPushUserKey);
+      }
+
+      function readPendingOpenLibraryChanges(): ShelfChange[] {
+        try {
+          const pending = JSON.parse(localStorage.getItem(openLibraryPendingKey) || "[]");
+          return Array.isArray(pending) ? pending : [];
+        } catch {
+          return [];
+        }
+      }
+
+      function writePendingOpenLibraryChanges(pending: ShelfChange[]) {
+        if (pending.length > 0) localStorage.setItem(openLibraryPendingKey, JSON.stringify(pending));
+        else localStorage.removeItem(openLibraryPendingKey);
+      }
+
+      function showOpenLibraryStatus(message: string) {
+        openLibrarySyncStatus.hidden = !message;
+        openLibrarySyncStatus.textContent = message;
+      }
+
+      /** Saves the list without sending anything, for changes that came from Open Library. */
+      function saveLocalBooksWithoutPush() {
+        localStorage.setItem(savedBooksKey, JSON.stringify(localBooks));
+        openLibraryShelfSnapshot = shelfSnapshot(localBooks);
+      }
+
+      function queueOpenLibraryChanges(changes: ShelfChange[]) {
+        if (changes.length === 0) return;
+        writePendingOpenLibraryChanges(
+          mergePendingChanges(readPendingOpenLibraryChanges(), changes),
+        );
+        flushOpenLibraryChanges();
+      }
+
+      /** Saves the list and sends any shelf changes to Open Library when logged in. */
+      function persistLocalBooks() {
+        const nextSnapshot = shelfSnapshot(localBooks);
+        const changes = getOpenLibraryPushUser()
+          ? diffShelves(openLibraryShelfSnapshot, nextSnapshot)
+          : [];
+        changes.forEach((change) => {
+          if (change.status === null) return;
+          localBooks.forEach((book) => {
+            if (workIdOf(book) === change.workId && book.status === change.status) {
+              book.openLibraryRemoved = false;
+            }
+          });
+        });
+        saveLocalBooksWithoutPush();
+        queueOpenLibraryChanges(changes);
+      }
+
+      function markOpenLibraryChangeSent(change: ShelfChange, username: string) {
+        if (change.status === null) return;
+        let changed = false;
+        localBooks.forEach((book) => {
+          if (workIdOf(book) !== change.workId || book.status !== change.status) return;
+          if (book.openLibrarySyncUsername === username && !book.openLibraryRemoved) return;
+          book.openLibrarySyncUsername = username;
+          book.openLibraryRemoved = false;
+          changed = true;
+        });
+        if (changed) saveLocalBooksWithoutPush();
+      }
+
+      function handleOpenLibraryLoggedOut() {
+        localStorage.removeItem(openLibraryPushUserKey);
+        updateOpenLibraryAccountView();
+        const waiting = readPendingOpenLibraryChanges().length;
+        showOpenLibraryStatus(waiting > 0
+          ? `Open Library logged you out. Log in again to send ${waiting} waiting ${waiting === 1 ? "change" : "changes"}.`
+          : "Open Library logged you out. Log in again to keep sending changes.");
+      }
+
+      function flushOpenLibraryChanges() {
+        if (!openLibraryFlush) {
+          openLibraryFlush = sendPendingOpenLibraryChanges().finally(() => {
+            openLibraryFlush = null;
+          });
+        }
+        return openLibraryFlush;
+      }
+
+      async function sendPendingOpenLibraryChanges() {
+        window.clearTimeout(openLibraryRetryTimer);
+        let sent = 0;
+        while (true) {
+          const username = getOpenLibraryPushUser();
+          const [change] = readPendingOpenLibraryChanges();
+          if (!username || !change) break;
+          const remaining = readPendingOpenLibraryChanges().length;
+          showOpenLibraryStatus(`Sending ${remaining} ${remaining === 1 ? "change" : "changes"} to Open Library…`);
+
+          let response: Response;
+          let data: any = {};
+          try {
+            response = await fetch("/api/openlibrary-shelf.json", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                workKey: `/works/${change.workId}`,
+                editionKey: change.editionKey,
+                status: change.status,
+              }),
+            });
+            data = await response.json().catch(() => ({}));
+          } catch {
+            showOpenLibraryStatus("Couldn't reach Open Library. Your changes will be sent again soon.");
+            openLibraryRetryTimer = window.setTimeout(flushOpenLibraryChanges, 60 * 1000);
+            return;
+          }
+
+          if (data.loggedOut) {
+            handleOpenLibraryLoggedOut();
+            return;
+          }
+          if (!response.ok && response.status !== 400) {
+            showOpenLibraryStatus(`${data.error || "Open Library didn't accept a change."} It will be sent again soon.`);
+            openLibraryRetryTimer = window.setTimeout(flushOpenLibraryChanges, 60 * 1000);
+            return;
+          }
+
+          // A newer change to the same book may have been queued while this one was sending.
+          const pending = readPendingOpenLibraryChanges();
+          if (JSON.stringify(pending[0]) === JSON.stringify(change)) pending.shift();
+          writePendingOpenLibraryChanges(pending);
+          if (response.ok) {
+            markOpenLibraryChangeSent(change, username);
+            sent++;
+          }
+          await new Promise((resolve) => window.setTimeout(resolve, 250));
+        }
+        if (sent > 0) {
+          showOpenLibraryStatus(`Sent ${sent} ${sent === 1 ? "change" : "changes"} to Open Library.`);
+        }
+      }
+
+      function getOpenLibraryDialogMode() {
+        return document.querySelector<HTMLInputElement>('input[name="open-library-mode"]:checked')?.value || "login";
+      }
+
+      function updateOpenLibraryAccountView() {
+        const pushUser = getOpenLibraryPushUser();
+        const mode = getOpenLibraryDialogMode();
+        openLibraryModeSwitch.hidden = Boolean(pushUser);
+        openLibraryLoginFields.hidden = Boolean(pushUser) || mode !== "login";
+        openLibraryUsernameFields.hidden = Boolean(pushUser) || mode !== "username";
+        openLibraryLoggedIn.hidden = !pushUser;
+        openLibraryLoggedInText.textContent = pushUser ? `Logged in as ${pushUser}` : "";
+        updateOpenLibrarySyncSubmitLabel();
+      }
+
+      async function logInToOpenLibrary() {
+        const email = openLibraryEmailInput.value.trim();
+        const password = openLibraryPasswordInput.value;
+        if (!email || !password) {
+          openLibraryAccountMessage.textContent = "Enter your Open Library email and password.";
+          return;
+        }
+        openLibrarySyncSubmit.disabled = true;
+        openLibraryAccountMessage.textContent = "Logging in to Open Library…";
+        try {
+          const response = await fetch("/api/openlibrary-account.json", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ email, password }),
+          });
+          const data = await response.json().catch(() => ({}));
+          if (!response.ok || !data.username) throw new Error(data.error || "Could not log in to Open Library.");
+          openLibraryPasswordInput.value = "";
+
+          const previousUsername = localStorage.getItem(openLibraryUsernameKey);
+          if (
+            previousUsername &&
+            previousUsername !== data.username &&
+            !window.confirm(`Switch from ${previousUsername} to ${data.username}? Books synced from ${previousUsername} will be replaced. Books added only in this app will stay.`)
+          ) {
+            await fetch("/api/openlibrary-account.json", { method: "DELETE" });
+            openLibraryAccountMessage.textContent = "Account switch cancelled.";
+            return;
+          }
+
+          localStorage.setItem(openLibraryPushUserKey, data.username);
+          updateOpenLibraryAccountView();
+          openLibraryAccountMessage.textContent = `Logged in as ${data.username}.`;
+          await syncOpenLibrary(data.username, { confirmed: true, sendLocalOnlyBooks: true });
+        } catch (error) {
+          openLibraryAccountMessage.textContent = error instanceof Error
+            ? error.message
+            : "Could not log in to Open Library.";
+        } finally {
+          openLibrarySyncSubmit.disabled = false;
+        }
+      }
+
+      async function logOutOfOpenLibrary() {
+        openLibraryLogoutButton.disabled = true;
+        try {
+          await fetch("/api/openlibrary-account.json", { method: "DELETE" });
+          localStorage.removeItem(openLibraryPushUserKey);
+          writePendingOpenLibraryChanges([]);
+          updateOpenLibraryAccountView();
+          openLibraryAccountMessage.textContent = "Logged out. Changes here will no longer be sent to Open Library.";
+          showOpenLibraryStatus("");
+        } catch {
+          openLibraryAccountMessage.textContent = "Could not log out. Try again.";
+        } finally {
+          openLibraryLogoutButton.disabled = false;
+        }
+      }
+
+      async function checkOpenLibraryAccount() {
+        try {
+          const response = await fetch("/api/openlibrary-account.json", { cache: "no-store" });
+          const data = await response.json();
+          if (data.connected && data.username) {
+            localStorage.setItem(openLibraryPushUserKey, data.username);
+            updateOpenLibraryAccountView();
+            flushOpenLibraryChanges();
+          } else if (getOpenLibraryPushUser()) {
+            handleOpenLibraryLoggedOut();
+          }
+        } catch {
+          // Offline: keep the saved state and try again on the next visit.
+        }
+      }
+
+      function syncOpenLibraryIfDue() {
+        const username = localStorage.getItem(openLibraryUsernameKey);
+        if (!username || readPendingOpenLibraryChanges().length > 0) return;
+        const interval = getOpenLibraryPushUser() === username
+          ? openLibraryLoggedInSyncInterval
+          : openLibrarySyncInterval;
+        const lastSync = Number(localStorage.getItem(openLibraryLastSyncKey) || 0);
+        if (Date.now() - lastSync > interval) syncOpenLibrary(username, { quiet: true });
+      }
+
       function updateOpenLibrarySyncLabel() {
         const username = localStorage.getItem(openLibraryUsernameKey);
         openLibrarySyncButton.textContent = username
@@ -2159,9 +2572,13 @@ const splitAuthors = (author: string) =>
         openLibrarySyncStatus.hidden = true;
       }
 
-      async function syncOpenLibrary(username: string) {
+      async function syncOpenLibrary(
+        username: string,
+        { confirmed = false, quiet = false, sendLocalOnlyBooks = false } = {},
+      ) {
         const previousUsername = localStorage.getItem(openLibraryUsernameKey);
         if (
+          !confirmed &&
           previousUsername &&
           previousUsername !== username &&
           !window.confirm(`Switch from ${previousUsername} to ${username}? Books synced from ${previousUsername} will be replaced. Books added only in this app will stay.`)
@@ -2173,11 +2590,17 @@ const splitAuthors = (author: string) =>
         openLibrarySyncButton.disabled = true;
         mobileOpenLibrarySyncButton.disabled = true;
         openLibrarySyncSubmit.disabled = true;
-        openLibrarySyncMessage.textContent = "Syncing your public reading log…";
-        openLibrarySyncStatus.hidden = false;
-        openLibrarySyncStatus.textContent = "Syncing Open Library…";
 
         try {
+          // Send waiting changes first so the pull doesn't undo them.
+          if (getOpenLibraryPushUser()) await flushOpenLibraryChanges();
+          const waitingChanges = readPendingOpenLibraryChanges().length;
+          if (waitingChanges > 0 && getOpenLibraryPushUser()) {
+            throw new Error(`${waitingChanges} ${waitingChanges === 1 ? "change hasn't" : "changes haven't"} reached Open Library yet, so syncing was skipped to keep them. Try again in a minute.`);
+          }
+
+          openLibrarySyncMessage.textContent = "Syncing your reading log…";
+          if (!quiet) showOpenLibraryStatus("Syncing Open Library…");
           const response = await fetch(
             `/api/openlibrary-reading-log.json?username=${encodeURIComponent(username)}`,
           );
@@ -2249,8 +2672,9 @@ const splitAuthors = (author: string) =>
             }
           });
 
+          const listChanged = JSON.stringify(nextBooks) !== JSON.stringify(localBooks);
           localBooks = nextBooks;
-          localStorage.setItem(savedBooksKey, JSON.stringify(localBooks));
+          saveLocalBooksWithoutPush();
           localStorage.setItem(openLibraryUsernameKey, username);
           localStorage.setItem(openLibraryLastSyncKey, String(Date.now()));
           const incompleteMessage = incompleteShelves
@@ -2269,12 +2693,32 @@ const splitAuthors = (author: string) =>
             ? `Synced ${syncedBooks.length} books from ${username}. ${syncWarnings}.`
             : `Synced ${syncedBooks.length} books from ${username}.`;
           localStorage.setItem(openLibraryLastSyncResultKey, syncWarnings);
-          openLibrarySyncStatus.textContent = syncResult;
           openLibrarySyncMessage.textContent = syncWarnings
             ? syncResult
             : `Synced ${syncedBooks.length} books.`;
           updateOpenLibrarySyncLabel();
-          openLibrarySyncStatus.textContent = syncResult;
+          if (!quiet || listChanged) showOpenLibraryStatus(syncResult);
+
+          let sentLocalOnlyBooks = false;
+          if (sendLocalOnlyBooks && getOpenLibraryPushUser() === username) {
+            // Books added only here go to Open Library, unless Open Library already has that work.
+            const syncedWorkIds = new Set(syncedBooks.map((book: any) => workIdOf(book)));
+            const localOnlyChanges = diffShelves(
+              new Map(),
+              shelfSnapshot(localBooks.filter((book) => !book.openLibrarySyncUsername)),
+            ).filter((change) => !syncedWorkIds.has(change.workId));
+            if (localOnlyChanges.length > 0) {
+              openLibrarySyncMessage.textContent = `Sending ${localOnlyChanges.length} books that were only here to Open Library…`;
+              queueOpenLibraryChanges(localOnlyChanges);
+              await flushOpenLibraryChanges();
+              sentLocalOnlyBooks = true;
+            }
+          }
+
+          if (!listChanged && !sentLocalOnlyBooks) {
+            if (!quiet) window.setTimeout(() => openLibrarySyncDialog.close(), 900);
+            return;
+          }
           window.setTimeout(() => {
             openLibrarySyncDialog.close();
             window.location.reload();
@@ -2282,7 +2726,7 @@ const splitAuthors = (author: string) =>
         } catch (error) {
           const message = error instanceof Error ? error.message : "Could not sync Open Library.";
           openLibrarySyncMessage.textContent = message;
-          openLibrarySyncStatus.textContent = message;
+          if (!quiet) showOpenLibraryStatus(message);
         } finally {
           openLibrarySyncButton.disabled = false;
           mobileOpenLibrarySyncButton.disabled = false;
@@ -2293,26 +2737,41 @@ const splitAuthors = (author: string) =>
       function openOpenLibrarySyncDialog() {
         const username = localStorage.getItem(openLibraryUsernameKey) || "";
         openLibraryUsernameInput.value = username;
-        updateOpenLibrarySyncSubmitLabel();
+        const mode = !getOpenLibraryPushUser() && username ? "username" : "login";
+        openLibraryModeInputs.forEach((input) => { input.checked = input.value === mode; });
+        updateOpenLibraryAccountView();
         openLibrarySyncMessage.textContent = "";
         openLibrarySyncDialog.showModal();
-        openLibraryUsernameInput.focus();
+        if (getOpenLibraryPushUser()) openLibrarySyncSubmit.focus();
+        else if (mode === "username") openLibraryUsernameInput.focus();
+        else openLibraryEmailInput.focus();
       }
 
       function updateOpenLibrarySyncSubmitLabel() {
         const connectedUsername = localStorage.getItem(openLibraryUsernameKey);
         const enteredUsername = openLibraryUsernameInput.value.trim();
-        openLibrarySyncSubmit.textContent = connectedUsername && enteredUsername !== connectedUsername
-          ? "Switch and sync"
-          : connectedUsername
-            ? "Sync now"
-            : "Connect and sync";
+        openLibrarySyncSubmit.textContent = getOpenLibraryPushUser()
+          ? "Sync now"
+          : getOpenLibraryDialogMode() === "login"
+            ? "Log in and sync"
+            : connectedUsername && enteredUsername !== connectedUsername
+            ? "Switch and sync"
+            : connectedUsername
+              ? "Sync now"
+              : "Connect and sync";
       }
 
       openLibrarySyncButton.addEventListener("click", openOpenLibrarySyncDialog);
       mobileOpenLibrarySyncButton.addEventListener("click", openOpenLibrarySyncDialog);
       openLibraryUsernameInput.addEventListener("input", updateOpenLibrarySyncSubmitLabel);
-
+      openLibraryModeInputs.forEach((input) => {
+        input.addEventListener("change", () => {
+          openLibrarySyncMessage.textContent = "";
+          updateOpenLibraryAccountView();
+          (getOpenLibraryDialogMode() === "login" ? openLibraryEmailInput : openLibraryUsernameInput).focus();
+        });
+      });
+      openLibraryLogoutButton.addEventListener("click", logOutOfOpenLibrary);
       openLibrarySyncCancel.addEventListener("click", () => {
         openLibrarySyncDialog.close();
       });
@@ -2327,19 +2786,32 @@ const splitAuthors = (author: string) =>
 
       openLibrarySyncForm.addEventListener("submit", (event) => {
         event.preventDefault();
-        const username = openLibraryUsernameInput.value.trim();
-        if (username) syncOpenLibrary(username);
+        const pushUser = getOpenLibraryPushUser();
+        if (pushUser) {
+          syncOpenLibrary(pushUser);
+        } else if (getOpenLibraryDialogMode() === "login") {
+          logInToOpenLibrary();
+        } else {
+          const username = openLibraryUsernameInput.value.trim();
+          if (username) syncOpenLibrary(username);
+          else openLibrarySyncMessage.textContent = "Enter your Open Library username.";
+        }
       });
 
       updateOpenLibrarySyncLabel();
-      const savedOpenLibraryUsername = localStorage.getItem(openLibraryUsernameKey);
-      const lastOpenLibrarySync = Number(localStorage.getItem(openLibraryLastSyncKey) || 0);
-      if (
-        savedOpenLibraryUsername &&
-        Date.now() - lastOpenLibrarySync > openLibrarySyncInterval
-      ) {
-        window.setTimeout(() => syncOpenLibrary(savedOpenLibraryUsername), 500);
+      updateOpenLibraryAccountView();
+      if (readPendingOpenLibraryChanges().length > 0 && !getOpenLibraryPushUser()) {
+        handleOpenLibraryLoggedOut();
       }
+      window.setTimeout(async () => {
+        await checkOpenLibraryAccount();
+        await flushOpenLibraryChanges();
+        syncOpenLibraryIfDue();
+      }, 500);
+      document.addEventListener("visibilitychange", () => {
+        if (document.visibilityState === "visible") syncOpenLibraryIfDue();
+      });
+      window.addEventListener("online", () => flushOpenLibraryChanges());
 
       function activatePanel(target: string) {
         buttons.forEach((button) =>
@@ -3744,7 +4216,7 @@ const splitAuthors = (author: string) =>
           });
 
           if (restoredCount > 0) {
-            localStorage.setItem(savedBooksKey, JSON.stringify(localBooks));
+            persistLocalBooks();
             updateShelfCounts();
             panelRefreshers.forEach((refreshPanel) => refreshPanel());
             syncShelfControls();
@@ -3778,7 +4250,7 @@ const splitAuthors = (author: string) =>
           localBooks.push(updatedBook);
         }
 
-        localStorage.setItem(savedBooksKey, JSON.stringify(localBooks));
+        persistLocalBooks();
         removeMatchingContentBooks(updatedBook);
         document.querySelectorAll<HTMLElement>("[data-local-book-key]").forEach((card) => {
           const cardBook = {
@@ -3807,7 +4279,7 @@ const splitAuthors = (author: string) =>
         invalidateShelfUndo(book);
 
         const [deletedBook] = localBooks.splice(existingIndex, 1);
-        localStorage.setItem(savedBooksKey, JSON.stringify(localBooks));
+        persistLocalBooks();
         document.querySelectorAll<HTMLElement>("[data-local-book-key]").forEach((card) => {
           const cardBook = {
             key: card.dataset.bookKey,

@@ -53,7 +53,8 @@ test('sync uses current edition covers, preserves logged identity and reports fa
 
   const sync = async () => GET({
     url: new URL('http://localhost/api/openlibrary-reading-log.json?username=tester'),
-  } as Parameters<typeof GET>[0]);
+    cookies: { get: () => undefined },
+  } as unknown as Parameters<typeof GET>[0]);
 
   try {
     let response = await sync();
