@@ -46,6 +46,18 @@ const { libraryBooks = [] } = Astro.props;
     </label>
     <button type="button" id="reset-search-filters" class="search-reset-button" disabled>Reset filters</button>
   </div>
+  <section id="trending-books" class="trending-books" aria-labelledby="trending-books-heading">
+    <div class="trending-header">
+      <h3 id="trending-books-heading">Trending books</h3>
+      <div class="trending-tabs" role="group" aria-label="Trending period">
+        <button type="button" data-period="daily" aria-pressed="false">Today</button>
+        <button type="button" data-period="weekly" aria-pressed="true">This week</button>
+        <button type="button" data-period="monthly" aria-pressed="false">This month</button>
+      </div>
+    </div>
+    <p id="trending-status" class="trending-status" role="status"></p>
+    <div id="trending-results" class="results-grid"></div>
+  </section>
   <div id="search-results" class="results-grid"></div>
   <div id="pagination-controls" class="pagination"></div>
 </div>
@@ -248,6 +260,66 @@ const { libraryBooks = [] } = Astro.props;
   }
   .results-grid > :global(p) {
     color: var(--muted);
+  }
+  .trending-books {
+    margin-top: 2rem;
+  }
+  .trending-books[hidden] {
+    display: none;
+  }
+  .trending-header {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem 1rem;
+  }
+  .trending-header h3 {
+    margin: 0;
+    font-size: 1.15rem;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+  }
+  .trending-tabs {
+    display: inline-flex;
+    gap: 0.2rem;
+    padding: 0.2rem;
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    background: var(--panel);
+  }
+  .trending-tabs button {
+    padding: 0.35rem 0.75rem;
+    border: 0;
+    border-radius: 7px;
+    background: transparent;
+    color: var(--muted);
+    font: inherit;
+    font-size: 0.82rem;
+    cursor: pointer;
+  }
+  .trending-tabs button:hover {
+    color: var(--fg);
+  }
+  .trending-tabs button[aria-pressed="true"] {
+    background: var(--fill);
+    color: var(--fg);
+    font-weight: 600;
+  }
+  .trending-tabs button:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 1px;
+  }
+  .trending-status {
+    margin: 0.75rem 0 0;
+    color: var(--muted);
+    font-size: 0.85rem;
+  }
+  .trending-status:empty {
+    display: none;
+  }
+  .trending-books .results-grid {
+    margin-top: 1.25rem;
   }
   .pagination {
     display: flex;
@@ -750,7 +822,19 @@ const { libraryBooks = [] } = Astro.props;
   const resultsContainer = document.getElementById('search-results') as HTMLElement;
   const summaryContainer = document.getElementById('search-summary') as HTMLElement;
   const paginationContainer = document.getElementById('pagination-controls') as HTMLElement;
-  resultsContainer.addEventListener('error', (event) => {
+  const trendingSection = document.getElementById('trending-books') as HTMLElement;
+  const trendingContainer = document.getElementById('trending-results') as HTMLElement;
+  const trendingStatus = document.getElementById('trending-status') as HTMLElement;
+  const trendingTabs = Array.from(trendingSection.querySelectorAll<HTMLButtonElement>('.trending-tabs button'));
+  const trendingPeriodKey = 'my-book-library:trending-period';
+  const trendingPeriodLabels: Record<string, string> = { daily: 'today', weekly: 'this week', monthly: 'this month' };
+  let trendingPeriod = localStorage.getItem(trendingPeriodKey) || 'weekly';
+  if (!trendingPeriodLabels[trendingPeriod]) trendingPeriod = 'weekly';
+  let trendingBooks: any[] = [];
+  let trendingLoadedPeriod = '';
+  let trendingRequestId = 0;
+  let trendingRenderedKey = '';
+  function handleCoverError(event: Event) {
     const image = event.target;
     if (!(image instanceof HTMLImageElement) || !image.matches('.search-card img')) return;
 
@@ -765,7 +849,9 @@ const { libraryBooks = [] } = Astro.props;
     placeholder.className = 'search-cover-placeholder';
     placeholder.textContent = 'NO IMAGE';
     image.replaceWith(placeholder);
-  }, true);
+  }
+  resultsContainer.addEventListener('error', handleCoverError, true);
+  trendingContainer.addEventListener('error', handleCoverError, true);
   const libraryBooks = JSON.parse(searchContainer.dataset.libraryBooks || '[]') as any[];
   
   let debounceTimer: NodeJS.Timeout;
@@ -798,6 +884,7 @@ const { libraryBooks = [] } = Astro.props;
   let searchPageSize = observeGridPageSize(resultsContainer, (nextPageSize) => {
     searchPageSize = nextPageSize;
     schedulePageSizeRefresh();
+    if (trendingBooks.length && !trendingSection.hidden) renderTrending();
   });
   function schedulePageSizeRefresh() {
     clearTimeout(pageSizeRefreshTimer);
@@ -928,10 +1015,10 @@ const { libraryBooks = [] } = Astro.props;
   }
 
   function closeShelfMenus() {
-    resultsContainer.querySelectorAll<HTMLElement>('.shelf-menu').forEach((menu) => {
+    searchContainer.querySelectorAll<HTMLElement>('.shelf-menu').forEach((menu) => {
       menu.hidden = true;
     });
-    resultsContainer.querySelectorAll<HTMLButtonElement>('.shelf-toggle').forEach((toggle) => {
+    searchContainer.querySelectorAll<HTMLButtonElement>('.shelf-toggle').forEach((toggle) => {
       toggle.setAttribute('aria-expanded', 'false');
     });
   }
@@ -951,6 +1038,201 @@ const { libraryBooks = [] } = Astro.props;
       "'": '&#39;',
       '"': '&quot;',
     }[character] || character));
+  }
+
+  function renderBookCards(
+    container: HTMLElement,
+    books: any[],
+    { isInternetArchive = false, editionLanguage = '' } = {},
+  ) {
+    const savedBooks = getSavedBooks();
+    container.innerHTML = books.map((book: any, index: number) => {
+      const matchedSavedBook = isInternetArchive ? undefined : savedBooks.find((item: any) => isSameBook(item, book));
+      const firstEditionKey = Array.isArray(book.editionKeys) ? book.editionKeys[0] : null;
+      const savedEditionKey = matchedSavedBook?.editionKey || book.editionKey || firstEditionKey;
+      const savedEditionId = String(savedEditionKey || '').match(/OL\d+M/i)?.[0];
+      const coverImage = matchedSavedBook?.editionHeroImage
+        || book.editionHeroImage
+        || (savedEditionId
+          ? `https://covers.openlibrary.org/b/olid/${savedEditionId}-M.jpg?default=false`
+          : null)
+        || book.heroImage;
+      const editionUrl = matchedSavedBook?.editionUrl
+        || book.editionUrl
+        || (savedEditionId ? `https://openlibrary.org/books/${savedEditionId}` : '');
+      const workUrl = book.workKey
+        ? `https://openlibrary.org/${String(book.workKey).replace(/^\/+/, '')}`
+        : '';
+      const recordUrl = editionUrl || workUrl;
+      const recordLinkLabel = book.provider === 'internet-archive'
+        ? 'View on Internet Archive'
+        : 'Open selected edition';
+      return `
+      <div class="search-card">
+        <div>
+          ${coverImage
+            ? `<img src="${coverImage}" alt="${book.title}" loading="${index === 0 ? 'eager' : 'lazy'}" decoding="async"${index === 0 ? ' fetchpriority="high"' : ''} />`
+            : '<div class="search-cover-placeholder">NO IMAGE</div>'
+          }
+          <h5>${book.title}</h5>
+          ${book.subtitle ? `<p class="subtitle">${book.subtitle}</p>` : ''}
+          <p class="author-text">${authorLinksMarkup(book.author || 'Unknown Author')}</p>
+          <p class="pub-date">${book.pubDate ? `Published: ${book.pubDate}` : 'Publication date unknown'}</p>
+          <a class="selected-edition-link" href="${escapeHtml(recordUrl || '#')}" target="_blank" rel="noopener noreferrer" ${recordUrl ? '' : 'hidden'}>${recordLinkLabel}</a>
+          ${book.workKey ? `<button type="button" class="edition-button" data-book-index="${index}" data-preferred-edition="${escapeHtml(String(savedEditionKey || ''))}">Browse editions${book.editionCount ? ` (${book.editionCount})` : ''}</button>` : ''}
+        </div>
+        <div class="shelf-control">
+          <button type="button" class="shelf-primary">Plan to Read</button>
+          <button type="button" class="shelf-toggle" aria-label="Choose a reading list" aria-haspopup="menu" aria-expanded="false">▾</button>
+          <div class="shelf-menu" role="menu" hidden>
+            <button type="button" role="menuitem" data-status="Plan to Read">Plan to Read</button>
+            <button type="button" role="menuitem" data-status="Reading">Reading</button>
+            <button type="button" role="menuitem" data-status="Read">Read</button>
+            <div class="shelf-menu-divider" role="separator"></div>
+            <button type="button" role="menuitem" data-action="remove" hidden>Delete from My Lists</button>
+          </div>
+        </div>
+      </div>
+    `;
+    }).join('');
+
+    container.querySelectorAll<HTMLElement>('.search-card').forEach((card, index) => {
+      const image = card.querySelector<HTMLImageElement>('img');
+      const fallback = books[index].heroImage;
+      if (image && fallback) image.dataset.fallbackImage = fallback;
+      const title = card.querySelector<HTMLElement>('h5');
+      if (title) {
+        title.tabIndex = 0;
+        title.setAttribute('role', 'button');
+        title.setAttribute('aria-label', `View details of ${books[index].title}`);
+        title.addEventListener('keydown', (event) => {
+          if (event.key !== 'Enter' && event.key !== ' ') return;
+          event.preventDefault();
+          title.click();
+        });
+      }
+      card.addEventListener('click', (event) => {
+        if ((event.target as HTMLElement).closest('button, a, input, select, .shelf-control')) return;
+        event.stopPropagation();
+        const book = books[index];
+        const savedBook = getSavedBooks().find((item: any) => isSameBook(item, book));
+        const link = card.querySelector<HTMLAnchorElement>('.selected-edition-link');
+        window.dispatchEvent(new CustomEvent('library:book-details', {
+          detail: {
+            card,
+            cover: card.querySelector<HTMLImageElement>('img'),
+            book: { ...book, ...savedBook, editionUrl: link?.hidden ? '' : link?.href },
+          },
+        }));
+      });
+    });
+
+    container.querySelectorAll<HTMLButtonElement>('.edition-button').forEach((button) => {
+      const book = books[Number(button.dataset.bookIndex)];
+      const card = button.closest<HTMLElement>('.search-card');
+      if (book && card) {
+        button.dataset.work = book.workKey || '';
+        button.dataset.title = book.title || '';
+        button.dataset.author = book.author || '';
+        button.dataset.editionKey = button.dataset.preferredEdition || '';
+        button.dataset.editionLanguage = editionLanguage || book.editionLanguage || '';
+        button.dataset.editionCount = String(book.editionCount || 0);
+        button.dataset.heroImage = book.heroImage || '';
+        button.addEventListener('click', () => {
+          window.dispatchEvent(new CustomEvent('library:browse-editions', { detail: { button } }));
+        });
+      }
+    });
+
+    container.querySelectorAll<HTMLElement>('.shelf-control').forEach((control, index) => {
+      const book = books[index];
+      const primaryButton = control.querySelector<HTMLButtonElement>('.shelf-primary')!;
+      const toggleButton = control.querySelector<HTMLButtonElement>('.shelf-toggle')!;
+      const menu = control.querySelector<HTMLElement>('.shelf-menu')!;
+      const removeButton = control.querySelector<HTMLButtonElement>('[data-action="remove"]')!;
+      const savedBook = savedBooks.find((item: any) => isSameBook(item, book));
+      const collectionBook = libraryBooks.find((item: any) =>
+        shelfLabels[item.status] && isSameBook(item, book)
+      );
+      let currentStatus = savedBook?.status || collectionBook?.status || null;
+      let hasSavedShelf = Boolean(savedBook || collectionBook);
+      let hasLocalSavedBook = Boolean(savedBook);
+
+      function updateShelfControl(status: string) {
+        const label = shelfLabels[status] || shelfLabels['Plan to Read'];
+        primaryButton.textContent = `${hasSavedShelf ? '✓ ' : ''}${label}`;
+        primaryButton.title = hasSavedShelf ? 'Remove from My Lists' : 'Add to Plan to Read';
+        control.classList.toggle('is-saved', hasSavedShelf);
+        removeButton.hidden = !hasLocalSavedBook;
+        menu.querySelectorAll<HTMLButtonElement>('[data-status]').forEach((option) => {
+          if (option.dataset.status === status) {
+            option.setAttribute('aria-current', 'true');
+          } else {
+            option.removeAttribute('aria-current');
+          }
+        });
+      }
+
+      updateShelfControl(currentStatus || 'Plan to Read');
+
+      const toggleShelfMenu = () => {
+        const shouldOpen = menu.hidden;
+        closeShelfMenus();
+        menu.hidden = !shouldOpen;
+        toggleButton.setAttribute('aria-expanded', String(shouldOpen));
+      };
+
+      primaryButton.addEventListener('click', (event) => {
+        if (hasSavedShelf) {
+          event.stopPropagation();
+          removeBookFromShelf();
+          return;
+        }
+        const updatedBook = saveBookToShelf(book, 'Plan to Read');
+        currentStatus = updatedBook.status;
+        hasSavedShelf = true;
+        hasLocalSavedBook = true;
+        updateShelfControl(updatedBook.status);
+      });
+
+      toggleButton.addEventListener('click', (event) => {
+        event.stopPropagation();
+        toggleShelfMenu();
+      });
+
+      menu.querySelectorAll<HTMLButtonElement>('[data-status]').forEach((option) => {
+        option.addEventListener('click', () => {
+          const updatedBook = saveBookToShelf(book, option.dataset.status || 'Plan to Read');
+          currentStatus = updatedBook.status;
+          hasSavedShelf = true;
+          hasLocalSavedBook = true;
+          updateShelfControl(updatedBook.status);
+          menu.hidden = true;
+          toggleButton.setAttribute('aria-expanded', 'false');
+        });
+      });
+
+      const removeBookFromShelf = () => {
+        if (!hasLocalSavedBook) return;
+        const saved = getSavedBooks().find((item: any) => isSameBook(item, book));
+        if (!saved) return;
+        window.dispatchEvent(new CustomEvent('library:book-removed', { detail: saved }));
+        currentStatus = collectionBook?.status || null;
+        hasSavedShelf = Boolean(collectionBook);
+        hasLocalSavedBook = false;
+        updateShelfControl('Plan to Read');
+        menu.hidden = true;
+        toggleButton.setAttribute('aria-expanded', 'false');
+      };
+      removeButton.addEventListener('click', removeBookFromShelf);
+      control.addEventListener('library:shelf-sync', () => {
+        const saved = getSavedBooks().find((item: any) => isSameBook(item, book));
+        currentStatus = saved?.status || collectionBook?.status || null;
+        hasSavedShelf = Boolean(saved || collectionBook);
+        hasLocalSavedBook = Boolean(saved);
+        updateShelfControl(currentStatus || 'Plan to Read');
+      });
+    });
   }
 
   function authorLinksMarkup(author: string) {
@@ -987,6 +1269,7 @@ const { libraryBooks = [] } = Astro.props;
     clearTimeout(pageSizeRefreshTimer);
     const pageSize = searchPageSize;
     currentQuery = query;
+    updateTrendingVisibility();
     currentPage = page;
     currentSort = sort;
     currentLanguage = language;
@@ -1254,193 +1537,7 @@ const { libraryBooks = [] } = Astro.props;
         summaryContainer.textContent = `${searchNotice ? `${searchNotice} ` : ''}Showing ${resultCount}${resultSource}`;
       }
 
-      resultsContainer.innerHTML = displayBooks.map((book: any, index: number) => {
-        const matchedSavedBook = isInternetArchive ? undefined : savedBooks.find((item: any) => isSameBook(item, book));
-        const firstEditionKey = Array.isArray(book.editionKeys) ? book.editionKeys[0] : null;
-        const savedEditionKey = matchedSavedBook?.editionKey || book.editionKey || firstEditionKey;
-        const savedEditionId = String(savedEditionKey || '').match(/OL\d+M/i)?.[0];
-        const coverImage = matchedSavedBook?.editionHeroImage
-          || book.editionHeroImage
-          || (savedEditionId
-            ? `https://covers.openlibrary.org/b/olid/${savedEditionId}-M.jpg?default=false`
-            : null)
-          || book.heroImage;
-        const editionUrl = matchedSavedBook?.editionUrl
-          || book.editionUrl
-          || (savedEditionId ? `https://openlibrary.org/books/${savedEditionId}` : '');
-        const workUrl = book.workKey
-          ? `https://openlibrary.org/${String(book.workKey).replace(/^\/+/, '')}`
-          : '';
-        const recordUrl = editionUrl || workUrl;
-        const recordLinkLabel = book.provider === 'internet-archive'
-          ? 'View on Internet Archive'
-          : 'Open selected edition';
-        return `
-        <div class="search-card">
-          <div>
-            ${coverImage
-              ? `<img src="${coverImage}" alt="${book.title}" loading="${index === 0 ? 'eager' : 'lazy'}" decoding="async"${index === 0 ? ' fetchpriority="high"' : ''} />`
-              : '<div class="search-cover-placeholder">NO IMAGE</div>'
-            }
-            <h5>${book.title}</h5>
-            ${book.subtitle ? `<p class="subtitle">${book.subtitle}</p>` : ''}
-            <p class="author-text">${authorLinksMarkup(book.author || 'Unknown Author')}</p>
-            <p class="pub-date">${book.pubDate ? `Published: ${book.pubDate}` : 'Publication date unknown'}</p>
-            <a class="selected-edition-link" href="${escapeHtml(recordUrl || '#')}" target="_blank" rel="noopener noreferrer" ${recordUrl ? '' : 'hidden'}>${recordLinkLabel}</a>
-            ${book.workKey ? `<button type="button" class="edition-button" data-book-index="${index}" data-preferred-edition="${escapeHtml(String(savedEditionKey || ''))}">Browse editions${book.editionCount ? ` (${book.editionCount})` : ''}</button>` : ''}
-          </div>
-          <div class="shelf-control">
-            <button type="button" class="shelf-primary">Plan to Read</button>
-            <button type="button" class="shelf-toggle" aria-label="Choose a reading list" aria-haspopup="menu" aria-expanded="false">▾</button>
-            <div class="shelf-menu" role="menu" hidden>
-              <button type="button" role="menuitem" data-status="Plan to Read">Plan to Read</button>
-              <button type="button" role="menuitem" data-status="Reading">Reading</button>
-              <button type="button" role="menuitem" data-status="Read">Read</button>
-              <div class="shelf-menu-divider" role="separator"></div>
-              <button type="button" role="menuitem" data-action="remove" hidden>Delete from My Lists</button>
-            </div>
-          </div>
-        </div>
-      `;
-      }).join('');
-
-      resultsContainer.querySelectorAll<HTMLElement>('.search-card').forEach((card, index) => {
-        const image = card.querySelector<HTMLImageElement>('img');
-        const fallback = displayBooks[index].heroImage;
-        if (image && fallback) image.dataset.fallbackImage = fallback;
-        const title = card.querySelector<HTMLElement>('h5');
-        if (title) {
-          title.tabIndex = 0;
-          title.setAttribute('role', 'button');
-          title.setAttribute('aria-label', `View details of ${displayBooks[index].title}`);
-          title.addEventListener('keydown', (event) => {
-            if (event.key !== 'Enter' && event.key !== ' ') return;
-            event.preventDefault();
-            title.click();
-          });
-        }
-        card.addEventListener('click', (event) => {
-          if ((event.target as HTMLElement).closest('button, a, input, select, .shelf-control')) return;
-          event.stopPropagation();
-          const book = displayBooks[index];
-          const savedBook = getSavedBooks().find((item: any) => isSameBook(item, book));
-          const link = card.querySelector<HTMLAnchorElement>('.selected-edition-link');
-          window.dispatchEvent(new CustomEvent('library:book-details', {
-            detail: {
-              card,
-              cover: card.querySelector<HTMLImageElement>('img'),
-              book: { ...book, ...savedBook, editionUrl: link?.hidden ? '' : link?.href },
-            },
-          }));
-        });
-      });
-
-      resultsContainer.querySelectorAll<HTMLButtonElement>('.edition-button').forEach((button) => {
-        const book = displayBooks[Number(button.dataset.bookIndex)];
-        const card = button.closest<HTMLElement>('.search-card');
-        if (book && card) {
-          button.dataset.work = book.workKey || '';
-          button.dataset.title = book.title || '';
-          button.dataset.author = book.author || '';
-          button.dataset.editionKey = button.dataset.preferredEdition || '';
-          button.dataset.editionLanguage = currentLanguage || book.editionLanguage || '';
-          button.dataset.editionCount = String(book.editionCount || 0);
-          button.dataset.heroImage = book.heroImage || '';
-          button.addEventListener('click', () => {
-            window.dispatchEvent(new CustomEvent('library:browse-editions', { detail: { button } }));
-          });
-        }
-      });
-
-      resultsContainer.querySelectorAll<HTMLElement>('.shelf-control').forEach((control, index) => {
-        const book = displayBooks[index];
-        const primaryButton = control.querySelector<HTMLButtonElement>('.shelf-primary')!;
-        const toggleButton = control.querySelector<HTMLButtonElement>('.shelf-toggle')!;
-        const menu = control.querySelector<HTMLElement>('.shelf-menu')!;
-        const removeButton = control.querySelector<HTMLButtonElement>('[data-action="remove"]')!;
-        const savedBook = savedBooks.find((item: any) => isSameBook(item, book));
-        const collectionBook = libraryBooks.find((item: any) =>
-          shelfLabels[item.status] && isSameBook(item, book)
-        );
-        let currentStatus = savedBook?.status || collectionBook?.status || null;
-        let hasSavedShelf = Boolean(savedBook || collectionBook);
-        let hasLocalSavedBook = Boolean(savedBook);
-
-        function updateShelfControl(status: string) {
-          const label = shelfLabels[status] || shelfLabels['Plan to Read'];
-          primaryButton.textContent = `${hasSavedShelf ? '✓ ' : ''}${label}`;
-          primaryButton.title = hasSavedShelf ? 'Remove from My Lists' : 'Add to Plan to Read';
-          control.classList.toggle('is-saved', hasSavedShelf);
-          removeButton.hidden = !hasLocalSavedBook;
-          menu.querySelectorAll<HTMLButtonElement>('[data-status]').forEach((option) => {
-            if (option.dataset.status === status) {
-              option.setAttribute('aria-current', 'true');
-            } else {
-              option.removeAttribute('aria-current');
-            }
-          });
-        }
-
-        updateShelfControl(currentStatus || 'Plan to Read');
-
-        const toggleShelfMenu = () => {
-          const shouldOpen = menu.hidden;
-          closeShelfMenus();
-          menu.hidden = !shouldOpen;
-          toggleButton.setAttribute('aria-expanded', String(shouldOpen));
-        };
-
-        primaryButton.addEventListener('click', (event) => {
-          if (hasSavedShelf) {
-            event.stopPropagation();
-            removeBookFromShelf();
-            return;
-          }
-          const updatedBook = saveBookToShelf(book, 'Plan to Read');
-          currentStatus = updatedBook.status;
-          hasSavedShelf = true;
-          hasLocalSavedBook = true;
-          updateShelfControl(updatedBook.status);
-        });
-
-        toggleButton.addEventListener('click', (event) => {
-          event.stopPropagation();
-          toggleShelfMenu();
-        });
-
-        menu.querySelectorAll<HTMLButtonElement>('[data-status]').forEach((option) => {
-          option.addEventListener('click', () => {
-            const updatedBook = saveBookToShelf(book, option.dataset.status || 'Plan to Read');
-            currentStatus = updatedBook.status;
-            hasSavedShelf = true;
-            hasLocalSavedBook = true;
-            updateShelfControl(updatedBook.status);
-            menu.hidden = true;
-            toggleButton.setAttribute('aria-expanded', 'false');
-          });
-        });
-
-        const removeBookFromShelf = () => {
-          if (!hasLocalSavedBook) return;
-          const saved = getSavedBooks().find((item: any) => isSameBook(item, book));
-          if (!saved) return;
-          window.dispatchEvent(new CustomEvent('library:book-removed', { detail: saved }));
-          currentStatus = collectionBook?.status || null;
-          hasSavedShelf = Boolean(collectionBook);
-          hasLocalSavedBook = false;
-          updateShelfControl('Plan to Read');
-          menu.hidden = true;
-          toggleButton.setAttribute('aria-expanded', 'false');
-        };
-        removeButton.addEventListener('click', removeBookFromShelf);
-        control.addEventListener('library:shelf-sync', () => {
-          const saved = getSavedBooks().find((item: any) => isSameBook(item, book));
-          currentStatus = saved?.status || collectionBook?.status || null;
-          hasSavedShelf = Boolean(saved || collectionBook);
-          hasLocalSavedBook = Boolean(saved);
-          updateShelfControl(currentStatus || 'Plan to Read');
-        });
-      });
+      renderBookCards(resultsContainer, displayBooks, { isInternetArchive, editionLanguage: currentLanguage });
 
       if (displayTotalPages > 1) {
         paginationContainer.innerHTML = `
@@ -1550,6 +1647,7 @@ const { libraryBooks = [] } = Astro.props;
       searchLanguageSelect.innerHTML = '<option value="">Languages found after searching</option>';
       searchLanguageSelect.disabled = true;
       currentLanguage = '';
+      updateTrendingVisibility();
       return;
     }
 
@@ -1629,6 +1727,7 @@ const { libraryBooks = [] } = Astro.props;
   hideAddedToggle?.addEventListener('change', () => {
     currentHideAdded = hideAddedToggle.checked;
     updateSearchResetButton();
+    if (!currentQuery && trendingBooks.length) renderTrending();
     if (currentQuery) {
       performSearch(
         currentQuery,
@@ -1642,6 +1741,70 @@ const { libraryBooks = [] } = Astro.props;
       );
     }
   });
+
+  function isInMyLists(book: any) {
+    return getSavedBooks().some((item: any) => isSameBook(item, book))
+      || libraryBooks.some((item: any) => shelfLabels[item.status] && isSameBook(item, book));
+  }
+
+  function renderTrending() {
+    const available = currentHideAdded ? trendingBooks.filter((book) => !isInMyLists(book)) : trendingBooks;
+    const books = available.slice(0, searchPageSize);
+    // Skip identical re-renders so resizing never makes the covers blink.
+    const renderKey = `${trendingLoadedPeriod}|${currentHideAdded}|${books.map((book) => book.key).join(',')}`;
+    if (renderKey === trendingRenderedKey) return;
+    trendingRenderedKey = renderKey;
+    if (!books.length) {
+      trendingContainer.innerHTML = '';
+      trendingStatus.textContent = trendingBooks.length
+        ? 'Every trending book is already in your lists.'
+        : `No trending books ${trendingPeriodLabels[trendingLoadedPeriod]}.`;
+      return;
+    }
+    trendingStatus.textContent = '';
+    renderBookCards(trendingContainer, books);
+  }
+
+  async function loadTrending(period: string) {
+    const requestId = ++trendingRequestId;
+    trendingTabs.forEach((tab) => tab.setAttribute('aria-pressed', String(tab.dataset.period === period)));
+    trendingStatus.textContent = 'Loading trending books...';
+    trendingContainer.innerHTML = '';
+    trendingRenderedKey = '';
+    try {
+      const response = await fetch(`/api/trending-books.json?period=${encodeURIComponent(period)}`);
+      const data = await response.json();
+      if (requestId !== trendingRequestId) return;
+      if (!response.ok || data.error) throw new Error('Trending books unavailable');
+      trendingBooks = Array.isArray(data.books) ? data.books : [];
+      trendingLoadedPeriod = period;
+      renderTrending();
+    } catch {
+      if (requestId !== trendingRequestId) return;
+      trendingBooks = [];
+      trendingLoadedPeriod = '';
+      trendingStatus.textContent = 'Trending books could not be loaded right now.';
+    }
+  }
+
+  function updateTrendingVisibility() {
+    trendingSection.hidden = Boolean(currentQuery);
+    if (!trendingSection.hidden && trendingLoadedPeriod !== trendingPeriod) {
+      loadTrending(trendingPeriod);
+    }
+  }
+
+  trendingTabs.forEach((tab) => {
+    tab.addEventListener('click', () => {
+      const period = tab.dataset.period || 'weekly';
+      if (period === trendingPeriod && trendingLoadedPeriod === period) return;
+      trendingPeriod = period;
+      localStorage.setItem(trendingPeriodKey, period);
+      loadTrending(period);
+    });
+  });
+
+  updateTrendingVisibility();
 
   document.addEventListener('click', (event) => {
     if (!(event.target as HTMLElement).closest('.shelf-control')) closeShelfMenus();

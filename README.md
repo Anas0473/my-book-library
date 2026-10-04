@@ -73,6 +73,12 @@ per row show 2 rows per page, and narrower layouts show 3 rows (always at least
 12 books). Resizing the window recalculates the page size and keeps the first
 book you were viewing on screen.
 
+Before you search, Search books shows trending books from Open Library, with
+tabs for Today, This week and This month. It fills the same number of rows as a
+search results page, and the selected tab is remembered. With "Hide books in my
+lists" turned on, books you've already added are skipped and replaced by the
+next trending ones.
+
 When syncing from Open Library, a logged edition without a cover is shown as the
 work's newest edition that has one. Editions you pick in this app are kept as chosen.
 Sync reads edition records in batches from Open Library's Books API rather than
