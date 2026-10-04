@@ -65,6 +65,10 @@ and lets you add that specific edition to a list without changing the search res
 
 When syncing from Open Library, a logged edition without a cover is shown as the
 work's newest edition that has one. Editions you pick in this app are kept as chosen.
+Sync reads edition records in batches from Open Library's Books API rather than
+its search index, so cover changes appear on the next successful sync even when
+the index is out of date. Failed edition lookups fail the sync without replacing
+your saved books.
 
 ## Optional Search Fallback
 

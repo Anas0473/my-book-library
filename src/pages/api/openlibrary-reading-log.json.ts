@@ -144,47 +144,49 @@ export const GET: APIRoute = async ({ url }) => {
       const batch = editionsToEnrich.slice(offset, offset + editionBatchSize);
       const editionIds = batch.map((book) => book.editionKey.split('/').pop());
       const params = new URLSearchParams({
-        q: `edition_key:(${editionIds.join(' OR ')})`,
-        fields: 'key,title,isbn,publisher,editions,editions.key,editions.title,editions.subtitle,editions.publish_date,editions.cover_i,editions.language',
-        limit: String(editionBatchSize),
+        bibkeys: editionIds.map((id) => `OLID:${id}`).join(','),
+        jscmd: 'details',
+        format: 'json',
       });
 
       const controller = new AbortController();
       const timeout = setTimeout(() => controller.abort(), 10000);
       try {
-        const response = await fetch(`https://openlibrary.org/search.json?${params}`, {
+        const response = await fetch(`https://openlibrary.org/api/books?${params}`, {
           signal: controller.signal,
+          cache: 'no-store',
           headers: { 'User-Agent': 'my-book-library/0.0.1' },
         });
-        if (!response.ok) continue;
+        if (!response.ok) {
+          throw new Error(`Open Library edition lookup returned ${response.status}`);
+        }
 
         const data = await response.json();
-        for (const work of data.docs || []) {
-          for (const edition of work.editions?.docs || []) {
-            const book = books.get(edition.key);
-            if (!book) continue;
+        for (const book of batch) {
+          const editionId = book.editionKey.split('/').pop();
+          const edition = data[`OLID:${editionId}`]?.details;
+          if (!edition || edition.key !== book.editionKey) {
+            throw new Error(`Open Library did not return edition ${book.editionKey}`);
+          }
 
-            book.title = edition.title || book.title;
-            book.subtitle = edition.subtitle || book.subtitle;
-            book.pubDate = Array.isArray(edition.publish_date)
-              ? edition.publish_date[0] || book.pubDate
-              : edition.publish_date || book.pubDate;
-            const editionLanguage = Array.isArray(edition.language)
-              ? edition.language[0]
-              : edition.language;
-            book.editionLanguage = typeof editionLanguage === 'string'
-              ? editionLanguage.split('/').pop()
-              : editionLanguage?.key?.split('/').pop() || null;
-            book.isbn = work.isbn?.[0] || book.isbn || null;
-            book.publisher = work.publisher?.[0] || book.publisher || null;
-            if (edition.cover_i) {
-              book.editionHeroImage = `https://covers.openlibrary.org/b/id/${edition.cover_i}-M.jpg`;
-              editionsWithCovers.add(book.loggedEditionKey);
-            }
+          book.title = edition.title || book.title;
+          book.subtitle = edition.subtitle || null;
+          book.pubDate = Array.isArray(edition.publish_date)
+            ? edition.publish_date[0] || book.pubDate
+            : edition.publish_date || book.pubDate;
+          book.editionLanguage = edition.languages?.[0]?.key?.split('/').pop() || null;
+          book.isbn = edition.isbn_13?.[0] || edition.isbn_10?.[0] || null;
+          book.publisher = edition.publishers?.[0] || null;
+          const coverId = Array.isArray(edition.covers)
+            ? edition.covers.find((id: unknown) => typeof id === 'number' && id > 0)
+            : null;
+          book.editionHeroImage = coverId
+            ? `https://covers.openlibrary.org/b/id/${coverId}-M.jpg`
+            : null;
+          if (coverId) {
+            editionsWithCovers.add(book.loggedEditionKey);
           }
         }
-      } catch (error) {
-        console.error('Open Library edition lookup error:', error);
       } finally {
         clearTimeout(timeout);
       }
@@ -203,7 +205,7 @@ export const GET: APIRoute = async ({ url }) => {
       const workPath = book.workKey.replace(/^\/+/, '');
       const hasCover = (edition: any) =>
         Array.isArray(edition?.covers) && edition.covers.some((coverId: any) => Number(coverId) > 0);
-      const edition = await findMatchingEdition(workPath, '', undefined, 5000, true);
+      const edition = await findMatchingEdition(workPath, '', undefined, 5000, true, true);
       if (!hasCover(edition)) continue;
 
       const coverId = edition.covers.find((id: any) => Number(id) > 0);
