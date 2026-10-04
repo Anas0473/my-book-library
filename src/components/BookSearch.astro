@@ -730,7 +730,7 @@ const { libraryBooks = [] } = Astro.props;
 </style>
 
 <script>
-  import { observeGridPageSize, pageForNewSize } from '../lib/responsive-page-size';
+  import { getGridPageSize, observeGridPageSize, pageForNewSize } from '../lib/responsive-page-size';
 
   const searchContainer = document.querySelector('.search-container') as HTMLElement;
   const searchInput = document.getElementById('global-book-search') as HTMLInputElement;
@@ -789,16 +789,29 @@ const { libraryBooks = [] } = Astro.props;
       && !hideAddedToggle.checked;
   }
   let pageSizeRefreshTimer: ReturnType<typeof setTimeout>;
-  let searchPageSize = observeGridPageSize(resultsContainer, (nextPageSize, previousPageSize) => {
+  let searchLoading = false;
+  let displayedPageSize = 0;
+  let keepResultsOnNextSearch = false;
+  // A scrollbar appearing/disappearing changes the column count without the window changing,
+  // so only one automatic refresh is allowed per window width to prevent a refresh loop.
+  let lastAutoRefreshWidth = -1;
+  let searchPageSize = observeGridPageSize(resultsContainer, (nextPageSize) => {
     searchPageSize = nextPageSize;
-    if (!currentQuery) return;
+    schedulePageSizeRefresh();
+  });
+  function schedulePageSizeRefresh() {
     clearTimeout(pageSizeRefreshTimer);
-    const targetPage = pageForNewSize(currentPage, previousPageSize, nextPageSize);
-    // Wait for the resize to settle so dragging the window edge doesn't fire a search per step.
+    if (!currentQuery || searchLoading || !displayedPageSize || searchPageSize === displayedPageSize) return;
+    if (window.innerWidth === lastAutoRefreshWidth) return;
+    // Wait for the resize/zoom to settle so it doesn't fire a search per step.
     pageSizeRefreshTimer = setTimeout(() => {
+      if (searchLoading || searchPageSize === displayedPageSize) return;
+      lastAutoRefreshWidth = window.innerWidth;
+      keepResultsOnNextSearch = true;
+      const targetPage = pageForNewSize(currentPage, displayedPageSize, searchPageSize);
       performSearch(currentQuery, targetPage, currentAuthorOnly, currentAuthorKey, currentAuthorExact, currentSort, currentLanguage);
     }, 300);
-  });
+  }
   const savedBooksKey = 'my-book-library:books';
   const legacySavedBooksKey = 'my-book-library:plan-to-read';
   const shelfLabels: Record<string, string> = {
@@ -1038,12 +1051,18 @@ const { libraryBooks = [] } = Astro.props;
       .map((isbn: string) => `&exclude_isbn=${encodeURIComponent(isbn)}`)
       .join('');
 
-    resultsContainer.innerHTML = '<p>Searching...</p>';
-    summaryContainer.innerHTML = '';
-    summaryContainer.dataset.state = '';
-    paginationContainer.innerHTML = '';
+    const keepResults = keepResultsOnNextSearch;
+    keepResultsOnNextSearch = false;
+    if (!keepResults) {
+      lastAutoRefreshWidth = -1;
+      resultsContainer.innerHTML = '<p>Searching...</p>';
+      summaryContainer.innerHTML = '';
+      summaryContainer.dataset.state = '';
+      paginationContainer.innerHTML = '';
+    }
 
     const requestId = ++searchRequestId;
+    searchLoading = true;
 
     try {
       const authorParam = authorOnly ? '&author=1' : '';
@@ -1457,6 +1476,14 @@ const { libraryBooks = [] } = Astro.props;
       }
     } catch (err) {
       resultsContainer.innerHTML = '<p>An error occurred while fetching books.</p>';
+    } finally {
+      if (requestId === searchRequestId) {
+        searchLoading = false;
+        displayedPageSize = pageSize;
+        // Re-measure now that results (and possibly a scrollbar) are on screen.
+        searchPageSize = getGridPageSize(resultsContainer);
+        schedulePageSizeRefresh();
+      }
     }
   }
 
@@ -1514,6 +1541,9 @@ const { libraryBooks = [] } = Astro.props;
       currentAuthorExact = false;
       currentLanguage = '';
       searchRequestId++;
+      searchLoading = false;
+      displayedPageSize = 0;
+      clearTimeout(pageSizeRefreshTimer);
       resultsContainer.innerHTML = '';
       summaryContainer.innerHTML = '';
       paginationContainer.innerHTML = '';
