@@ -903,13 +903,8 @@ const splitAuthors = (author: string) =>
       @media (min-width: 701px) {
         :global(.edition-dialog:has(.category-edition-preview:not([hidden]))),
         :global(.edition-dialog.saved-book-detail-dialog) {
-          /*
-           * Preserve the cover's share of the original 42rem dialog. The edition preview
-           * scales --preview-unit with the viewport height so the whole box, including the
-           * reading-list menu, fits on screen without scrolling.
-           */
           --preview-unit: 1rem;
-          --preview-cover-width: calc((42 - 2.2 - 1.25) * 0.4 * var(--preview-unit) - 0.8px);
+          --preview-cover-width: calc((48 - 2.2 - 1.25) * 0.4 * var(--preview-unit) - 0.8px);
           width: min(calc(var(--preview-cover-width) + 21.15 * var(--preview-unit) + 2px), calc(100% - 2rem));
         }
         :global(.edition-dialog:has(.category-edition-preview:not([hidden]))) {
