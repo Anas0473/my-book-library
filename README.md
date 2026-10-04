@@ -70,9 +70,15 @@ work's newest edition that has one. Editions you pick in this app are kept as ch
 
 Search uses Open Library first, then Internet Archive's cataloged books when Open Library is unavailable. No API key is required for the Internet Archive fallback.
 
-Each search checks Open Library rather than reusing cached search results. If
-search or the required edition lookup fails, a warning is shown and results come
+Open Library search results are cached for 10 minutes. Before serving a cached
+result, a live search-service check requests just one record's key, with a
+five-second timeout. A failed check never serves the cached results. If
+search fails, a warning is shown and results come
 only from Internet Archive (saved Open Library matches are not mixed in).
+Edition enrichment uses at most three concurrent lookups and caches successful
+matches for 10 minutes. If an edition lookup is rate limited or times out, search
+availability is checked again before declaring an outage. A working search keeps
+its Open Library results and available work covers.
 Books without cover data do not, by themselves, indicate an outage.
 
 Fallback results link to their source and do not support the Open Library edition picker. Internet Archive's catalog is narrower than Open Library, so fallback result totals may differ.

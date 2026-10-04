@@ -1,25 +1,79 @@
 import type { APIRoute } from 'astro';
 import { findMatchingEdition as lookupMatchingEdition } from '../../lib/editions';
 
-const findMatchingEdition = (
+const matchingEditionCache = new Map<string, { expiresAt: number; edition: any }>();
+const findSearchMatchingEdition = async (
   ...args: Parameters<typeof lookupMatchingEdition>
-) => lookupMatchingEdition(args[0], args[1], args[2], args[3], args[4], true);
+) => {
+  const key = JSON.stringify([args[0], args[1], args[2], args[4]]);
+  const cached = matchingEditionCache.get(key);
+  if (cached && cached.expiresAt > Date.now()) return cached.edition;
+  const edition = await lookupMatchingEdition(args[0], args[1], args[2], args[3], args[4], true);
+  if (edition) {
+    matchingEditionCache.set(key, { expiresAt: Date.now() + 10 * 60 * 1000, edition });
+  }
+  return edition;
+};
+
+async function mapEditionLookups<T, R>(
+  items: T[],
+  lookup: (item: T, index: number) => Promise<R> | R,
+): Promise<R[]> {
+  const results = new Array<R>(items.length);
+  let nextIndex = 0;
+  await Promise.all(Array.from({ length: Math.min(3, items.length) }, async () => {
+    while (nextIndex < items.length) {
+      const index = nextIndex++;
+      results[index] = await lookup(items[index], index);
+    }
+  }));
+  return results;
+}
 
 const languageEditionCache = new Map<string, { expiresAt: number; edition: any | null }>();
 const searchResponseCache = new Map<string, { expiresAt: number; data: any }>();
 const selectedEditionCache = new Map<string, { expiresAt: number; edition: any | null }>();
 
 async function fetchOpenLibrarySearch(apiUrl: string) {
+  const cached = searchResponseCache.get(apiUrl);
+  if (cached && cached.expiresAt > Date.now()) {
+    // Check the search service itself, not just the homepage, before using cached data.
+    const probeUrl = new URL(apiUrl);
+    probeUrl.searchParams.set('limit', '1');
+    probeUrl.searchParams.set('offset', '0');
+    probeUrl.searchParams.set('fields', 'key');
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 5000);
+    try {
+      const response = await fetch(probeUrl, {
+        signal: controller.signal,
+        cache: 'no-store',
+        headers: { 'User-Agent': 'my-book-library/0.0.1' },
+      });
+      if (!response.ok) return null;
+      const data = await response.json();
+      return Array.isArray(data.docs) ? cached.data : null;
+    } catch {
+      // A failed availability check must never serve cached Open Library results.
+      return null;
+    } finally {
+      clearTimeout(timeout);
+    }
+  }
+
   for (let attempt = 0; attempt < 2; attempt++) {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 15000);
     try {
       const response = await fetch(apiUrl, {
         signal: controller.signal,
+        cache: 'no-store',
         headers: { 'User-Agent': 'my-book-library/0.0.1' },
       });
       if (response.ok) {
         const data = await response.json();
+        if (!Array.isArray(data.docs)) return null;
+        searchResponseCache.set(apiUrl, { expiresAt: Date.now() + 10 * 60 * 1000, data });
         return data;
       }
     } catch {
@@ -174,7 +228,7 @@ async function findEditionInLanguage(workKey: string, language: string) {
   const cached = languageEditionCache.get(cacheKey);
   if (cached && cached.expiresAt > Date.now()) return cached.edition;
 
-  const edition = await findMatchingEdition(workKey, '', language, 2500);
+  const edition = await findSearchMatchingEdition(workKey, '', language, 2500);
   languageEditionCache.set(cacheKey, {
     expiresAt: Date.now() + (edition ? 15 : 2) * 60 * 1000,
     edition,
@@ -221,6 +275,19 @@ export const GET: APIRoute = async ({ url }) => {
   const directType = directUrlMatch?.[1].toLowerCase()
     || (directIdMatch?.[1].toUpperCase().endsWith('M') ? 'books' : directIdMatch ? 'works' : null);
   const directId = directUrlMatch?.[2] || directIdMatch?.[1];
+
+  let editionLookupFailed = false;
+  const optionalEditionLookup = async <T>(lookup: () => Promise<T>): Promise<T | null> => {
+    try {
+      return await lookup();
+    } catch (error) {
+      editionLookupFailed = true;
+      console.warn('Open Library edition enrichment failed; checking search availability:', error);
+      return null;
+    }
+  };
+  const findMatchingEdition = (...args: Parameters<typeof lookupMatchingEdition>) =>
+    optionalEditionLookup(() => findSearchMatchingEdition(...args));
 
   const unavailableResponse = async () => {
     const fallback = await fetchInternetArchiveFallback({
@@ -386,18 +453,21 @@ export const GET: APIRoute = async ({ url }) => {
     if (isIsbnSearch) {
       const isbnController = new AbortController();
       const isbnTimeout = setTimeout(() => isbnController.abort(), 8000);
-      try {
-        const isbnResponse = await fetch(`https://openlibrary.org/isbn/${normalizedIsbn}.json`, {
-          signal: isbnController.signal,
-          headers: { 'User-Agent': 'my-book-library/0.0.1' },
-        });
-        if (isbnResponse.ok) isbnEdition = await isbnResponse.json();
-        else if (isbnResponse.status !== 404) {
-          throw new Error(`Open Library ISBN lookup returned ${isbnResponse.status}`);
+      await optionalEditionLookup(async () => {
+        try {
+          const isbnResponse = await fetch(`https://openlibrary.org/isbn/${normalizedIsbn}.json`, {
+            signal: isbnController.signal,
+            headers: { 'User-Agent': 'my-book-library/0.0.1' },
+          });
+          if (isbnResponse.ok) isbnEdition = await isbnResponse.json();
+          else if (isbnResponse.status !== 404) {
+            throw new Error(`Open Library ISBN lookup returned ${isbnResponse.status}`);
+          }
+        } finally {
+          clearTimeout(isbnTimeout);
         }
-      } finally {
-        clearTimeout(isbnTimeout);
-      }
+        return isbnEdition;
+      });
     }
     // OpenLibrary's general "q" search matches loosely across unrelated fields
     // (e.g. subjects and contributor notes). Prefer results where the full phrase
@@ -430,12 +500,12 @@ export const GET: APIRoute = async ({ url }) => {
           second.relevance - first.relevance,
         )
         .slice(0, topRankedCount);
-      const editions = await Promise.all(titleCandidates.map(({ doc }: any) => {
+      const editions = await mapEditionLookups(titleCandidates, ({ doc }: any) => {
         const docKey = String(doc.key);
         return fallbackEditionMatches.has(docKey)
           ? fallbackEditionMatches.get(docKey)
           : findMatchingEdition(docKey.replace(/^\/+/, ''), normalizedPhrase, undefined, 2500, true);
-      }));
+      });
       titleCandidates.forEach(({ doc }: any, index: number) => {
         if (editions[index]) titleEditionMatches.set(String(doc.key), editions[index]);
       });
@@ -448,9 +518,9 @@ export const GET: APIRoute = async ({ url }) => {
       const lookupBatchSize = 30;
       for (let offset = 0; offset < untaggedDocs.length; offset += lookupBatchSize) {
         const batch = untaggedDocs.slice(offset, offset + lookupBatchSize);
-        const editions = await Promise.all(batch.map((doc: any) =>
-          findEditionInLanguage(String(doc.key).replace(/^\/+/, ''), language),
-        ));
+        const editions = await mapEditionLookups(batch, (doc: any) =>
+          optionalEditionLookup(() => findEditionInLanguage(String(doc.key).replace(/^\/+/, ''), language)),
+        );
         batch.forEach((doc: any, index: number) => {
           if (editions[index]) languageEditionMatches.set(String(doc.key), editions[index]);
         });
@@ -533,23 +603,25 @@ export const GET: APIRoute = async ({ url }) => {
           ) ? isbnEdition : null,
         )
       : isGeneralQuery || language
-      ? await Promise.all(
-          editionLookupDocs.map((doc: any) => {
+      ? await mapEditionLookups(
+          editionLookupDocs, (doc: any) => {
             if (!doc.key) return null;
             const docKey = String(doc.key);
             if (language) {
               return findMatchingEdition(docKey.replace(/^\/+/, ''), normalizedPhrase, language, 2500, true);
             }
             return fallbackEditionMatches.get(docKey) || titleEditionMatches.get(docKey) || null;
-          }),
+          },
         )
       : pageDocs.map(() => null);
       const editionDetailsDocs = includeAllResults ? pageDocs.slice(0, limit) : pageDocs;
-      const selectedEditions = await Promise.all(editionDetailsDocs.map(async (doc: any, index: number) => {
+      const selectedEditions = await mapEditionLookups(editionDetailsDocs, async (doc: any, index: number) => {
         const matchedEdition = matchedEditions[index];
         let edition = matchedEdition;
         const editionKey = matchedEdition?.key || (!isIsbnSearch && !language ? doc.edition_key?.[0] : '');
-        if (!edition && editionKey) edition = await fetchSelectedEdition(String(editionKey));
+        if (!edition && editionKey) {
+          edition = await optionalEditionLookup(() => fetchSelectedEdition(String(editionKey)));
+        }
 
         const hasCover = Array.isArray(edition?.covers)
           && edition.covers.some((coverId: any) => Number(coverId) > 0);
@@ -566,7 +638,11 @@ export const GET: APIRoute = async ({ url }) => {
           }
         }
         return edition;
-      }));
+      });
+
+    if (editionLookupFailed && !await fetchOpenLibrarySearch(apiUrl)) {
+      return unavailableResponse();
+    }
 
     const formattedBooks = pageDocs.map((doc: any, index: number) => {
         const edition = selectedEditions[index] || matchedEditions[index];
