@@ -62,6 +62,9 @@ const splitAuthors = (author: string) =>
         --line: color-mix(in srgb, var(--fg) 13%, transparent);
         --fill: color-mix(in srgb, var(--fg) 5%, transparent);
         --fill-strong: color-mix(in srgb, var(--fg) 10%, transparent);
+        --panel: var(--fill);
+        --page-accent-text: var(--accent);
+        --page-focus: var(--accent);
         margin: 0;
         background: #1c1c1c;
         color: var(--fg);
@@ -83,7 +86,7 @@ const splitAuthors = (author: string) =>
         box-sizing: border-box;
         padding: 1.5rem 1rem 1rem;
         border-right: 1px solid var(--line);
-        background: color-mix(in srgb, var(--fg) 2%, transparent);
+        background: var(--panel);
       }
       header h1 {
         margin: 0;
@@ -95,7 +98,7 @@ const splitAuthors = (author: string) =>
         letter-spacing: -0.01em;
       }
       .title-accent {
-        color: var(--accent);
+        color: var(--page-accent-text);
         font-style: italic;
       }
       .home-link {
@@ -154,7 +157,7 @@ const splitAuthors = (author: string) =>
         left: -1rem;
         width: 3px;
         border-radius: 0 3px 3px 0;
-        background: var(--accent);
+        background: var(--page-focus);
       }
       .category-btn svg {
         flex: 0 0 auto;
@@ -633,7 +636,7 @@ const splitAuthors = (author: string) =>
       .search-input::placeholder {
         color: var(--faint);
       }
-      /* Selects use translucent fills, which some browsers' native option lists can't show. */
+      /* Native option lists need an explicit background rather than browser defaults. */
       :global(select option) {
         background-color: var(--page-background, #1c1c1c);
         color: var(--fg);
@@ -706,8 +709,8 @@ const splitAuthors = (author: string) =>
       .search-input:focus,
       .sort-select:focus,
       .language-select:focus {
-        border-color: var(--accent);
-        box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 18%, transparent);
+        border-color: var(--page-focus);
+        box-shadow: 0 0 0 3px color-mix(in srgb, var(--page-focus) 18%, transparent);
       }
       .cards-grid {
         display: grid;
@@ -1628,6 +1631,8 @@ const splitAuthors = (author: string) =>
     </dialog>
 
     <script>
+      import { createTheme } from "../lib/theme";
+
       const buttons = document.querySelectorAll(
         ".category-btn, .mobile-nav-button",
       );
@@ -1665,17 +1670,11 @@ const splitAuthors = (author: string) =>
         ? savedBackground || "#1c1c1c"
         : "#1c1c1c";
       function setPageForeground(background: string) {
-        const channels = background.match(/[0-9a-f]{2}/gi)?.map((channel) => parseInt(channel, 16) / 255) || [1, 1, 1];
-        const luminance = channels
-          .map((channel) => channel <= 0.04045 ? channel / 12.92 : ((channel + 0.055) / 1.055) ** 2.4)
-          .reduce((sum, channel, index) => sum + channel * [0.2126, 0.7152, 0.0722][index], 0);
-        const darkContrast = (luminance + 0.05) / 0.058;
-        const lightContrast = 1.05 / (luminance + 0.05);
-        document.body.style.setProperty(
-          "--page-foreground",
-          lightContrast > darkContrast ? "#ffffff" : "#0f172a",
-        );
-        document.documentElement.style.colorScheme = lightContrast > darkContrast ? "dark" : "light";
+        const theme = createTheme(background);
+        for (const [property, value] of Object.entries(theme.variables)) {
+          document.body.style.setProperty(property, value);
+        }
+        document.documentElement.style.colorScheme = theme.colorScheme;
       }
 
       function setPageBackground(background: string, persist = true) {
@@ -2316,6 +2315,14 @@ const splitAuthors = (author: string) =>
 
       openLibrarySyncCancel.addEventListener("click", () => {
         openLibrarySyncDialog.close();
+      });
+
+      openLibrarySyncDialog.addEventListener("click", (event) => {
+        if (event.target !== openLibrarySyncDialog) return;
+        const rect = openLibrarySyncDialog.getBoundingClientRect();
+        const isOutside = event.clientX < rect.left || event.clientX > rect.right ||
+          event.clientY < rect.top || event.clientY > rect.bottom;
+        if (isOutside) openLibrarySyncDialog.close();
       });
 
       openLibrarySyncForm.addEventListener("submit", (event) => {

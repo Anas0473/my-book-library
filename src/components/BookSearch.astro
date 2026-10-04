@@ -89,7 +89,7 @@ const { libraryBooks = [] } = Astro.props;
     padding: 0.75rem;
     border: 1px solid var(--line);
     border-radius: 14px;
-    background: var(--fill);
+    background: var(--panel);
   }
   .search-input-wrap {
     position: relative;
@@ -104,7 +104,8 @@ const { libraryBooks = [] } = Astro.props;
     width: 0.9rem;
     height: 0.9rem;
     transform: translateY(-50%);
-    background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23999' stroke-width='2.2' stroke-linecap='round'%3E%3Ccircle cx='11' cy='11' r='7' /%3E%3Cpath d='m20 20-3.5-3.5' /%3E%3C/svg%3E") center / contain no-repeat;
+    background-color: var(--muted);
+    mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.2' stroke-linecap='round'%3E%3Ccircle cx='11' cy='11' r='7' /%3E%3Cpath d='m20 20-3.5-3.5' /%3E%3C/svg%3E") center / contain no-repeat;
     pointer-events: none;
   }
   #global-book-search,
@@ -125,7 +126,7 @@ const { libraryBooks = [] } = Astro.props;
     padding: 0.45rem 2.5rem 0.45rem 2.2rem;
   }
   #global-book-search::placeholder {
-    color: var(--faint);
+    color: var(--muted);
   }
   #search-sort-select,
   #search-language-select {
@@ -137,8 +138,8 @@ const { libraryBooks = [] } = Astro.props;
   #global-book-search:focus,
   #search-sort-select:focus,
   #search-language-select:focus {
-    border-color: var(--accent);
-    box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 18%, transparent);
+    border-color: var(--page-focus);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--page-focus) 18%, transparent);
   }
   .search-clear-button {
     position: absolute;
@@ -183,7 +184,7 @@ const { libraryBooks = [] } = Astro.props;
     cursor: pointer;
   }
   .search-hide-added:focus-within {
-    border-color: var(--accent);
+    border-color: var(--page-focus);
   }
   .search-hide-added input {
     position: relative;
@@ -216,7 +217,7 @@ const { libraryBooks = [] } = Astro.props;
     transform: translateX(0.85rem);
   }
   .search-hide-added input:focus-visible {
-    outline: 2px solid var(--accent);
+    outline: 2px solid var(--page-focus);
     outline-offset: 2px;
   }
   .search-reset-button {

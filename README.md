@@ -43,6 +43,10 @@ Any static assets, like images, can be placed in the `public/` directory.
 
 ## Reading list controls
 
+The Appearance picker preserves your exact background color. Panel, input, and
+selected-state colors adapt to it, with contrast-checked primary and secondary
+text, accent text, and keyboard focus indicators.
+
 Click an unsaved book's status button to add it to Plan to Read. Click a yellow
 status button to remove the book from My Lists; use the arrow to choose a different
 list. Up to two separate Undo notifications are shown for the latest actions.
@@ -70,6 +74,8 @@ Sync reads edition records in batches from Open Library's Books API rather than
 its search index, so cover changes appear on the next successful sync even when
 the index is out of date. Failed edition lookups fail the sync without replacing
 your saved books.
+Click outside the Open Library connection dialog, press Escape, or choose Cancel
+to close it without starting a sync.
 
 ## Optional Search Fallback
 
