@@ -1772,7 +1772,7 @@ const { libraryBooks = [] } = Astro.props;
     trendingContainer.innerHTML = '';
     trendingRenderedKey = '';
     try {
-      const response = await fetch(`/api/trending-books.json?period=${encodeURIComponent(period)}`);
+      const response = await fetch(`/api/trending-books.json?period=${encodeURIComponent(period)}&v=2`);
       const data = await response.json();
       if (requestId !== trendingRequestId) return;
       if (!response.ok || data.error) throw new Error('Trending books unavailable');

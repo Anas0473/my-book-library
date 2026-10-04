@@ -9,30 +9,50 @@ const UPSTREAM_LIMIT = MAX_PAGE_SIZE * 2;
 const CACHE_MS = 30 * 60 * 1000;
 const trendingCache = new Map<TrendingPeriod, { expiresAt: number; books: any[] }>();
 
+// Open Library mixes work-level data (original title, first publish year) with a cover from an
+// arbitrary edition, so ask for its matched edition and take everything shown from that edition.
+const TRENDING_FIELDS = [
+  'key', 'title', 'subtitle', 'author_name', 'author_key', 'cover_i', 'cover_edition_key',
+  'edition_count', 'first_publish_year', 'language', 'editions', 'editions.key', 'editions.title',
+  'editions.subtitle', 'editions.publish_date', 'editions.cover_i', 'editions.language',
+  'editions.publisher', 'editions.isbn',
+].join(',');
+
+const firstValue = (value: any) => (Array.isArray(value) ? value[0] : value) || '';
+
 export function mapTrendingWork(work: any) {
-  const editionId = String(work.cover_edition_key || '').match(/OL\d+M/i)?.[0] || '';
+  const edition = work.editions?.docs?.[0];
+  const editionId = String(edition?.key || '').match(/OL\d+M/i)?.[0].toUpperCase() || '';
   const editionKey = editionId ? `/books/${editionId}` : '';
+  const editionCover = edition?.cover_i
+    ? `https://covers.openlibrary.org/b/id/${edition.cover_i}-M.jpg`
+    : '';
   const authors = Array.isArray(work.author_name) ? work.author_name : [];
+  const editionLanguages = Array.isArray(edition?.language) ? edition.language : [];
   return {
     key: work.key,
     workKey: work.key,
     editionKey,
     editionUrl: editionKey ? `https://openlibrary.org${editionKey}` : '',
-    editionLanguage: '',
-    editionHeroImage: editionId
-      ? `https://covers.openlibrary.org/b/olid/${editionId}-M.jpg?default=false`
-      : '',
-    title: work.title || 'Untitled',
-    subtitle: work.subtitle || '',
+    editionLanguage: editionLanguages[0] || '',
+    editionHeroImage: editionCover
+      || (editionId ? `https://covers.openlibrary.org/b/olid/${editionId}-M.jpg?default=false` : ''),
+    title: edition?.title || work.title || 'Untitled',
+    subtitle: edition?.subtitle || (edition ? '' : work.subtitle) || '',
     author: authors.length ? authors.join(', ') : 'Unknown Author',
-    publisher: '',
+    publisher: firstValue(edition?.publisher),
     authorKeys: Array.isArray(work.author_key) ? work.author_key : [],
     editionKeys: editionId ? [editionId] : [],
     editionCount: Number(work.edition_count) || 0,
-    languages: Array.isArray(work.language) ? work.language : [],
-    pubDate: work.first_publish_year ? String(work.first_publish_year) : '',
-    isbn: '',
-    heroImage: work.cover_i ? `https://covers.openlibrary.org/b/id/${work.cover_i}-M.jpg` : '',
+    languages: editionLanguages.length ? editionLanguages : Array.isArray(work.language) ? work.language : [],
+    pubDate: /\d{4}/.test(String(firstValue(edition?.publish_date)))
+      ? String(firstValue(edition?.publish_date))
+      : String(work.first_publish_year || ''),
+    isbn: firstValue(edition?.isbn),
+    // Without a matched edition the work cover is the only cover that belongs with the work title.
+    heroImage: editionCover || (!edition && work.cover_i
+      ? `https://covers.openlibrary.org/b/id/${work.cover_i}-M.jpg`
+      : ''),
   };
 }
 
@@ -44,7 +64,7 @@ async function fetchTrending(period: TrendingPeriod) {
   const timeout = setTimeout(() => controller.abort(), 10000);
   try {
     const response = await fetch(
-      `https://openlibrary.org/trending/${period}.json?limit=${UPSTREAM_LIMIT}`,
+      `https://openlibrary.org/trending/${period}.json?limit=${UPSTREAM_LIMIT}&fields=${TRENDING_FIELDS}`,
       { signal: controller.signal, headers: { 'User-Agent': 'my-book-library/0.0.1' } },
     );
     if (!response.ok) throw new Error(`Open Library responded with ${response.status}`);
@@ -67,7 +87,7 @@ export const GET: APIRoute = async ({ url }) => {
     return new Response(JSON.stringify({ period, books }), {
       headers: {
         'Content-Type': 'application/json',
-        'Cache-Control': 'public, max-age=600',
+        'Cache-Control': 'no-cache',
       },
     });
   } catch {
