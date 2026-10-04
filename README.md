@@ -68,6 +68,9 @@ work's newest edition that has one. Editions you pick in this app are kept as ch
 
 ## Optional Search Fallback
 
+Press Enter in the search field to search immediately or retry the unchanged
+query, keeping its current filters and returning to the first page.
+
 Search uses Open Library first, then Internet Archive's cataloged books when Open Library is unavailable. No API key is required for the Internet Archive fallback.
 
 Open Library search results are cached for 10 minutes. Before serving a cached

@@ -1513,6 +1513,23 @@ const { libraryBooks = [] } = Astro.props;
     }, 400);
   });
 
+  searchInput.addEventListener('keydown', (event) => {
+    if (event.key !== 'Enter' || event.isComposing) return;
+    event.preventDefault();
+    clearTimeout(debounceTimer);
+    const query = searchInput.value.trim();
+    if (query.length < 3) return;
+    const unchanged = query === currentQuery;
+    performSearch(
+      query, 1,
+      unchanged ? currentAuthorOnly : false,
+      unchanged ? currentAuthorKey : '',
+      unchanged ? currentAuthorExact : false,
+      currentSort,
+      unchanged ? currentLanguage : '',
+    );
+  });
+
   clearSearchButton?.addEventListener('click', () => {
     searchInput.value = '';
     searchInput.dispatchEvent(new Event('input', { bubbles: true }));
