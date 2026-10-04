@@ -89,7 +89,10 @@ Click outside the Open Library connection dialog, press Escape, or choose Cancel
 to close it without starting a sync.
 
 To sync both ways, log in with your Open Library email and password in that
-dialog. Your password is sent only to Open Library to log in and is never stored.
+dialog. If you signed up for Open Library with Google, you have no password, so
+choose "Signed up with Google?" and paste your Internet Archive access and secret
+keys from https://archive.org/account/s3.php (sign in to archive.org with Google
+first). The password or keys are sent only to Open Library to log in and are never stored.
 The site keeps Open Library's login session in an HTTP-only cookie. While you're
 logged in, adding, moving or deleting a book here also does it on Open Library, and
 changes made on Open Library come here every 15 minutes or when you choose Sync now.

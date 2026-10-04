@@ -58,10 +58,18 @@ function loginErrorFromPage(html: string) {
     .replace(/&amp;/g, '&')
     .replace(/\s+/g, ' ')
     .trim();
-  return text || 'Open Library did not accept that email and password.';
+  return text || 'Open Library did not accept those login details.';
 }
 
-export async function loginToOpenLibrary(email: string, password: string) {
+export type OpenLibraryCredentials =
+  | { email: string; password: string }
+  | { access: string; secret: string };
+
+/** Logs in with an email and password, or with Internet Archive S3 keys (for accounts made with Google). */
+export async function loginToOpenLibrary(credentials: OpenLibraryCredentials) {
+  const fields: Record<string, string> = 'access' in credentials
+    ? { access: credentials.access, secret: credentials.secret }
+    : { username: credentials.email, password: credentials.password };
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 15000);
   try {
@@ -73,7 +81,7 @@ export async function loginToOpenLibrary(email: string, password: string) {
         'User-Agent': USER_AGENT,
         'Content-Type': 'application/x-www-form-urlencoded',
       },
-      body: new URLSearchParams({ username: email, password, remember: 'true', redirect: '/' }),
+      body: new URLSearchParams({ ...fields, remember: 'true', redirect: '/' }),
     });
     const sessionCookie = response.headers
       .getSetCookie()

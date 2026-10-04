@@ -456,6 +456,28 @@ const splitAuthors = (author: string) =>
       .open-library-sync-form .open-library-mode-panel label:first-of-type {
         margin-top: 0;
       }
+      .open-library-credentials {
+        display: grid;
+        gap: 0.5rem;
+      }
+      .open-library-credentials[hidden] {
+        display: none;
+      }
+      .open-library-steps {
+        margin: 0 0 0.25rem;
+        padding-left: 1.2rem;
+        color: var(--text-dark-muted);
+        font-size: 0.8rem;
+        line-height: 1.7;
+      }
+      .open-library-steps a {
+        color: var(--text-dark);
+      }
+      .open-library-sync-form .open-library-method-toggle {
+        justify-self: start;
+        margin-top: 0.15rem;
+        text-align: left;
+      }
       .open-library-sync-form .open-library-note {
         margin-top: 0.35rem;
         font-size: 0.8rem;
@@ -1757,11 +1779,26 @@ const splitAuthors = (author: string) =>
         </div>
         <div class="open-library-mode-panel" id="open-library-login-fields">
           <p>Log in to also send your changes here to Open Library, such as adding, moving or deleting books, so you only have to update one place.</p>
-          <label for="open-library-email">Email</label>
-          <input id="open-library-email" type="email" autocomplete="email" />
-          <label for="open-library-password">Password</label>
-          <input id="open-library-password" type="password" autocomplete="current-password" />
-          <p class="open-library-note">Your password goes only to Open Library to log in and is never stored. This site keeps just the login session, in a secure cookie.</p>
+          <div class="open-library-credentials" id="open-library-password-fields">
+            <label for="open-library-email">Email</label>
+            <input id="open-library-email" type="email" autocomplete="email" />
+            <label for="open-library-password">Password</label>
+            <input id="open-library-password" type="password" autocomplete="current-password" />
+            <p class="open-library-note">Your password goes only to Open Library to log in and is never stored. This site keeps just the login session, in a secure cookie.</p>
+          </div>
+          <div class="open-library-credentials" id="open-library-key-fields" hidden>
+            <p class="open-library-note">Open Library accounts made with Google have no password. Log in with your Internet Archive keys instead:</p>
+            <ol class="open-library-steps">
+              <li>Sign in to <a href="https://archive.org/account/login" target="_blank" rel="noopener">archive.org</a> with Google.</li>
+              <li>Open <a href="https://archive.org/account/s3.php" target="_blank" rel="noopener">archive.org/account/s3.php</a> and copy both keys.</li>
+            </ol>
+            <label for="open-library-access-key">Access key</label>
+            <input id="open-library-access-key" type="text" autocomplete="off" spellcheck="false" />
+            <label for="open-library-secret-key">Secret key</label>
+            <input id="open-library-secret-key" type="password" autocomplete="off" spellcheck="false" />
+            <p class="open-library-note">The keys go only to Open Library to log in and are never stored. This site keeps just the login session, in a secure cookie.</p>
+          </div>
+          <button type="button" class="open-library-link-button open-library-method-toggle" id="open-library-method-toggle">Signed up with Google? Use your Internet Archive keys</button>
         </div>
         <div class="open-library-account-card" id="open-library-logged-in" hidden>
           <span class="open-library-account-dot" aria-hidden="true"></span>
@@ -1822,6 +1859,12 @@ const splitAuthors = (author: string) =>
       const openLibraryAccountMessage = openLibrarySyncMessage;
       const openLibraryUsernameFields = document.getElementById("open-library-username-fields") as HTMLElement;
       const openLibraryModeSwitch = document.getElementById("open-library-mode-switch") as HTMLElement;
+      const openLibraryPasswordFields = document.getElementById("open-library-password-fields") as HTMLElement;
+      const openLibraryKeyFields = document.getElementById("open-library-key-fields") as HTMLElement;
+      const openLibraryAccessKeyInput = document.getElementById("open-library-access-key") as HTMLInputElement;
+      const openLibrarySecretKeyInput = document.getElementById("open-library-secret-key") as HTMLInputElement;
+      const openLibraryMethodToggle = document.getElementById("open-library-method-toggle") as HTMLButtonElement;
+      const openLibraryLoginMethodKey = "my-book-library:openlibrary-login-method";
       const openLibraryModeInputs = document.querySelectorAll<HTMLInputElement>('input[name="open-library-mode"]');
       // v2: the old key auto-saved white on every load, so it can't tell a real choice from the old default.
       const backgroundPreferenceKey = "my-book-library:page-background-v2";
@@ -2451,9 +2494,7 @@ const splitAuthors = (author: string) =>
           }
           await new Promise((resolve) => window.setTimeout(resolve, 250));
         }
-        if (sent > 0) {
-          showOpenLibraryStatus(`Sent ${sent} ${sent === 1 ? "change" : "changes"} to Open Library.`);
-        }
+        if (sent > 0) showOpenLibraryStatus("");
       }
 
       function getOpenLibraryDialogMode() {
@@ -2467,15 +2508,37 @@ const splitAuthors = (author: string) =>
         openLibraryLoginFields.hidden = Boolean(pushUser) || mode !== "login";
         openLibraryUsernameFields.hidden = Boolean(pushUser) || mode !== "username";
         openLibraryLoggedIn.hidden = !pushUser;
+        updateOpenLibraryLoginMethod();
         openLibraryLoggedInText.textContent = pushUser ? `Logged in as ${pushUser}` : "";
         updateOpenLibrarySyncSubmitLabel();
       }
 
+      function getOpenLibraryLoginInput() {
+        return usesOpenLibraryKeys() ? openLibraryAccessKeyInput : openLibraryEmailInput;
+      }
+
+      function usesOpenLibraryKeys() {
+        return localStorage.getItem(openLibraryLoginMethodKey) === "keys";
+      }
+
+      function updateOpenLibraryLoginMethod() {
+        const useKeys = usesOpenLibraryKeys();
+        openLibraryPasswordFields.hidden = useKeys;
+        openLibraryKeyFields.hidden = !useKeys;
+        openLibraryMethodToggle.textContent = useKeys
+          ? "Have a password? Log in with email instead"
+          : "Signed up with Google? Use your Internet Archive keys";
+      }
+
       async function logInToOpenLibrary() {
-        const email = openLibraryEmailInput.value.trim();
-        const password = openLibraryPasswordInput.value;
-        if (!email || !password) {
-          openLibraryAccountMessage.textContent = "Enter your Open Library email and password.";
+        const useKeys = usesOpenLibraryKeys();
+        const credentials = useKeys
+          ? { access: openLibraryAccessKeyInput.value.trim(), secret: openLibrarySecretKeyInput.value.trim() }
+          : { email: openLibraryEmailInput.value.trim(), password: openLibraryPasswordInput.value };
+        if (Object.values(credentials).some((value) => !value)) {
+          openLibraryAccountMessage.textContent = useKeys
+            ? "Enter both your access key and secret key."
+            : "Enter your Open Library email and password.";
           return;
         }
         openLibrarySyncSubmit.disabled = true;
@@ -2484,11 +2547,13 @@ const splitAuthors = (author: string) =>
           const response = await fetch("/api/openlibrary-account.json", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ email, password }),
+            body: JSON.stringify(credentials),
           });
           const data = await response.json().catch(() => ({}));
           if (!response.ok || !data.username) throw new Error(data.error || "Could not log in to Open Library.");
           openLibraryPasswordInput.value = "";
+          openLibraryAccessKeyInput.value = "";
+          openLibrarySecretKeyInput.value = "";
 
           const previousUsername = localStorage.getItem(openLibraryUsernameKey);
           if (
@@ -2697,7 +2762,7 @@ const splitAuthors = (author: string) =>
             ? syncResult
             : `Synced ${syncedBooks.length} books.`;
           updateOpenLibrarySyncLabel();
-          if (!quiet || listChanged) showOpenLibraryStatus(syncResult);
+          showOpenLibraryStatus(syncWarnings ? syncResult : "");
 
           let sentLocalOnlyBooks = false;
           if (sendLocalOnlyBooks && getOpenLibraryPushUser() === username) {
@@ -2744,7 +2809,7 @@ const splitAuthors = (author: string) =>
         openLibrarySyncDialog.showModal();
         if (getOpenLibraryPushUser()) openLibrarySyncSubmit.focus();
         else if (mode === "username") openLibraryUsernameInput.focus();
-        else openLibraryEmailInput.focus();
+        else getOpenLibraryLoginInput().focus();
       }
 
       function updateOpenLibrarySyncSubmitLabel() {
@@ -2768,8 +2833,14 @@ const splitAuthors = (author: string) =>
         input.addEventListener("change", () => {
           openLibrarySyncMessage.textContent = "";
           updateOpenLibraryAccountView();
-          (getOpenLibraryDialogMode() === "login" ? openLibraryEmailInput : openLibraryUsernameInput).focus();
+          (getOpenLibraryDialogMode() === "login" ? getOpenLibraryLoginInput() : openLibraryUsernameInput).focus();
         });
+      });
+      openLibraryMethodToggle.addEventListener("click", () => {
+        localStorage.setItem(openLibraryLoginMethodKey, usesOpenLibraryKeys() ? "password" : "keys");
+        openLibrarySyncMessage.textContent = "";
+        updateOpenLibraryLoginMethod();
+        getOpenLibraryLoginInput().focus();
       });
       openLibraryLogoutButton.addEventListener("click", logOutOfOpenLibrary);
       openLibrarySyncCancel.addEventListener("click", () => {
