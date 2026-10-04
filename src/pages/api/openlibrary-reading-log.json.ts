@@ -10,7 +10,7 @@ const shelves = [
 const pageSize = 100;
 const maxPagesPerShelf = 20;
 const requestDelayMs = 1100;
-const editionBatchSize = 20;
+const editionBatchSize = 50;
 
 function jsonResponse(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {

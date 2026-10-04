@@ -86,6 +86,9 @@ Sync reads edition records in batches from Open Library's Books API rather than
 its search index, so cover changes appear on the next successful sync even when
 the index is out of date. Failed edition lookups fail the sync without replacing
 your saved books.
+Edition details are fetched in batches of up to 50 to reduce requests and waiting.
+Every sync still refreshes all books, with the same request pacing, timeouts and
+failure checks; no saved metadata is used to hide a failed lookup.
 Click outside the Open Library connection dialog, press Escape, or choose Cancel
 to close it without starting a sync.
 
