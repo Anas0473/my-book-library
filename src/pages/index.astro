@@ -2640,9 +2640,39 @@ const splitAuthors = (author: string) =>
         openLibrarySyncStatus.hidden = true;
       }
 
-      async function syncOpenLibrary(
+      type OpenLibrarySyncOptions = { confirmed?: boolean; quiet?: boolean; sendLocalOnlyBooks?: boolean };
+      // A sync of a large reading log can take half a minute, so a manual sync joins one already running.
+      let openLibrarySyncInProgress: {
+        username: string;
+        promise: Promise<void>;
+        state: { quiet: boolean; sendLocalOnlyBooks: boolean };
+      } | null = null;
+
+      function syncOpenLibrary(username: string, options: OpenLibrarySyncOptions = {}): Promise<void> {
+        const running = openLibrarySyncInProgress;
+        if (running) {
+          if (running.username !== username) {
+            return running.promise.then(() => syncOpenLibrary(username, options));
+          }
+          if (!options.quiet) {
+            running.state.quiet = false;
+            openLibrarySyncMessage.textContent = "Syncing your reading log…";
+            openLibrarySyncSubmit.disabled = true;
+          }
+          if (options.sendLocalOnlyBooks) running.state.sendLocalOnlyBooks = true;
+          return running.promise;
+        }
+        const state = { quiet: Boolean(options.quiet), sendLocalOnlyBooks: Boolean(options.sendLocalOnlyBooks) };
+        const promise = runOpenLibrarySync(username, Boolean(options.confirmed), state)
+          .finally(() => { openLibrarySyncInProgress = null; });
+        openLibrarySyncInProgress = { username, promise, state };
+        return promise;
+      }
+
+      async function runOpenLibrarySync(
         username: string,
-        { confirmed = false, quiet = false, sendLocalOnlyBooks = false } = {},
+        confirmed: boolean,
+        state: { quiet: boolean; sendLocalOnlyBooks: boolean },
       ) {
         const previousUsername = localStorage.getItem(openLibraryUsernameKey);
         if (
@@ -2655,9 +2685,7 @@ const splitAuthors = (author: string) =>
           return;
         }
 
-        openLibrarySyncButton.disabled = true;
-        mobileOpenLibrarySyncButton.disabled = true;
-        openLibrarySyncSubmit.disabled = true;
+        if (!state.quiet) openLibrarySyncSubmit.disabled = true;
 
         try {
           // Send waiting changes first so the pull doesn't undo them.
@@ -2668,7 +2696,7 @@ const splitAuthors = (author: string) =>
           }
 
           openLibrarySyncMessage.textContent = "Syncing your reading log…";
-          if (!quiet) showOpenLibraryStatus("Syncing Open Library…");
+          if (!state.quiet) showOpenLibraryStatus("Syncing Open Library…");
           const response = await fetch(
             `/api/openlibrary-reading-log.json?username=${encodeURIComponent(username)}`,
           );
@@ -2776,7 +2804,7 @@ const splitAuthors = (author: string) =>
           showOpenLibraryStatus(syncWarnings ? syncResult : "");
 
           let sentLocalOnlyBooks = false;
-          if (sendLocalOnlyBooks && getOpenLibraryPushUser() === username) {
+          if (state.sendLocalOnlyBooks && getOpenLibraryPushUser() === username) {
             // Books added only here go to Open Library, unless Open Library already has that work.
             const syncedWorkIds = new Set(syncedBooks.map((book: any) => workIdOf(book)));
             const localOnlyChanges = diffShelves(
@@ -2792,7 +2820,7 @@ const splitAuthors = (author: string) =>
           }
 
           if (!listChanged && !sentLocalOnlyBooks) {
-            if (!quiet) window.setTimeout(() => openLibrarySyncDialog.close(), 900);
+            if (!state.quiet) window.setTimeout(() => openLibrarySyncDialog.close(), 900);
             return;
           }
           window.setTimeout(() => {
@@ -2802,10 +2830,8 @@ const splitAuthors = (author: string) =>
         } catch (error) {
           const message = error instanceof Error ? error.message : "Could not sync Open Library.";
           openLibrarySyncMessage.textContent = message;
-          if (!quiet) showOpenLibraryStatus(message);
+          if (!state.quiet) showOpenLibraryStatus(message);
         } finally {
-          openLibrarySyncButton.disabled = false;
-          mobileOpenLibrarySyncButton.disabled = false;
           openLibrarySyncSubmit.disabled = false;
         }
       }
@@ -2816,7 +2842,7 @@ const splitAuthors = (author: string) =>
         const mode = !getOpenLibraryPushUser() && username ? "username" : "login";
         openLibraryModeInputs.forEach((input) => { input.checked = input.value === mode; });
         updateOpenLibraryAccountView();
-        openLibrarySyncMessage.textContent = "";
+        openLibrarySyncMessage.textContent = openLibrarySyncInProgress ? "Syncing your reading log…" : "";
         openLibrarySyncDialog.showModal();
         if (getOpenLibraryPushUser()) openLibrarySyncSubmit.focus();
         else if (mode === "username") openLibraryUsernameInput.focus();
