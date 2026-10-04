@@ -1820,6 +1820,7 @@ const splitAuthors = (author: string) =>
       import { createTheme } from "../lib/theme";
       import {
         diffShelves,
+        isLocalOnlyEdition,
         mergePendingChanges,
         shelfSnapshot,
         workIdOf,
@@ -2311,10 +2312,12 @@ const splitAuthors = (author: string) =>
         editionButton.dataset.heroImage = book.heroImage || "";
         editionButton.textContent = `Browse editions${book.editionCount ? ` (${book.editionCount})` : ""}`;
         details.appendChild(editionButton);
-        if (book.openLibraryRemoved) {
+        if (book.openLibraryRemoved || book.openLibraryLocalOnly) {
           const removedNotice = document.createElement("span");
           removedNotice.className = "open-library-removed";
-          removedNotice.textContent = "No longer on Open Library";
+          removedNotice.textContent = book.openLibraryLocalOnly
+            ? "Extra edition, only on this site"
+            : "No longer on Open Library";
           details.appendChild(removedNotice);
         }
 
@@ -2405,7 +2408,7 @@ const splitAuthors = (author: string) =>
         changes.forEach((change) => {
           if (change.status === null) return;
           localBooks.forEach((book) => {
-            if (workIdOf(book) === change.workId && book.status === change.status) {
+            if (!book.openLibraryLocalOnly && workIdOf(book) === change.workId && book.status === change.status) {
               book.openLibraryRemoved = false;
             }
           });
@@ -2418,7 +2421,7 @@ const splitAuthors = (author: string) =>
         if (change.status === null) return;
         let changed = false;
         localBooks.forEach((book) => {
-          if (workIdOf(book) !== change.workId || book.status !== change.status) return;
+          if (book.openLibraryLocalOnly || workIdOf(book) !== change.workId || book.status !== change.status) return;
           if (book.openLibrarySyncUsername === username && !book.openLibraryRemoved) return;
           book.openLibrarySyncUsername = username;
           book.openLibraryRemoved = false;
@@ -2705,9 +2708,16 @@ const splitAuthors = (author: string) =>
             const isStillOnOpenLibrary = syncedBooks.some((syncedBook: any) =>
               matchesSyncedBook(book, syncedBook),
             );
-            return isStillOnOpenLibrary
-              ? []
-              : [{ ...book, openLibraryRemoved: true }];
+            if (isStillOnOpenLibrary) return [];
+            // Open Library holds one edition per work; when it has another edition of this one, keep this copy here only.
+            const otherEditionOnOpenLibrary = syncedBooks.some((syncedBook: any) =>
+              workIdOf(syncedBook) && workIdOf(syncedBook) === workIdOf(book),
+            );
+            if (otherEditionOnOpenLibrary) {
+              const { openLibrarySyncUsername, openLibraryRemoved, loggedEditionKey, ...localBook } = book;
+              return [{ ...localBook, openLibraryLocalOnly: true }];
+            }
+            return [{ ...book, openLibraryRemoved: true }];
           });
 
           syncedBooks.forEach((book: any) => {
@@ -2728,8 +2738,9 @@ const splitAuthors = (author: string) =>
             );
 
             if (existingIndex >= 0) {
+              const { openLibraryLocalOnly, ...existingBook } = nextBooks[existingIndex];
               nextBooks[existingIndex] = {
-                ...nextBooks[existingIndex],
+                ...existingBook,
                 ...syncedBook,
               };
             } else {
@@ -4318,6 +4329,7 @@ const splitAuthors = (author: string) =>
         if (existingIndex >= 0) {
           localBooks[existingIndex] = updatedBook;
         } else {
+          if (isLocalOnlyEdition(updatedBook, localBooks)) updatedBook.openLibraryLocalOnly = true;
           localBooks.push(updatedBook);
         }
 

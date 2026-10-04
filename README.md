@@ -99,7 +99,9 @@ changes made on Open Library come here every 15 minutes or when you choose Sync 
 Right after logging in, books that are only in this app are added to Open Library
 unless Open Library already has that work. Changes made while offline or logged out
 wait and are sent once you're back online or log in again. Books without an Open
-Library work, such as fallback search results, stay only in this app.
+Library work, such as fallback search results, stay only in this app. Open Library
+keeps one edition per book, so if you add another edition of a book that's already in
+your lists, that extra edition stays only in this app and Open Library is left as it was.
 
 ## Optional Search Fallback
 

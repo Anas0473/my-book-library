@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { diffShelves, mergePendingChanges, shelfSnapshot } from '../src/lib/openlibrary-push';
+import { diffShelves, isLocalOnlyEdition, mergePendingChanges, shelfSnapshot } from '../src/lib/openlibrary-push';
 import { usernameFromSession } from '../src/lib/openlibrary-session';
 
 const book = (overrides: Record<string, unknown> = {}) => ({
@@ -53,6 +53,30 @@ test('books removed on Open Library are not pushed back until they are moved', (
   assert.deepEqual(diffShelves(before, shelfSnapshot([book({ status: 'Read' })])), [
     { workId: 'OL893415W', status: 'Read', editionKey: '/books/OL1M' },
   ]);
+});
+
+test('extra editions of a book already in the lists stay only on this site', () => {
+  const original = book({ status: 'Read', openLibrarySyncUsername: 'anas' });
+  const extra = book({ editionKey: '/books/OL2M', dateAdded: 2 });
+  assert.equal(isLocalOnlyEdition(extra, [original]), true);
+  assert.equal(isLocalOnlyEdition(book({ workKey: '/works/OL9W' }), [original]), false);
+  assert.equal(isLocalOnlyEdition(extra, [{ ...original, openLibraryLocalOnly: true }]), false);
+
+  const before = shelfSnapshot([original]);
+  const withExtra = shelfSnapshot([original, { ...extra, openLibraryLocalOnly: true }]);
+  assert.deepEqual(diffShelves(before, withExtra), []);
+  assert.deepEqual(diffShelves(withExtra, before), []);
+  assert.deepEqual(diffShelves(withExtra, shelfSnapshot([{ ...extra, openLibraryLocalOnly: true }])), [
+    { workId: 'OL893415W', status: null, editionKey: null },
+  ]);
+});
+
+test('a copy still on Open Library wins over one removed there', () => {
+  const snapshot = shelfSnapshot([
+    book({ status: 'Read' }),
+    book({ editionKey: '/books/OL2M', dateAdded: 2, openLibraryRemoved: true }),
+  ]);
+  assert.equal(snapshot.get('OL893415W')?.status, 'Read');
 });
 
 test('pending changes keep only the latest change per work', () => {

@@ -21,12 +21,23 @@ function editionIdOf(book: any) {
   return String(book?.loggedEditionKey || book?.editionKey || '').match(/OL\d+M/i)?.[0].toUpperCase() || '';
 }
 
-/** One entry per Open Library work; when a work is saved twice, the most recently added copy wins. */
+/** Extra editions of a book that is already in the lists stay only on this site. */
+export function isLocalOnlyEdition(book: any, books: any[]) {
+  const workId = workIdOf(book);
+  return Boolean(workId) && books.some((other) =>
+    other !== book && !other?.openLibraryLocalOnly && workIdOf(other) === workId,
+  );
+}
+
+/**
+ * One entry per Open Library work. Extra editions kept only on this site are left out;
+ * otherwise a copy still on Open Library wins, then the most recently added one.
+ */
 export function shelfSnapshot(books: any[]) {
   const snapshot = new Map<string, ShelfEntry>();
   books.forEach((book) => {
     const workId = workIdOf(book);
-    if (!workId || !SHELF_STATUSES.includes(book?.status)) return;
+    if (!workId || book?.openLibraryLocalOnly || !SHELF_STATUSES.includes(book?.status)) return;
     const entry = {
       status: book.status,
       editionId: editionIdOf(book),
@@ -34,7 +45,11 @@ export function shelfSnapshot(books: any[]) {
       dateAdded: Number(book.dateAdded) || 0,
     };
     const existing = snapshot.get(workId);
-    if (!existing || entry.dateAdded >= existing.dateAdded) snapshot.set(workId, entry);
+    if (
+      !existing
+      || (existing.removed && !entry.removed)
+      || (existing.removed === entry.removed && entry.dateAdded >= existing.dateAdded)
+    ) snapshot.set(workId, entry);
   });
   return snapshot;
 }
