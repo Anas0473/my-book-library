@@ -1,5 +1,9 @@
 import type { APIRoute } from 'astro';
 
+const EDITIONS_PAGE_SIZE = 1000;
+// A safety cap for works with an extreme number of editions.
+const MAX_EDITIONS = 20000;
+
 function unavailableResponse() {
   return new Response(JSON.stringify({ editions: [], searchUnavailable: true }), {
     status: 503,
@@ -44,20 +48,40 @@ export const GET: APIRoute = async ({ url }) => {
       });
     }
 
-    const params = new URLSearchParams({
-      limit: '1000',
-      fields: 'key,title,subtitle,publish_date,publishers,isbn_10,isbn_13,covers,languages,ocaid',
-    });
-    const response = await fetch(`https://openlibrary.org/${workKey}/editions.json?${params}`, {
-      headers: { 'User-Agent': 'my-book-library/0.0.1' },
-    });
+    const fetchEditionPage = async (offset: number) => {
+      const params = new URLSearchParams({
+        limit: String(EDITIONS_PAGE_SIZE),
+        offset: String(offset),
+        fields: 'key,title,subtitle,publish_date,publishers,isbn_10,isbn_13,covers,languages,ocaid',
+      });
+      const response = await fetch(`https://openlibrary.org/${workKey}/editions.json?${params}`, {
+        headers: { 'User-Agent': 'my-book-library/0.0.1' },
+      });
+      if (!response.ok) throw new Error(`Open Library responded with ${response.status}`);
+      return response.json();
+    };
 
-    if (!response.ok) {
+    let data: any;
+    try {
+      data = await fetchEditionPage(0);
+    } catch {
       return unavailableResponse();
     }
-
-    const data = await response.json();
-    const allEditions = (data.entries || [])
+    // Open Library returns at most 1000 editions per request, so fetch the rest in parallel.
+    const reportedCount = Number(data.size) || 0;
+    const fetchCount = Math.min(reportedCount, MAX_EDITIONS);
+    const remainingOffsets = [];
+    for (let offset = EDITIONS_PAGE_SIZE; offset < fetchCount; offset += EDITIONS_PAGE_SIZE) {
+      remainingOffsets.push(offset);
+    }
+    const remainingPages = await Promise.allSettled(remainingOffsets.map(fetchEditionPage));
+    const entries = [
+      ...(data.entries || []),
+      ...remainingPages.flatMap((page) => (page.status === 'fulfilled' ? page.value.entries || [] : [])),
+    ];
+    const seenEditionKeys = new Set<string>();
+    const allEditions = entries
+      .filter((edition: any) => !seenEditionKeys.has(edition?.key) && seenEditionKeys.add(edition?.key))
       .filter((edition: any) => /^\/books\/OL\d+M$/i.test(edition.key || ''))
       .map((edition: any) => ({
         key: edition.key,
@@ -114,7 +138,8 @@ export const GET: APIRoute = async ({ url }) => {
       ...featuredEditions,
       ...allEditions.filter((edition: any) => !featuredKeys.has(edition.key)).sort(compareEditions),
     ];
-    const totalCount = Number(data.size) || allEditions.length;
+    // The count matches the editions that can actually be shown and paged through.
+    const totalCount = allEditions.length;
 
     return new Response(JSON.stringify({ editions, featuredCount: featuredEditions.length, totalCount }), {
       status: 200,
