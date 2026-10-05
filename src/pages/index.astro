@@ -2835,6 +2835,10 @@ const splitAuthors = (author: string) =>
         }
       }
 
+      function countBrowserOnlyBooks() {
+        return shelfSnapshot(localBooks.filter((book) => !book.openLibrarySyncUsername)).size;
+      }
+
       // On touch screens, focusing a text field pops up the keyboard and covers the dialog.
       function canAutoFocusTextFields() {
         return window.matchMedia("(hover: hover) and (pointer: fine)").matches;
@@ -2842,7 +2846,12 @@ const splitAuthors = (author: string) =>
 
       function openOpenLibrarySyncDialog() {
         updateOpenLibraryAccountView();
-        openLibrarySyncMessage.textContent = openLibrarySyncInProgress ? "Syncing your reading log…" : "";
+        const browserOnlyCount = getOpenLibraryPushUser() ? countBrowserOnlyBooks() : 0;
+        openLibrarySyncMessage.textContent = openLibrarySyncInProgress
+          ? "Syncing your reading log…"
+          : browserOnlyCount > 0
+            ? `${browserOnlyCount} ${browserOnlyCount === 1 ? "book is" : "books are"} saved only in this browser. Sync now sends ${browserOnlyCount === 1 ? "it" : "them"} to Open Library.`
+            : "";
         openLibrarySyncDialog.showModal();
         if (getOpenLibraryPushUser()) openLibrarySyncSubmit.focus();
         else if (!canAutoFocusTextFields()) openLibrarySyncDialog.focus();
@@ -2880,7 +2889,7 @@ const splitAuthors = (author: string) =>
         event.preventDefault();
         const pushUser = getOpenLibraryPushUser();
         if (pushUser) {
-          syncOpenLibrary(pushUser);
+          syncOpenLibrary(pushUser, { sendLocalOnlyBooks: true });
         } else {
           logInToOpenLibrary();
         }
