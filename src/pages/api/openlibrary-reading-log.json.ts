@@ -1,6 +1,7 @@
 import type { APIRoute } from 'astro';
 import { findMatchingEdition } from '../../lib/editions';
 import { getSession, sessionHeaders } from '../../lib/openlibrary-session';
+import { OpenLibraryReadTimeoutError, readOpenLibrary } from '../../lib/openlibrary-read';
 
 const shelves = [
   { id: 'want-to-read', status: 'Plan to Read' },
@@ -61,17 +62,10 @@ export const GET: APIRoute = async ({ url, cookies }) => {
         apiUrl.searchParams.set('limit', String(pageSize));
         apiUrl.searchParams.set('page', String(page));
 
-        const controller = new AbortController();
-        const timeout = setTimeout(() => controller.abort(), 10000);
-        let response: Response;
-        try {
-          response = await fetch(apiUrl, {
-            signal: controller.signal,
-            headers: requestHeaders,
-          });
-        } finally {
-          clearTimeout(timeout);
-        }
+        const { response, data } = await readOpenLibrary(apiUrl, {
+          timeoutMs: 20000,
+          headers: requestHeaders,
+        }, (response) => response.json());
 
         if (!response.ok) {
           return jsonResponse(
@@ -80,10 +74,10 @@ export const GET: APIRoute = async ({ url, cookies }) => {
           );
         }
 
-        const data = await response.json();
-        const entries = Array.isArray(data.reading_log_entries)
-          ? data.reading_log_entries
-          : [];
+        if (!data || !Array.isArray(data.reading_log_entries)) {
+          throw new Error('Open Library returned an invalid reading-log page.');
+        }
+        const entries = data.reading_log_entries;
 
         if (entries.length === 0) {
           shelfComplete = true;
@@ -155,46 +149,42 @@ export const GET: APIRoute = async ({ url, cookies }) => {
         format: 'json',
       });
 
-      const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), 10000);
-      try {
-        const response = await fetch(`https://openlibrary.org/api/books?${params}`, {
-          signal: controller.signal,
-          cache: 'no-store',
-          headers: { 'User-Agent': 'my-book-library/0.0.1' },
-        });
-        if (!response.ok) {
-          throw new Error(`Open Library edition lookup returned ${response.status}`);
+      const { response, data } = await readOpenLibrary(`https://openlibrary.org/api/books?${params}`, {
+        timeoutMs: 20000,
+        cache: 'no-store',
+        headers: { 'User-Agent': 'my-book-library/0.0.1' },
+      }, (response) => response.json());
+      if (!response.ok) {
+        throw new Error(`Open Library edition lookup returned ${response.status}`);
+      }
+
+      if (!data || typeof data !== 'object') {
+        throw new Error('Open Library returned invalid edition details.');
+      }
+      for (const book of batch) {
+        const editionId = book.editionKey.split('/').pop();
+        const edition = data[`OLID:${editionId}`]?.details;
+        if (!edition || edition.key !== book.editionKey) {
+          throw new Error(`Open Library did not return edition ${book.editionKey}`);
         }
 
-        const data = await response.json();
-        for (const book of batch) {
-          const editionId = book.editionKey.split('/').pop();
-          const edition = data[`OLID:${editionId}`]?.details;
-          if (!edition || edition.key !== book.editionKey) {
-            throw new Error(`Open Library did not return edition ${book.editionKey}`);
-          }
-
-          book.title = edition.title || book.title;
-          book.subtitle = edition.subtitle || null;
-          book.pubDate = Array.isArray(edition.publish_date)
-            ? edition.publish_date[0] || book.pubDate
-            : edition.publish_date || book.pubDate;
-          book.editionLanguage = edition.languages?.[0]?.key?.split('/').pop() || null;
-          book.isbn = edition.isbn_13?.[0] || edition.isbn_10?.[0] || null;
-          book.publisher = edition.publishers?.[0] || null;
-          const coverId = Array.isArray(edition.covers)
-            ? edition.covers.find((id: unknown) => typeof id === 'number' && id > 0)
-            : null;
-          book.editionHeroImage = coverId
-            ? `https://covers.openlibrary.org/b/id/${coverId}-M.jpg`
-            : null;
-          if (coverId) {
-            editionsWithCovers.add(book.loggedEditionKey);
-          }
+        book.title = edition.title || book.title;
+        book.subtitle = edition.subtitle || null;
+        book.pubDate = Array.isArray(edition.publish_date)
+          ? edition.publish_date[0] || book.pubDate
+          : edition.publish_date || book.pubDate;
+        book.editionLanguage = edition.languages?.[0]?.key?.split('/').pop() || null;
+        book.isbn = edition.isbn_13?.[0] || edition.isbn_10?.[0] || null;
+        book.publisher = edition.publishers?.[0] || null;
+        const coverId = Array.isArray(edition.covers)
+          ? edition.covers.find((id: unknown) => typeof id === 'number' && id > 0)
+          : null;
+        book.editionHeroImage = coverId
+          ? `https://covers.openlibrary.org/b/id/${coverId}-M.jpg`
+          : null;
+        if (coverId) {
+          editionsWithCovers.add(book.loggedEditionKey);
         }
-      } finally {
-        clearTimeout(timeout);
       }
     }
 
@@ -236,7 +226,9 @@ export const GET: APIRoute = async ({ url, cookies }) => {
   } catch (error) {
     console.error('Open Library reading log sync error:', error);
     return jsonResponse(
-      { error: 'Could not sync the Open Library reading log. Please try again.' },
+      { error: error instanceof OpenLibraryReadTimeoutError
+        ? 'Open Library took too long to respond, even after retrying. Your saved books were kept. Please try again.'
+        : 'Could not sync the Open Library reading log. Please try again.' },
       502,
     );
   }

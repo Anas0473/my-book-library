@@ -91,12 +91,22 @@ its search index, so cover changes appear on the next successful sync even when
 the index is out of date. Failed edition lookups fail the sync without replacing
 your saved books.
 Edition details are fetched in batches of up to 50 to reduce requests and waiting.
-Every sync still refreshes all books, with the same request pacing, timeouts and
-failure checks; no saved metadata is used to hide a failed lookup.
+Every sync still refreshes all books, with the same request pacing and failure
+checks; no saved metadata is used to hide a failed lookup. Shelf and edition-detail
+reads allow 20 seconds per attempt and retry once after a timeout, network failure
+or temporary HTTP error. Retries wait at least 1.1 seconds and respect Retry-After
+up to 30 seconds; longer delays fail the sync instead of retrying early.
+Failed reads still stop the sync without replacing saved books, and exhausted
+timeouts show a specific warning. Invalid shelf pages also fail rather than being
+treated as empty shelves. Login and shelf-write requests are not retried by this logic.
 Click outside the Open Library connection dialog, press Escape, or choose Cancel
 to close it without starting a sync.
-On mobile, the Sync/Connect button opens Import only by default; you can still
-choose Two-way. Already logged-in accounts keep their connected-account view.
+Open Library connections use two-way sync only; log in to connect or sync.
+Books previously imported by username stay saved, but no longer sync until you
+log in. Already logged-in accounts keep their connected-account view.
+On touch screens, the keyboard stays closed until you tap a login field.
+The connection dialog separates sync benefits, account-switch guidance and login
+instructions, with grouped fields and descriptive links for Internet Archive keys.
 List cards are inserted and reordered in batches, without moving them when the
 order is unchanged. Sync matching uses indexed candidates with the same edition,
 work and fallback matching rules. Edition sorting computes publication dates once
@@ -116,6 +126,10 @@ wait and are sent once you're back online or log in again. Books without an Open
 Library work, such as fallback search results, stay only in this app. Open Library
 keeps one edition per book, so if you add another edition of a book that's already in
 your lists, that extra edition stays only in this app and Open Library is left as it was.
+Removing a synced book from Open Library removes it here on the next successful
+sync, including copies previously marked as removed. Local-only books and extra
+editions stay. Failed or malformed sync responses leave your books untouched;
+incomplete shelves keep their existing books and show a warning.
 
 ## Optional Search Fallback
 

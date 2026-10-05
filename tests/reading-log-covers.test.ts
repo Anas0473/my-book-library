@@ -145,7 +145,7 @@ test('sync refreshes all 238 editions in five batches and rejects failures in th
     assert.equal(init?.signal?.aborted, false);
     const ids = url.searchParams.get('bibkeys')!.split(',');
     batches.push(ids);
-    if (batches.length === 5 && mode === 'failed') return new Response('', { status: 503 });
+    if (batches.length >= 5 && mode === 'failed') return new Response('', { status: 503 });
     const details = Object.fromEntries(ids.map((id) => {
       const number = Number(id.match(/^OLID:OL(\d+)M$/)![1]);
       return [id, {
@@ -173,7 +173,8 @@ test('sync refreshes all 238 editions in five batches and rejects failures in th
         cookies: { get: () => undefined },
       } as unknown as Parameters<typeof GET>[0]);
       const data = await response.json();
-      assert.deepEqual(batches.map((batch) => batch.length), [50, 50, 50, 50, 38]);
+      assert.deepEqual(batches.map((batch) => batch.length),
+        mode === 'failed' ? [50, 50, 50, 50, 38, 38] : [50, 50, 50, 50, 38]);
       assert.equal(new Set(batches.flat()).size, 238);
       if (mode === 'success') {
         assert.equal(response.status, 200);
@@ -184,6 +185,42 @@ test('sync refreshes all 238 editions in five batches and rejects failures in th
         assert.equal(response.status, 502);
         assert.equal(data.error, 'Could not sync the Open Library reading log. Please try again.');
         assert.equal(data.books, undefined, 'a late failure must not return partially refreshed books');
+      }
+    }
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test('shelf timeouts retry once, but malformed shelf pages never become an empty successful sync', async () => {
+  const originalFetch = globalThis.fetch;
+  let mode = 'recover';
+  let calls = 0;
+  globalThis.fetch = async () => {
+    calls++;
+    if (mode === 'timeout' || (mode === 'recover' && calls === 1)) {
+      throw new DOMException('Request timed out', 'AbortError');
+    }
+    return Response.json(mode === 'malformed' ? {} : { reading_log_entries: [] });
+  };
+  try {
+    for (mode of ['recover', 'timeout', 'malformed']) {
+      calls = 0;
+      const response = await GET({
+        url: new URL('http://localhost/api/openlibrary-reading-log.json?username=tester'),
+        cookies: { get: () => undefined },
+      } as unknown as Parameters<typeof GET>[0]);
+      const data = await response.json();
+      if (mode === 'recover') {
+        assert.equal(calls, 4, 'one retried shelf and two other shelves');
+        assert.equal(response.status, 200);
+        assert.deepEqual(data.books, []);
+        assert.deepEqual(data.incompleteShelves, []);
+      } else {
+        assert.equal(calls, mode === 'timeout' ? 2 : 1);
+        assert.equal(response.status, 502);
+        assert.equal(data.books, undefined);
+        if (mode === 'timeout') assert.match(data.error, /even after retrying.*saved books were kept/);
       }
     }
   } finally {

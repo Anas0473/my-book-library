@@ -59,7 +59,7 @@ export function diffShelves(previous: Map<string, ShelfEntry>, next: Map<string,
   const changes: ShelfChange[] = [];
   next.forEach((entry, workId) => {
     const before = previous.get(workId);
-    // Books removed on Open Library stay here, flagged, until they are moved again.
+    // Legacy removed copies must not be pushed back before the next successful pull cleans them up.
     if (entry.removed && (!before || !before.removed || before.status === entry.status)) return;
     if (
       before
