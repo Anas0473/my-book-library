@@ -2911,6 +2911,8 @@ const splitAuthors = (author: string) =>
       window.addEventListener("online", () => flushOpenLibraryChanges());
 
       function activatePanel(target: string) {
+        const previousTarget = document.querySelector<HTMLElement>(".category-panel.active")?.id;
+        if (previousTarget !== target) window.dispatchEvent(new Event("library:exit-selection-mode"));
         buttons.forEach((button) =>
           button.classList.toggle(
             "active",
@@ -4145,6 +4147,10 @@ const splitAuthors = (author: string) =>
 
         selectionToggle.addEventListener("click", () => {
           setSelectionMode(!panel.classList.contains("selection-mode"));
+        });
+
+        window.addEventListener("library:exit-selection-mode", () => {
+          if (panel.classList.contains("selection-mode")) setSelectionMode(false);
         });
 
         searchInput.addEventListener("input", updateSelectionControls);
