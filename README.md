@@ -83,6 +83,10 @@ number of rows as a search results page; Show more trending books adds more rows
 With "Hide books in my
 lists" turned on, books you've already added are skipped and replaced by the
 next trending ones.
+The discovery area also has a Recommended for you tab. It uses subjects and
+languages from books in Read, Reading and Plan to Read to find related Open
+Library works with editions in those languages, then hides books already in
+your lists. Add more books to those lists to refresh and improve recommendations.
 
 When syncing from Open Library, a logged edition without a cover is shown as the
 work's newest edition that has one. Editions you pick in this app are kept as chosen.

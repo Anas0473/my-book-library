@@ -48,8 +48,12 @@ const { libraryBooks = [] } = Astro.props;
   </div>
   <section id="trending-books" class="trending-books" aria-labelledby="trending-books-heading">
     <div class="trending-header">
-      <h3 id="trending-books-heading">Trending books</h3>
-      <div class="trending-tabs" role="group" aria-label="Trending period">
+      <h3 id="trending-books-heading">Discover books</h3>
+      <div class="discovery-tabs" role="group" aria-label="Book discovery">
+        <button type="button" data-discovery="trending" aria-pressed="true">Trending</button>
+        <button type="button" data-discovery="recommended" aria-pressed="false">Recommended for you</button>
+      </div>
+      <div id="trending-period-controls" class="trending-tabs" role="group" aria-label="Trending period">
         <button type="button" data-period="daily" aria-pressed="true">Today</button>
         <button type="button" data-period="weekly" aria-pressed="false">This week</button>
         <button type="button" data-period="monthly" aria-pressed="false">This month</button>
@@ -58,7 +62,7 @@ const { libraryBooks = [] } = Astro.props;
     <p id="trending-status" class="trending-status" role="status"></p>
     <div id="trending-results" class="results-grid"></div>
     <div class="trending-more">
-      <button type="button" id="trending-show-more" class="trending-more-button" hidden>Show more trending books</button>
+      <button type="button" id="trending-show-more" class="trending-more-button" hidden>Show more books</button>
     </div>
   </section>
   <div id="search-results" class="results-grid"></div>
@@ -283,6 +287,7 @@ const { libraryBooks = [] } = Astro.props;
     font-weight: 600;
     letter-spacing: -0.01em;
   }
+  .discovery-tabs,
   .trending-tabs {
     display: inline-flex;
     gap: 0.2rem;
@@ -291,6 +296,7 @@ const { libraryBooks = [] } = Astro.props;
     border-radius: 10px;
     background: var(--panel);
   }
+  .discovery-tabs button,
   .trending-tabs button {
     padding: 0.35rem 0.75rem;
     border: 0;
@@ -301,17 +307,23 @@ const { libraryBooks = [] } = Astro.props;
     font-size: 0.82rem;
     cursor: pointer;
   }
+  .discovery-tabs button:hover,
   .trending-tabs button:hover {
     color: var(--fg);
   }
+  .discovery-tabs button[aria-pressed="true"],
   .trending-tabs button[aria-pressed="true"] {
     background: var(--fill);
     color: var(--fg);
     font-weight: 600;
   }
+  .discovery-tabs button:focus-visible,
   .trending-tabs button:focus-visible {
     outline: 2px solid var(--accent);
     outline-offset: 1px;
+  }
+  .trending-tabs[hidden] {
+    display: none;
   }
   .trending-status {
     margin: 0.75rem 0 0;
@@ -854,18 +866,27 @@ const { libraryBooks = [] } = Astro.props;
   const trendingSection = document.getElementById('trending-books') as HTMLElement;
   const trendingContainer = document.getElementById('trending-results') as HTMLElement;
   const trendingStatus = document.getElementById('trending-status') as HTMLElement;
+  const discoveryTabs = Array.from(trendingSection.querySelectorAll<HTMLButtonElement>('.discovery-tabs button'));
   const trendingTabs = Array.from(trendingSection.querySelectorAll<HTMLButtonElement>('.trending-tabs button'));
+  const trendingPeriodControls = document.getElementById('trending-period-controls') as HTMLElement;
   const trendingShowMoreButton = document.getElementById('trending-show-more') as HTMLButtonElement;
   const trendingPeriodLabels: Record<string, string> = { daily: 'today', weekly: 'this week', monthly: 'this month' };
   localStorage.removeItem('my-book-library:trending-period');
   // Trending always opens on Today.
   let trendingPeriod = 'daily';
-  // How many screenfuls of trending books are shown; Show more adds one.
-  let trendingScreens = 1;
   let trendingBooks: any[] = [];
   let trendingLoadedPeriod = '';
   let trendingRequestId = 0;
   let trendingRenderedKey = '';
+  let discoveryMode = 'trending';
+  let recommendedBooks: any[] = [];
+  let recommendedPartial = false;
+  let recommendedLoadedSeedKey = '';
+  let recommendedRequestId = 0;
+  let recommendedRenderedKey = '';
+  let recommendedScreens = 1;
+  // How many screenfuls of trending books are shown; Show more adds one.
+  let trendingShowMoreScreens = 1;
   function handleCoverError(event: Event) {
     const image = event.target;
     if (!(image instanceof HTMLImageElement) || !image.matches('.search-card img')) return;
@@ -916,7 +937,9 @@ const { libraryBooks = [] } = Astro.props;
   let searchPageSize = observeGridPageSize(resultsContainer, (nextPageSize) => {
     searchPageSize = nextPageSize;
     schedulePageSizeRefresh();
-    if (trendingBooks.length && !trendingSection.hidden) renderTrending();
+    if (trendingSection.hidden) return;
+    if (discoveryMode === 'recommended') renderRecommended();
+    else if (trendingBooks.length) renderTrending();
   });
   function schedulePageSizeRefresh() {
     clearTimeout(pageSizeRefreshTimer);
@@ -1099,17 +1122,22 @@ const { libraryBooks = [] } = Astro.props;
       const recordLinkLabel = book.provider === 'internet-archive'
         ? 'View on Internet Archive'
         : 'Open selected edition';
+      const titleText = escapeHtml(String(book.title || 'Untitled'));
+      const subtitleText = book.subtitle ? escapeHtml(String(book.subtitle)) : '';
+      const publicationText = book.pubDate
+        ? `Published: ${escapeHtml(String(book.pubDate))}`
+        : 'Publication date unknown';
       return `
       <div class="search-card">
         <div>
           ${coverImage
-            ? `<img src="${coverImage}" alt="${book.title}" loading="${index === 0 ? 'eager' : 'lazy'}" decoding="async"${index === 0 ? ' fetchpriority="high"' : ''} />`
+            ? `<img src="${coverImage}" alt="${titleText}" loading="${index === 0 ? 'eager' : 'lazy'}" decoding="async"${index === 0 ? ' fetchpriority="high"' : ''} />`
             : '<div class="search-cover-placeholder">NO IMAGE</div>'
           }
-          <h5>${book.title}</h5>
-          ${book.subtitle ? `<p class="subtitle">${book.subtitle}</p>` : ''}
+          <h5>${titleText}</h5>
+          ${subtitleText ? `<p class="subtitle">${subtitleText}</p>` : ''}
           <p class="author-text">${authorLinksMarkup(book.author || 'Unknown Author')}</p>
-          <p class="pub-date">${book.pubDate ? `Published: ${book.pubDate}` : 'Publication date unknown'}</p>
+          <p class="pub-date">${publicationText}</p>
           <a class="selected-edition-link" href="${escapeHtml(recordUrl || '#')}" target="_blank" rel="noopener noreferrer" ${recordUrl ? '' : 'hidden'}>${recordLinkLabel}</a>
           ${book.workKey ? `<button type="button" class="edition-button" data-book-index="${index}" data-preferred-edition="${escapeHtml(String(savedEditionKey || ''))}">Browse editions${book.editionCount ? ` (${book.editionCount})` : ''}</button>` : ''}
         </div>
@@ -1759,7 +1787,10 @@ const { libraryBooks = [] } = Astro.props;
   hideAddedToggle?.addEventListener('change', () => {
     currentHideAdded = hideAddedToggle.checked;
     updateSearchResetButton();
-    if (!currentQuery && trendingBooks.length) renderTrending();
+    if (!currentQuery && !trendingSection.hidden) {
+      if (discoveryMode === 'recommended') renderRecommended();
+      else if (trendingBooks.length) renderTrending();
+    }
     if (currentQuery) {
       performSearch(
         currentQuery,
@@ -1779,10 +1810,132 @@ const { libraryBooks = [] } = Astro.props;
       || libraryBooks.some((item: any) => shelfLabels[item.status] && isSameBook(item, book));
   }
 
+  function getRecommendationSeedKeys() {
+    const books = [
+      ...getSavedBooks().sort((first: any, second: any) =>
+        (Number(second.dateAdded) || 0) - (Number(first.dateAdded) || 0),
+      ),
+      ...libraryBooks.filter((book: any) => shelfLabels[book.status]),
+    ];
+    const keys = new Set<string>();
+    for (const book of books) {
+      if (!shelfLabels[book.status]) continue;
+      const workKey = String(book.workKey || book.key || '');
+      const editionKey = String(book.editionKey || '');
+      const seed = /^\/?works\/OL\d+W$/i.test(workKey)
+        ? workKey.replace(/^\/?/, '/')
+        : editionKey;
+      if (/^\/?books\/OL\d+M$/i.test(seed)) keys.add(seed.replace(/^\/?/, '/'));
+      else if (/^\/?works\/OL\d+W$/i.test(seed)) keys.add(seed.replace(/^\/?/, '/'));
+      if (keys.size >= 12) break;
+    }
+    return Array.from(keys);
+  }
+
+  function getRecommendationLanguages() {
+    const books = [
+      ...getSavedBooks(),
+      ...libraryBooks.filter((book: any) => shelfLabels[book.status]),
+    ];
+    const counts = new Map<string, number>();
+    for (const book of books) {
+      if (!shelfLabels[book.status]) continue;
+      const values = [book.editionLanguage, book.language, ...(Array.isArray(book.languages) ? book.languages : [])];
+      for (const value of values) {
+        const language = String(value || '').trim().toLowerCase();
+        if (!/^[a-z]{2,3}$/.test(language) || ['und', 'mul', 'zxx'].includes(language)) continue;
+        counts.set(language, (counts.get(language) || 0) + 1);
+      }
+    }
+    return Array.from(counts.entries())
+      .sort((first, second) => second[1] - first[1])
+      .slice(0, 10)
+      .map(([language]) => language);
+  }
+
+  function getRecommendationLanguageLabel(languages: string[]) {
+    if (!languages.length) return 'Based on the subjects of books in your lists.';
+    const displayNames = new Intl.DisplayNames(['en'], { type: 'language', fallback: 'none' });
+    const names = languages.map((language) => displayNames.of(language) || language.toUpperCase());
+    return `Based on your lists and their languages: ${names.join(', ')}.`;
+  }
+
+  function renderRecommended() {
+    const available = recommendedBooks.filter((book) => !isInMyLists(book));
+    const books = available.slice(0, searchPageSize * recommendedScreens);
+    trendingShowMoreButton.hidden = available.length <= books.length;
+    trendingShowMoreButton.textContent = 'Show more recommendations';
+    const renderKey = `${recommendedLoadedSeedKey}|${books.map((book) => book.key).join(',')}`;
+    if (renderKey === recommendedRenderedKey) return;
+    recommendedRenderedKey = renderKey;
+    if (!books.length) {
+      trendingContainer.innerHTML = '';
+      trendingStatus.textContent = recommendedBooks.length
+        ? `You already have these books in your lists. Try adding more books to get fresh recommendations.${recommendedPartial ? ' Some Open Library editions could not be checked; try again shortly.' : ''}`
+        : recommendedLoadedSeedKey
+          ? `No recommendations found yet. Add more books to your lists and try again.${recommendedPartial ? ' Some Open Library editions could not be checked; try again shortly.' : ''}`
+          : 'Add books to Read, Reading or Plan to Read to get recommendations.';
+      return;
+    }
+    trendingStatus.textContent = recommendedPartial
+      ? 'Some Open Library editions could not be checked. Showing the matches available; try again shortly for more.'
+      : getRecommendationLanguageLabel(getRecommendationLanguages());
+    renderBookCards(trendingContainer, books);
+  }
+
+  async function loadRecommended() {
+    const seeds = getRecommendationSeedKeys();
+    const languages = getRecommendationLanguages();
+    const seedKey = seeds.join('|');
+    const requestKey = `${seedKey}|${languages.join(',')}`;
+    if (!seeds.length) {
+      recommendedBooks = [];
+      recommendedLoadedSeedKey = requestKey;
+      recommendedRenderedKey = '';
+      trendingStatus.textContent = 'Add books to Read, Reading or Plan to Read to get recommendations.';
+      trendingContainer.innerHTML = '';
+      trendingShowMoreButton.hidden = true;
+      return;
+    }
+    if (recommendedLoadedSeedKey === requestKey) {
+      renderRecommended();
+      return;
+    }
+
+    const requestId = ++recommendedRequestId;
+    recommendedScreens = 1;
+    recommendedRenderedKey = '';
+    trendingStatus.textContent = 'Finding books based on your lists...';
+    trendingContainer.innerHTML = '';
+    trendingShowMoreButton.hidden = true;
+    try {
+      const params = new URLSearchParams();
+      seeds.forEach((seed) => params.append('seed', seed));
+      languages.forEach((language) => params.append('language', language));
+      const response = await fetch(`/api/recommended-books.json?${params}`);
+      const data = await response.json();
+      if (requestId !== recommendedRequestId) return;
+      if (!response.ok || data.error) throw new Error('Recommendations unavailable');
+      recommendedBooks = Array.isArray(data.books) ? data.books : [];
+      recommendedPartial = data.partial === true;
+      recommendedLoadedSeedKey = requestKey;
+      if (discoveryMode === 'recommended' && !trendingSection.hidden) renderRecommended();
+    } catch {
+      if (requestId !== recommendedRequestId) return;
+      recommendedBooks = [];
+      recommendedPartial = false;
+      recommendedLoadedSeedKey = '';
+      if (discoveryMode === 'recommended' && !trendingSection.hidden) {
+        trendingStatus.textContent = 'Recommendations could not be loaded right now.';
+      }
+    }
+  }
+
   function renderTrending() {
     const available = currentHideAdded ? trendingBooks.filter((book) => !isInMyLists(book)) : trendingBooks;
-    const books = available.slice(0, searchPageSize * trendingScreens);
+    const books = available.slice(0, searchPageSize * trendingShowMoreScreens);
     trendingShowMoreButton.hidden = available.length <= books.length;
+    trendingShowMoreButton.textContent = 'Show more trending books';
     // Skip identical re-renders so resizing never makes the covers blink.
     const renderKey = `${trendingLoadedPeriod}|${currentHideAdded}|${books.map((book) => book.key).join(',')}`;
     if (renderKey === trendingRenderedKey) return;
@@ -1804,7 +1957,7 @@ const { libraryBooks = [] } = Astro.props;
     trendingStatus.textContent = 'Loading trending books...';
     trendingContainer.innerHTML = '';
     trendingShowMoreButton.hidden = true;
-    trendingScreens = 1;
+    trendingShowMoreScreens = 1;
     trendingRenderedKey = '';
     try {
       const response = await fetch(`/api/trending-books.json?period=${encodeURIComponent(period)}&v=2`);
@@ -1813,21 +1966,47 @@ const { libraryBooks = [] } = Astro.props;
       if (!response.ok || data.error) throw new Error('Trending books unavailable');
       trendingBooks = Array.isArray(data.books) ? data.books : [];
       trendingLoadedPeriod = period;
-      renderTrending();
+      if (discoveryMode === 'trending' && !trendingSection.hidden) renderTrending();
     } catch {
       if (requestId !== trendingRequestId) return;
       trendingBooks = [];
       trendingLoadedPeriod = '';
-      trendingStatus.textContent = 'Trending books could not be loaded right now.';
+      if (discoveryMode === 'trending' && !trendingSection.hidden) {
+        trendingStatus.textContent = 'Trending books could not be loaded right now.';
+      }
     }
   }
 
   function updateTrendingVisibility() {
     trendingSection.hidden = Boolean(currentQuery);
-    if (!trendingSection.hidden && trendingLoadedPeriod !== trendingPeriod) {
+    if (trendingSection.hidden) return;
+    if (discoveryMode === 'recommended') {
+      loadRecommended();
+    } else if (trendingLoadedPeriod !== trendingPeriod) {
       loadTrending(trendingPeriod);
     }
   }
+
+  discoveryTabs.forEach((tab) => {
+    tab.addEventListener('click', () => {
+      const mode = tab.dataset.discovery || 'trending';
+      if (mode === discoveryMode) return;
+      discoveryMode = mode;
+      trendingRenderedKey = '';
+      recommendedRenderedKey = '';
+      discoveryTabs.forEach((item) =>
+        item.setAttribute('aria-pressed', String(item.dataset.discovery === discoveryMode)),
+      );
+      trendingPeriodControls.hidden = discoveryMode !== 'trending';
+      if (discoveryMode === 'recommended') {
+        loadRecommended();
+      } else if (trendingLoadedPeriod === trendingPeriod) {
+        renderTrending();
+      } else {
+        loadTrending(trendingPeriod);
+      }
+    });
+  });
 
   trendingTabs.forEach((tab) => {
     tab.addEventListener('click', () => {
@@ -1839,11 +2018,24 @@ const { libraryBooks = [] } = Astro.props;
   });
 
   trendingShowMoreButton.addEventListener('click', () => {
-    trendingScreens++;
-    renderTrending();
+    if (discoveryMode === 'recommended') {
+      recommendedScreens++;
+      renderRecommended();
+    } else {
+      trendingShowMoreScreens++;
+      renderTrending();
+    }
   });
 
   updateTrendingVisibility();
+  window.addEventListener('library:book-shelf-changed', () => {
+    if (discoveryMode === 'recommended' && !trendingSection.hidden) loadRecommended();
+  });
+  window.addEventListener('library:book-removed', () => {
+    if (discoveryMode === 'recommended' && !trendingSection.hidden) {
+      window.setTimeout(() => loadRecommended(), 0);
+    }
+  });
 
   document.addEventListener('click', (event) => {
     if (!(event.target as HTMLElement).closest('.shelf-control')) closeShelfMenus();
