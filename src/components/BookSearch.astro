@@ -844,7 +844,7 @@ const { libraryBooks = [] } = Astro.props;
 </style>
 
 <script>
-  import { isSameOpenLibraryWork } from '../lib/book-identity';
+  import { deduplicateRecommendedBooks, isSameRecommendedBook } from '../lib/book-identity';
 
   import { getGridPageSize, observeGridPageSize, pageForNewSize } from '../lib/responsive-page-size';
 
@@ -1868,9 +1868,10 @@ const { libraryBooks = [] } = Astro.props;
       ...getSavedBooks(),
       ...libraryBooks.filter((item: any) => shelfLabels[item.status]),
     ];
-    const available = recommendedBooks.filter((book) =>
-      !listBooks.some((item: any) => isSameOpenLibraryWork(item, book) || isSameBook(item, book)),
+    const matchingBooks = recommendedBooks.filter((book) =>
+      !listBooks.some((item: any) => isSameRecommendedBook(item, book) || isSameBook(item, book)),
     );
+    const available = deduplicateRecommendedBooks(matchingBooks);
     const books = available.slice(0, searchPageSize * recommendedScreens);
     trendingShowMoreButton.hidden = available.length <= books.length;
     trendingShowMoreButton.textContent = 'Show more recommendations';
