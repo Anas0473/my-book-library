@@ -269,6 +269,54 @@ const { libraryBooks = [] } = Astro.props;
   .results-grid > :global(p) {
     color: var(--muted);
   }
+  .results-grid > :global(.isbn-empty-state) {
+    grid-column: 1 / -1;
+    justify-self: start;
+    box-sizing: border-box;
+    width: fit-content;
+    max-width: min(100%, 26rem);
+    padding: 1.5rem 1.4rem;
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    background: var(--panel);
+  }
+  .results-grid :global(.isbn-empty-state h3) {
+    margin: 0 0 0.4rem;
+    font-size: 1.05rem;
+    font-weight: 600;
+  }
+  .results-grid :global(.isbn-empty-state p) {
+    margin: 0 0 1rem;
+    color: var(--muted);
+    font-size: 0.9rem;
+    line-height: 1.5;
+  }
+  .results-grid :global(.isbn-empty-state strong) {
+    color: var(--fg);
+    font-variant-numeric: tabular-nums;
+  }
+  .results-grid :global(.isbn-empty-state-link) {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.55rem;
+    border-radius: 9px;
+    background: var(--accent);
+    color: var(--accent-ink);
+    font-size: 0.88rem;
+    font-weight: 600;
+    text-decoration: none;
+    white-space: nowrap;
+  }
+  .results-grid :global(.isbn-empty-state-link span) {
+    margin-left: 0.55rem;
+  }
+  .results-grid :global(.isbn-empty-state-link:hover) {
+    background: var(--accent-strong);
+  }
+  .results-grid :global(.isbn-empty-state-link:focus-visible) {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+  }
   .trending-books {
     margin-top: 2rem;
   }
@@ -1577,7 +1625,31 @@ const { libraryBooks = [] } = Astro.props;
       currentLanguage = searchLanguageSelect.value;
 
       if (displayBooks.length === 0) {
-        resultsContainer.innerHTML = '<p>No books found.</p>';
+        const isIsbnQuery = !authorOnly && /^(?:\d{9}[\dX]|\d{13})$/.test(normalizedIsbnQuery);
+        if (isIsbnQuery && !isInternetArchive && !searchUnavailable) {
+          const emptyState = document.createElement('div');
+          emptyState.className = 'isbn-empty-state';
+          const heading = document.createElement('h3');
+          heading.textContent = 'No books found for this ISBN';
+          const message = document.createElement('p');
+          message.append('Open Library has no record of ISBN ');
+          const isbn = document.createElement('strong');
+          isbn.textContent = normalizedIsbnQuery;
+          message.append(isbn, '. You can add it so it can be found and added to your lists.');
+          const addLink = document.createElement('a');
+          addLink.href = 'https://openlibrary.org/books/add';
+          addLink.target = '_blank';
+          addLink.rel = 'noopener noreferrer';
+          addLink.className = 'isbn-empty-state-link';
+          const arrow = document.createElement('span');
+          arrow.setAttribute('aria-hidden', 'true');
+          arrow.textContent = '↗';
+          addLink.append('Add book to Open Library', arrow);
+          emptyState.append(heading, message, addLink);
+          resultsContainer.replaceChildren(emptyState);
+        } else {
+          resultsContainer.innerHTML = '<p>No books found.</p>';
+        }
         summaryContainer.textContent = isInternetArchive
           ? `${searchNotice} No results found in Internet Archive.`
           : searchNotice;
