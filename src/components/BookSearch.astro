@@ -89,7 +89,8 @@ const { libraryBooks = [] } = Astro.props;
     color: var(--muted);
     font-size: 0.82rem;
   }
-  .search-summary[data-state="warning"] {
+  .search-summary[data-state="warning"],
+  .trending-status[data-state="warning"] {
     display: inline-block;
     max-width: min(100%, 42rem);
     box-sizing: border-box;
@@ -1905,6 +1906,7 @@ const { libraryBooks = [] } = Astro.props;
     const requestId = ++recommendedRequestId;
     recommendedScreens = 1;
     recommendedRenderedKey = '';
+    delete trendingStatus.dataset.state;
     trendingStatus.textContent = 'Finding books based on your lists...';
     trendingContainer.innerHTML = '';
     trendingShowMoreButton.hidden = true;
@@ -1926,7 +1928,8 @@ const { libraryBooks = [] } = Astro.props;
       recommendedPartial = false;
       recommendedLoadedSeedKey = '';
       if (discoveryMode === 'recommended' && !trendingSection.hidden) {
-        trendingStatus.textContent = 'Recommendations could not be loaded right now.';
+        trendingStatus.textContent = 'Open Library is temporarily unavailable. Please try again later.';
+        trendingStatus.dataset.state = 'warning';
       }
     }
   }
@@ -1954,6 +1957,7 @@ const { libraryBooks = [] } = Astro.props;
   async function loadTrending(period: string) {
     const requestId = ++trendingRequestId;
     trendingTabs.forEach((tab) => tab.setAttribute('aria-pressed', String(tab.dataset.period === period)));
+    delete trendingStatus.dataset.state;
     trendingStatus.textContent = 'Loading trending books...';
     trendingContainer.innerHTML = '';
     trendingShowMoreButton.hidden = true;
@@ -1972,7 +1976,8 @@ const { libraryBooks = [] } = Astro.props;
       trendingBooks = [];
       trendingLoadedPeriod = '';
       if (discoveryMode === 'trending' && !trendingSection.hidden) {
-        trendingStatus.textContent = 'Trending books could not be loaded right now.';
+        trendingStatus.textContent = 'Open Library is temporarily unavailable. Please try again later.';
+        trendingStatus.dataset.state = 'warning';
       }
     }
   }
