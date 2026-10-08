@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { createSyncBookIndex } from '../src/lib/sync-book-index';
+import { createSyncBookIndex } from '../src/lib/sync-book-index.ts';
 
 interface Book {
   key?: string;
@@ -10,6 +10,7 @@ interface Book {
   openLibrarySyncUsername?: string;
   title?: string;
   isbn?: string;
+  openLibraryLocalOnly?: boolean;
 }
 
 function matches(existing: Book, incoming: Book) {
@@ -85,6 +86,29 @@ test('changing an indexed book removes stale candidates and preserves the earlie
   assert.equal(indexed.findIndex({ editionKey: '/books/OL2M' }), 0);
   indexed.set(0, { editionKey: '/books/OL1M' });
   assert.equal(indexed.findIndex({ editionKey: '/books/OL1M' }), 0);
+});
+
+test('work-only sync records cannot overwrite local-only extra editions', () => {
+  const extra = {
+    workKey: '/works/OL912133W',
+    editionKey: '/books/OL1M',
+    openLibraryLocalOnly: true,
+  };
+  const indexed = createSyncBookIndex<Book>([extra], matches);
+  assert.equal(indexed.findIndex({
+    workKey: extra.workKey,
+    openLibrarySyncUsername: 'reader',
+  }), -1);
+  assert.equal(indexed.findIndex({
+    workKey: extra.workKey,
+    editionKey: '/books/OL62657082M',
+    openLibrarySyncUsername: 'reader',
+  }), -1);
+  assert.equal(indexed.findIndex({
+    workKey: extra.workKey,
+    editionKey: extra.editionKey,
+    openLibrarySyncUsername: 'reader',
+  }), 0);
 });
 
 test('unique-edition matching checks one candidate per book rather than scanning the full library', () => {

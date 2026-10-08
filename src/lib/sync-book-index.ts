@@ -3,6 +3,7 @@ interface SyncBookIdentity {
   workKey?: string | null;
   editionKey?: string | null;
   loggedEditionKey?: string | null;
+  openLibraryLocalOnly?: boolean;
 }
 
 // Use when at least one side is synced: logged editions, then works, then the fallback matcher.
@@ -70,6 +71,11 @@ export function createSyncBookIndex<T extends SyncBookIdentity>(
     for (const indices of candidates) {
       if (!indices) continue;
       for (const index of indices) {
+        if (books[index].openLibraryLocalOnly || book.openLibraryLocalOnly) {
+          const existingEdition = books[index].editionKey;
+          const incomingEdition = book.editionKey;
+          if (!existingEdition || !incomingEdition || existingEdition !== incomingEdition) continue;
+        }
         if (index < first && matches(books[index], book)) first = index;
       }
     }
