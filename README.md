@@ -136,6 +136,32 @@ sync, including copies previously marked as removed. Local-only books and extra
 editions stay. Failed or malformed sync responses leave your books untouched;
 incomplete shelves keep their existing books and show a warning.
 
+## Cloud Library
+
+Connect a Neon Postgres database to the Vercel project. The server reads
+`STORAGE_URL`, `DATABASE_URL`, or `POSTGRES_URL`; these values must stay private
+and must never use a `PUBLIC_` prefix. The required tables are created on the
+first cloud login. Database access stays on the server.
+
+Log in to Open Library again after enabling the database. A successful login
+creates a separate HTTP-only cloud session; existing username cookies cannot
+authorize database access. No Open Library password or access keys are stored
+in the database. Logging out revokes the current cloud session.
+
+Cloud storage preserves each selected edition separately, including editions
+that Open Library cannot put on its reading log. Existing browser books are
+imported without replacing cloud records. Upload failures keep a persistent
+per-account outbox, concurrent saves use revision checks, and deletion markers
+prevent stale first-time imports from restoring removed books. Account switching
+keeps a browser backup of the previous library. Cloud updates arrive on login,
+Sync now, returning to the page, reconnecting, and every minute while visible.
+
+For localhost, privately set the database connection in the ignored `.env` file
+and restart Astro, then log in with the same Open Library account. Connecting the
+database only to Vercel Production does not configure localhost or Preview.
+Localhost and Production must use the same database to share their libraries;
+Preview should use a separate database.
+
 ## Optional Search Fallback
 
 Press Enter in the search field to search immediately or retry the unchanged

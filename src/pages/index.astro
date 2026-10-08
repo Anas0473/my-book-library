@@ -1820,6 +1820,7 @@ const splitAuthors = (author: string) =>
           </div>
           <button type="button" class="open-library-link-button" id="open-library-logout">Log out</button>
         </div>
+        <p class="open-library-sync-message" id="cloud-library-status" role="status" aria-live="polite" hidden></p>
         <p class="open-library-sync-message" id="open-library-sync-message" role="status" aria-live="polite"></p>
         <div class="open-library-sync-actions">
           <button type="button" id="open-library-sync-cancel">Cancel</button>
@@ -1830,6 +1831,7 @@ const splitAuthors = (author: string) =>
 
     <script>
       import { createTheme } from "../lib/theme";
+      import { createCloudLibraryClient } from "../lib/cloud-library-client";
       import { createSyncBookIndex } from "../lib/sync-book-index";
       import {
         diffShelves,
@@ -1860,6 +1862,9 @@ const splitAuthors = (author: string) =>
       const openLibrarySyncDialog = document.getElementById("open-library-sync-dialog") as HTMLDialogElement;
       const openLibrarySyncForm = document.getElementById("open-library-sync-form") as HTMLFormElement;
       const openLibrarySyncMessage = document.getElementById("open-library-sync-message") as HTMLElement;
+      const cloudLibraryStatus = document.getElementById("cloud-library-status") as HTMLElement;
+      let cloudReauthenticationRequired = false;
+      let cloudLibrary: ReturnType<typeof createCloudLibraryClient> | null = null;
       const openLibrarySyncSubmit = document.getElementById("open-library-sync-submit") as HTMLButtonElement;
       const openLibrarySyncCancel = document.getElementById("open-library-sync-cancel") as HTMLButtonElement;
       const openLibraryLoginFields = document.getElementById("open-library-login-fields") as HTMLElement;
@@ -2376,6 +2381,28 @@ const splitAuthors = (author: string) =>
       let openLibraryFlush: Promise<void> | null = null;
       let openLibraryRetryTimer = 0;
 
+      cloudLibrary = createCloudLibraryClient({
+        storage: localStorage,
+        getBooks: () => localBooks,
+        setBooks: (books) => {
+          localBooks = books;
+          saveLocalBooksWithoutPush(false);
+          document.querySelectorAll("[data-local-book-key]").forEach((card) => card.remove());
+          localBooks.forEach((book) => {
+            removeMatchingContentBooks(book);
+            renderLocalBook(book);
+          });
+          updateShelfCounts();
+          panelRefreshers.forEach((refreshPanel) => refreshPanel());
+          syncShelfControls();
+          window.dispatchEvent(new Event("library:cloud-updated"));
+        },
+        message: (message) => {
+          cloudLibraryStatus.hidden = !message;
+          cloudLibraryStatus.textContent = message;
+        },
+      });
+
       function getOpenLibraryPushUser() {
         return localStorage.getItem(openLibraryPushUserKey);
       }
@@ -2400,9 +2427,10 @@ const splitAuthors = (author: string) =>
       }
 
       /** Saves the list without sending anything, for changes that came from Open Library. */
-      function saveLocalBooksWithoutPush() {
+      function saveLocalBooksWithoutPush(cloudChange = true) {
         localStorage.setItem(savedBooksKey, JSON.stringify(localBooks));
         openLibraryShelfSnapshot = shelfSnapshot(localBooks);
+        if (cloudChange) cloudLibrary?.schedule();
       }
 
       function queueOpenLibraryChanges(changes: ShelfChange[]) {
@@ -2516,8 +2544,8 @@ const splitAuthors = (author: string) =>
 
       function updateOpenLibraryAccountView() {
         const pushUser = getOpenLibraryPushUser();
-        openLibraryLoginFields.hidden = Boolean(pushUser);
-        openLibraryLoggedIn.hidden = !pushUser;
+        openLibraryLoginFields.hidden = Boolean(pushUser) && !cloudReauthenticationRequired;
+        openLibraryLoggedIn.hidden = !pushUser || cloudReauthenticationRequired;
         updateOpenLibraryLoginMethod();
         openLibraryLoggedInText.textContent = pushUser ? `Logged in as ${pushUser}` : "";
         updateOpenLibrarySyncSubmitLabel();
@@ -2578,8 +2606,10 @@ const splitAuthors = (author: string) =>
           }
 
           localStorage.setItem(openLibraryPushUserKey, data.username);
+          cloudReauthenticationRequired = false;
           updateOpenLibraryAccountView();
           openLibraryAccountMessage.textContent = `Logged in as ${data.username}.`;
+          if (data.cloudConnected) await cloudLibrary?.connect(data.username);
           await syncOpenLibrary(data.username, { confirmed: true, sendLocalOnlyBooks: true });
         } catch (error) {
           openLibraryAccountMessage.textContent = error instanceof Error
@@ -2593,7 +2623,12 @@ const splitAuthors = (author: string) =>
       async function logOutOfOpenLibrary() {
         openLibraryLogoutButton.disabled = true;
         try {
-          await fetch("/api/openlibrary-account.json", { method: "DELETE" });
+          await cloudLibrary?.sync();
+          const response = await fetch("/api/openlibrary-account.json", { method: "DELETE" });
+          if (!response.ok) throw new Error("Logout failed");
+          cloudLibrary?.disconnect();
+          cloudReauthenticationRequired = false;
+          cloudLibraryStatus.hidden = true;
           localStorage.removeItem(openLibraryPushUserKey);
           writePendingOpenLibraryChanges([]);
           updateOpenLibraryAccountView();
@@ -2612,9 +2647,19 @@ const splitAuthors = (author: string) =>
           const data = await response.json();
           if (data.connected && data.username) {
             localStorage.setItem(openLibraryPushUserKey, data.username);
+            cloudReauthenticationRequired = Boolean(data.cloudConfigured && !data.cloudConnected && !data.cloudError);
+            if (data.cloudConnected) {
+              await cloudLibrary?.connect(data.username);
+            } else if (cloudReauthenticationRequired || data.cloudError) {
+              cloudLibrary?.disconnect();
+              cloudLibraryStatus.hidden = false;
+              cloudLibraryStatus.textContent = data.cloudError
+                || "Log in again to enable cloud library sync. Your browser books are kept.";
+            }
             updateOpenLibraryAccountView();
             flushOpenLibraryChanges();
           } else if (getOpenLibraryPushUser()) {
+            cloudLibrary?.disconnect();
             handleOpenLibraryLoggedOut();
           }
         } catch {
@@ -2624,7 +2669,7 @@ const splitAuthors = (author: string) =>
 
       function syncOpenLibraryIfDue() {
         const username = getOpenLibraryPushUser();
-        if (!username || readPendingOpenLibraryChanges().length > 0) return;
+        if (!username || cloudReauthenticationRequired || readPendingOpenLibraryChanges().length > 0) return;
         const lastSync = Number(localStorage.getItem(openLibraryLastSyncKey) || 0);
         if (Date.now() - lastSync > openLibraryLoggedInSyncInterval) syncOpenLibrary(username, { quiet: true });
       }
@@ -2692,6 +2737,7 @@ const splitAuthors = (author: string) =>
         if (!state.quiet) openLibrarySyncSubmit.disabled = true;
 
         try {
+          await cloudLibrary?.sync();
           // Send waiting changes first so the pull doesn't undo them.
           if (getOpenLibraryPushUser()) await flushOpenLibraryChanges();
           const waitingChanges = readPendingOpenLibraryChanges().length;
@@ -2786,6 +2832,7 @@ const splitAuthors = (author: string) =>
           const listChanged = JSON.stringify(nextBooks) !== JSON.stringify(localBooks);
           localBooks = nextBooks;
           saveLocalBooksWithoutPush();
+          await cloudLibrary?.sync();
           localStorage.setItem(openLibraryUsernameKey, username);
           localStorage.setItem(openLibraryLastSyncKey, String(Date.now()));
           const incompleteMessage = incompleteShelves
@@ -2859,7 +2906,7 @@ const splitAuthors = (author: string) =>
       }
 
       function updateOpenLibrarySyncSubmitLabel() {
-        openLibrarySyncSubmit.textContent = getOpenLibraryPushUser()
+        openLibrarySyncSubmit.textContent = getOpenLibraryPushUser() && !cloudReauthenticationRequired
           ? "Sync now"
           : "Log in and sync";
       }
@@ -2888,7 +2935,7 @@ const splitAuthors = (author: string) =>
       openLibrarySyncForm.addEventListener("submit", (event) => {
         event.preventDefault();
         const pushUser = getOpenLibraryPushUser();
-        if (pushUser) {
+        if (pushUser && !cloudReauthenticationRequired) {
           syncOpenLibrary(pushUser, { sendLocalOnlyBooks: true });
         } else {
           logInToOpenLibrary();
@@ -2906,9 +2953,19 @@ const splitAuthors = (author: string) =>
         syncOpenLibraryIfDue();
       }, 500);
       document.addEventListener("visibilitychange", () => {
-        if (document.visibilityState === "visible") syncOpenLibraryIfDue();
+        if (document.visibilityState === "visible") {
+          void cloudLibrary?.sync();
+          syncOpenLibraryIfDue();
+        }
       });
-      window.addEventListener("online", () => flushOpenLibraryChanges());
+      window.addEventListener("online", () => {
+        void cloudLibrary?.sync();
+        flushOpenLibraryChanges();
+      });
+      window.setInterval(() => {
+        if (document.visibilityState === "visible") void cloudLibrary?.sync();
+      }, 60 * 1000);
+      window.addEventListener("pagehide", () => cloudLibrary?.capture());
 
       function activatePanel(target: string) {
         const previousTarget = document.querySelector<HTMLElement>(".category-panel.active")?.id;
@@ -4056,7 +4113,7 @@ const splitAuthors = (author: string) =>
                     savedBooksChanged = true;
                   }
                 });
-                if (savedBooksChanged) localStorage.setItem(savedBooksKey, JSON.stringify(localBooks));
+                if (savedBooksChanged) saveLocalBooksWithoutPush();
                 updatePanel();
               } catch {
                 break;

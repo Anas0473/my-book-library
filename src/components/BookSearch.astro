@@ -2117,6 +2117,12 @@ const { libraryBooks = [] } = Astro.props;
   window.addEventListener('library:book-shelf-changed', () => {
     if (discoveryMode === 'recommended' && !trendingSection.hidden) loadRecommended();
   });
+  window.addEventListener('library:cloud-updated', () => {
+    recommendedRenderedKey = '';
+    trendingRenderedKey = '';
+    if (discoveryMode === 'recommended' && !trendingSection.hidden) loadRecommended();
+    else if (!trendingSection.hidden && trendingBooks.length) renderTrending();
+  });
   window.addEventListener('library:book-removed', () => {
     if (discoveryMode === 'recommended' && !trendingSection.hidden) {
       window.setTimeout(() => loadRecommended(), 0);
