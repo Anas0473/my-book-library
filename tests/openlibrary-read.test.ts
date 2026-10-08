@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { OpenLibraryReadTimeoutError, readOpenLibrary } from '../src/lib/openlibrary-read';
+import { OpenLibraryReadTimeoutError, readOpenLibrary } from '../src/lib/openlibrary-read.ts';
 
 const url = 'https://openlibrary.org/api/books';
 const options = { timeoutMs: 20, retryDelayMs: 0, cache: 'no-store' as const };
@@ -27,7 +27,7 @@ test('successful reads are fetched once, preserving headers and cache policy', a
   }
 });
 
-test('temporary HTTP errors and network failures retry at most once', async () => {
+test('temporary HTTP errors and network failures retry at most twice', async () => {
   const originalFetch = globalThis.fetch;
   try {
     for (const status of [408, 429, 500, 502, 503, 504, 'network']) {
@@ -48,7 +48,7 @@ test('temporary HTTP errors and network failures retry at most once', async () =
           assert.equal(result.response.ok, recover);
           assert.deepEqual(result.data, recover ? { recovered: true } : null);
         }
-        assert.equal(calls, 2);
+        assert.equal(calls, recover ? 2 : 3);
       }
     }
   } finally {
@@ -56,7 +56,7 @@ test('temporary HTTP errors and network failures retry at most once', async () =
   }
 });
 
-test('actual request timeouts retry with a fresh signal and surface an explicit exhausted-timeout error', async () => {
+test('actual request timeouts retry with fresh signals and surface an explicit exhausted-timeout error', async () => {
   const originalFetch = globalThis.fetch;
   try {
     for (const recover of [true, false]) {
@@ -66,7 +66,7 @@ test('actual request timeouts retry with a fresh signal and surface an explicit 
         assert.ok(signal);
         assert.equal(signal.aborted, false);
         signals.push(signal);
-        if (recover && signals.length === 2) return Response.json({ recovered: true });
+        if (recover && signals.length === 3) return Response.json({ recovered: true });
         return new Promise((_resolve, reject) => {
           signal.addEventListener('abort', () => reject(new DOMException('Aborted', 'AbortError')), { once: true });
         });
@@ -77,8 +77,9 @@ test('actual request timeouts retry with a fresh signal and surface an explicit 
       } else {
         await assert.rejects(readOpenLibrary(url, options, (response) => response.json()), OpenLibraryReadTimeoutError);
       }
-      assert.equal(signals.length, 2);
+      assert.equal(signals.length, 3);
       assert.notEqual(signals[0], signals[1]);
+      assert.notEqual(signals[1], signals[2]);
       assert.equal(signals[0].aborted, true);
     }
   } finally {
@@ -103,7 +104,7 @@ test('body reads are covered by the timeout as well as response headers', async 
         currentSignal.addEventListener('abort', () => reject(new DOMException('Aborted', 'AbortError')), { once: true });
       });
     }), OpenLibraryReadTimeoutError);
-    assert.equal(calls, 2);
+    assert.equal(calls, 3);
   } finally {
     globalThis.fetch = originalFetch;
   }

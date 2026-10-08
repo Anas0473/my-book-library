@@ -228,6 +228,8 @@ export const GET: APIRoute = async ({ url, cookies }) => {
     return jsonResponse(
       { error: error instanceof OpenLibraryReadTimeoutError
         ? 'Open Library took too long to respond, even after retrying. Your saved books were kept. Please try again.'
+        : error instanceof TypeError
+          ? 'Could not reach Open Library after retrying. Your saved books were kept. Please try again shortly.'
         : 'Could not sync the Open Library reading log. Please try again.' },
       502,
     );

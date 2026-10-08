@@ -13,6 +13,8 @@ interface ReadOptions {
 }
 
 const transientStatuses = new Set([408, 429, 500, 502, 503, 504]);
+const MAX_ATTEMPTS = 3;
+const MAX_RETRY_DELAY_MS = 10000;
 
 function isTransientError(error: unknown) {
   return error instanceof TypeError
@@ -25,11 +27,11 @@ export async function readOpenLibrary<T>(
   options: ReadOptions,
   readBody: (response: Response) => Promise<T>,
 ): Promise<{ response: Response; data: T } | { response: Response; data: null }> {
-  const retryDelayMs = options.retryDelayMs ?? 1100;
+  const baseRetryDelayMs = options.retryDelayMs ?? 1100;
   for (let attempt = 0; ; attempt++) {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), options.timeoutMs);
-    let delay = retryDelayMs;
+    let delay = Math.min(baseRetryDelayMs * (2 ** attempt), MAX_RETRY_DELAY_MS);
     try {
       const response = await fetch(url, {
         signal: controller.signal,
@@ -37,7 +39,7 @@ export async function readOpenLibrary<T>(
         cache: options.cache,
       });
       if (response.ok) return { response, data: await readBody(response) };
-      if (attempt > 0 || !transientStatuses.has(response.status)) {
+      if (attempt === MAX_ATTEMPTS - 1 || !transientStatuses.has(response.status)) {
         return { response, data: null };
       }
       const retryAfter = response.headers.get('Retry-After');
@@ -51,15 +53,15 @@ export async function readOpenLibrary<T>(
         if (Number.isFinite(wait)) delay = Math.max(delay, wait);
       }
       await response.body?.cancel();
-      console.warn(`Open Library sync read returned ${response.status}; retrying once.`);
+      console.warn(`Open Library sync read returned ${response.status}; retrying (${attempt + 2}/${MAX_ATTEMPTS}).`);
     } catch (error) {
       const timedOut = controller.signal.aborted
         || (error instanceof Error && ['AbortError', 'TimeoutError'].includes(error.name));
-      if (attempt > 0 || (!timedOut && !isTransientError(error))) {
+      if (attempt === MAX_ATTEMPTS - 1 || (!timedOut && !isTransientError(error))) {
         if (timedOut) throw new OpenLibraryReadTimeoutError();
         throw error;
       }
-      console.warn('Open Library sync read failed temporarily; retrying once.', error);
+      console.warn(`Open Library sync read failed temporarily; retrying (${attempt + 2}/${MAX_ATTEMPTS}).`, error);
     } finally {
       clearTimeout(timeout);
     }
