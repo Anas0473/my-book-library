@@ -2375,6 +2375,7 @@ const splitAuthors = (author: string) =>
       updateShelfCounts();
 
       const openLibraryPushUserKey = "my-book-library:openlibrary-push-user";
+      let verifiedOpenLibraryUser: string | null = null;
       const openLibraryPendingKey = "my-book-library:openlibrary-pending";
       const openLibraryLoggedInSyncInterval = 15 * 60 * 1000;
       let openLibraryShelfSnapshot = shelfSnapshot(localBooks);
@@ -2404,7 +2405,7 @@ const splitAuthors = (author: string) =>
       });
 
       function getOpenLibraryPushUser() {
-        return localStorage.getItem(openLibraryPushUserKey);
+        return verifiedOpenLibraryUser;
       }
 
       function readPendingOpenLibraryChanges(): ShelfChange[] {
@@ -2473,6 +2474,7 @@ const splitAuthors = (author: string) =>
       }
 
       function handleOpenLibraryLoggedOut() {
+        verifiedOpenLibraryUser = null;
         localStorage.removeItem(openLibraryPushUserKey);
         updateOpenLibraryAccountView();
         const waiting = readPendingOpenLibraryChanges().length;
@@ -2606,6 +2608,7 @@ const splitAuthors = (author: string) =>
           }
 
           localStorage.setItem(openLibraryPushUserKey, data.username);
+          verifiedOpenLibraryUser = data.username;
           cloudReauthenticationRequired = false;
           updateOpenLibraryAccountView();
           openLibraryAccountMessage.textContent = `Logged in as ${data.username}.`;
@@ -2629,6 +2632,7 @@ const splitAuthors = (author: string) =>
           cloudLibrary?.disconnect();
           cloudReauthenticationRequired = false;
           cloudLibraryStatus.hidden = true;
+          verifiedOpenLibraryUser = null;
           localStorage.removeItem(openLibraryPushUserKey);
           writePendingOpenLibraryChanges([]);
           updateOpenLibraryAccountView();
@@ -2645,9 +2649,12 @@ const splitAuthors = (author: string) =>
         try {
           const response = await fetch("/api/openlibrary-account.json", { cache: "no-store" });
           const data = await response.json();
-          if (data.connected && data.username) {
+          if (!response.ok) throw new Error("Account check failed");
+          if (data.connected === true && typeof data.username === "string" && data.username) {
             localStorage.setItem(openLibraryPushUserKey, data.username);
+            verifiedOpenLibraryUser = data.username;
             cloudReauthenticationRequired = Boolean(data.cloudConfigured && !data.cloudConnected && !data.cloudError);
+            updateOpenLibraryAccountView();
             if (data.cloudConnected) {
               await cloudLibrary?.connect(data.username);
             } else if (cloudReauthenticationRequired || data.cloudError) {
@@ -2658,8 +2665,9 @@ const splitAuthors = (author: string) =>
             }
             updateOpenLibraryAccountView();
             flushOpenLibraryChanges();
-          } else if (getOpenLibraryPushUser()) {
+          } else {
             cloudLibrary?.disconnect();
+            cloudReauthenticationRequired = false;
             handleOpenLibraryLoggedOut();
           }
         } catch {
@@ -2675,7 +2683,7 @@ const splitAuthors = (author: string) =>
       }
 
       function updateOpenLibrarySyncLabel() {
-        const username = getOpenLibraryPushUser();
+        const username = cloudReauthenticationRequired ? null : getOpenLibraryPushUser();
         openLibrarySyncButton.textContent = username
           ? "Open Library connected"
           : "Connect Open Library";
