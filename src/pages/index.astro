@@ -1,35 +1,9 @@
 ---
-import { getCollection } from "astro:content";
 import BookSearch from "../components/BookSearch.astro";
 import WebsiteAccount from "../components/WebsiteAccount.astro";
 import { websiteCloudOwner } from "../lib/website-auth";
 
 const accountSignedIn = Boolean(websiteCloudOwner(Astro.locals));
-
-const allBooks = await getCollection("blog");
-
-const naturalSort = (a: any, b: any) =>
-  a.data.title.localeCompare(b.data.title, undefined, {
-    numeric: true,
-    sensitivity: "base",
-  }) || String(a.data.subtitle || "").localeCompare(String(b.data.subtitle || ""), undefined, {
-    numeric: true,
-    sensitivity: "base",
-  });
-
-const reading = allBooks
-  .filter((b) => b.data.status === "Reading")
-  .sort(naturalSort);
-const planToRead = allBooks
-  .filter((b) => b.data.status === "Plan to Read")
-  .sort(naturalSort);
-const read = allBooks.filter((b) => b.data.status === "Read").sort(naturalSort);
-
-const splitAuthors = (author: string) =>
-  author
-    .split(/\s*(?:,|&|\band\b)\s*/i)
-    .map((name) => name.trim())
-    .filter(Boolean);
 ---
 
 <html lang="en">
@@ -1574,13 +1548,13 @@ const splitAuthors = (author: string) =>
         <div class="sidebar-section">
           <h3>My Lists</h3>
           <button class="category-btn" data-target="plan-to-read"
-            >Plan to Read <span class="category-count">{planToRead.length}</span></button
+            >Plan to Read <span class="category-count">0</span></button
           >
           <button class="category-btn" data-target="reading"
-            >Reading <span class="category-count">{reading.length}</span></button
+            >Reading <span class="category-count">0</span></button
           >
           <button class="category-btn" data-target="read"
-            >Read <span class="category-count">{read.length}</span></button
+            >Read <span class="category-count">0</span></button
           >
         </div>
         <section class="sidebar-account" aria-label="Account and sync">
@@ -1607,14 +1581,7 @@ const splitAuthors = (author: string) =>
         <!-- Dedicated Search Page Panel -->
         <div id="search-db" class="category-panel active">
           <BookSearch
-            libraryBooks={allBooks.map(({ data }) => ({
-              title: data.title,
-              author: data.author,
-              isbn: data.isbn,
-              status: data.status,
-              editionKey: (data as any).editionKey,
-              editionLanguage: (data as any).editionLanguage || (data as any).language,
-            }))}
+            libraryBooks={[]}
           />
         </div>
 
@@ -1624,17 +1591,15 @@ const splitAuthors = (author: string) =>
             {
               id: "plan-to-read",
               title: "Plan to Read",
-              books: planToRead,
               empty: "No books planned yet.",
             },
             {
               id: "reading",
               title: "Reading",
-              books: reading,
               empty: "No books currently being read.",
             },
-            { id: "read", title: "Read", books: read, empty: "No completed books yet." },
-          ].map(({ id, title, books, empty }) => (
+            { id: "read", title: "Read", empty: "No completed books yet." },
+          ].map(({ id, title, empty }) => (
             <div id={id} class="category-panel">
               <div class="panel-heading">
                 <h2>{title}</h2>
@@ -1682,97 +1647,9 @@ const splitAuthors = (author: string) =>
                 <button type="button" class="reset-filters-button" disabled>Reset filters</button>
               </div>
               <div class="cards-grid">
-                {books.map((book) => (
-                  <a
-                    href={`/blog/${book.id}/`}
-                    class="card"
-                    data-book-link
-                    data-content-book
-                    data-status={book.data.status || ""}
-                    data-isbn={book.data.isbn || ""}
-                    data-publisher={(book.data as any).publisher || ""}
-                    data-edition-key={(book.data as any).editionKey || ""}
-                    data-title={book.data.title.toLowerCase()}
-                    data-subtitle={(book.data.subtitle || "").toLowerCase()}
-                    data-author={(book.data.author || "").toLowerCase()}
-                    data-year={parseInt(String(book.data.pubDate)) || 0}
-                    data-date-added={(book.data as any).dateAdded || ""}
-                    data-language={String((book.data as any).editionLanguage || (book.data as any).language || "").toLowerCase()}
-                  >
-                    <div>
-                      {book.data.heroImage ? (
-                        <img
-                          src={book.data.heroImage}
-                          class="cover-img"
-                          alt={book.data.title}
-                          referrerpolicy="no-referrer"
-                          loading="lazy"
-                          decoding="async"
-                        />
-                      ) : (
-                        <div class="cover-placeholder">
-                          NO IMAGE
-                          <br />
-                          AVAILABLE
-                        </div>
-                      )}
-                      <h4>{book.data.title}</h4>
-                      {book.data.subtitle && (
-                        <p class="subtitle-text">{book.data.subtitle}</p>
-                      )}
-                      <p class="author-text">
-                        {splitAuthors(book.data.author || "Unknown Author").map((author, index) => (
-                          author.toLowerCase() === "unknown author" ? (
-                            <Fragment>
-                              {index > 0 && ", "}
-                              Unknown Author
-                            </Fragment>
-                          ) : (
-                            <Fragment>
-                              {index > 0 && ", "}
-                              <a
-                                href={`?panel=search-db&query=${encodeURIComponent(author)}&author=1&author_exact=1`}
-                                class="author-search-link"
-                                data-author-query={author}
-                                data-author-exact="true"
-                              >
-                                {author}
-                              </a>
-                            </Fragment>
-                          )
-                        ))}
-                      </p>
-                      {book.data.pubDate && (
-                        <p class="pub-date-text">
-                          Published: {book.data.pubDate}
-                        </p>
-                      )}
-                      <span class="shelf-indicator">
-                        ✓ {book.data.status === "Plan to Read"
-                          ? "Plan to Read"
-                          : book.data.status === "Reading"
-                            ? "Reading"
-                            : "Read"}
-                      </span>
-                      <button
-                        type="button"
-                        class="edition-button category-edition-button"
-                        data-title={book.data.title}
-                        data-author={book.data.author || ""}
-                        data-edition-key={(book.data as any).editionKey || ""}
-                        data-edition-count={(book.data as any).editionCount || ""}
-                        data-edition-language={(book.data as any).editionLanguage || ""}
-                        data-status={book.data.status || ""}
-                        data-hero-image={book.data.heroImage || ""}
-                      >
-                        {`Browse editions${(book.data as any).editionCount ? ` (${(book.data as any).editionCount})` : ""}`}
-                      </button>
-                    </div>
-                  </a>
-                ))}
               </div>
 
-              {books.length === 0 && <p class="empty-msg">{empty}</p>}
+              <p class="empty-msg">{empty}</p>
               <p class="empty-msg no-match-msg" style="display: none;">
                 No matching books found.
               </p>
@@ -1787,9 +1664,9 @@ const splitAuthors = (author: string) =>
 
     <nav class="mobile-nav" aria-label="Reading lists">
       <button class="mobile-nav-button active" data-target="search-db"><span class="mobile-nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><circle cx="11" cy="11" r="7" /><path d="m20 20-3.5-3.5" /></svg></span>Search</button>
-      <button class="mobile-nav-button" data-target="plan-to-read" aria-label="Plan to Read"><span class="category-count">{planToRead.length}</span>Plan</button>
-      <button class="mobile-nav-button" data-target="reading"><span class="category-count">{reading.length}</span>Reading</button>
-      <button class="mobile-nav-button" data-target="read"><span class="category-count">{read.length}</span>Read</button>
+      <button class="mobile-nav-button" data-target="plan-to-read" aria-label="Plan to Read"><span class="category-count">0</span>Plan</button>
+      <button class="mobile-nav-button" data-target="reading"><span class="category-count">0</span>Reading</button>
+      <button class="mobile-nav-button" data-target="read"><span class="category-count">0</span>Read</button>
       <button
         type="button"
         class:list={["mobile-nav-button", "open-library-button", { "is-connected": accountSignedIn }]}
