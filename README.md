@@ -173,8 +173,10 @@ sync: Neon must also be set.
 The sidebar's account item (the last item on the mobile bottom bar) shows a grey
 dot with "Sign in to sync" or a green dot with "Signed in as …". Signed out, it
 opens a sign-in dialog with **Continue with Google**, **Continue with Open
-Library**, and an email field that opens Clerk's sign-in (or sign-up) for
-password or email-code login. Google sign-in returns through `/sso-callback`.
+Library**, and an email field. Email sign-in and sign-up stay inside the same
+dialog (built with Clerk's custom-flow API): password, email codes, new-device
+verification, "account not found" errors and account creation all appear in
+place. Google sign-in returns through `/sso-callback`.
 Signed in, the dialog offers Manage account, Open Library and sign out. Syncing
 is automatic; the dialog shows device-only storage, queued changes, sync
 progress, and successful cloud saves. First sign-in imports guest books without

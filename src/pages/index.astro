@@ -2584,10 +2584,6 @@ const splitAuthors = (author: string) =>
           }
           return clerk;
         };
-        const emailInitialValues = () => {
-          const emailAddress = emailInput.value.trim();
-          return emailAddress ? { emailAddress } : undefined;
-        };
         googleButton.addEventListener("click", async () => {
           const clerk = loadedClerk();
           if (!clerk?.client) return;
@@ -2645,27 +2641,310 @@ const splitAuthors = (author: string) =>
             footerActionLink: { fontSize: "0.86rem", fontWeight: 600, color: "var(--text-dark)" },
           },
         };
-        // Google is already a button in the site's popup, so the email step only shows email.
-        const clerkEmailAppearance = {
-          ...clerkAppearance,
-          elements: {
-            ...clerkAppearance.elements,
-            socialButtonsRoot: { display: "none" },
-            dividerRow: { display: "none" },
-          },
+        // Email sign-in and sign-up run step by step inside the site's own popup.
+        type AccountStep = "start" | "password" | "code" | "sign-up";
+        type CodeMode = "first-factor" | "second-factor" | "sign-up";
+        const accountFlow = document.getElementById("account-flow") as HTMLElement;
+        const signedOutTitle = document.getElementById("account-signed-out-title") as HTMLElement;
+        const footerText = document.getElementById("account-footer-text") as HTMLElement;
+        const footerLink = document.getElementById("account-sign-up") as HTMLButtonElement;
+        const passwordForm = document.getElementById("account-password-form") as HTMLFormElement;
+        const passwordInput = document.getElementById("account-password") as HTMLInputElement;
+        const codeForm = document.getElementById("account-code-form") as HTMLFormElement;
+        const codeInput = document.getElementById("account-code") as HTMLInputElement;
+        const codeMessage = document.getElementById("account-code-message") as HTMLElement;
+        const signUpForm = document.getElementById("account-sign-up-form") as HTMLFormElement;
+        const signUpEmail = document.getElementById("account-sign-up-email") as HTMLInputElement;
+        const newPasswordInput = document.getElementById("account-new-password") as HTMLInputElement;
+        const firstNameInput = document.getElementById("account-first-name") as HTMLInputElement;
+        let accountEmail = "";
+        let codeMode: CodeMode = "first-factor";
+        let secondFactorEmailId: string | undefined;
+
+        const stepTitles: Record<AccountStep, string> = {
+          start: "Sign in to My Reading List",
+          password: "Enter your password",
+          code: "Check your email",
+          "sign-up": "Create your account",
         };
+        const showAccountStep = (step: AccountStep) => {
+          accountFlow.dataset.step = step;
+          accountFlow.querySelectorAll<HTMLElement>("[data-step-panel]").forEach((panel) => {
+            panel.hidden = panel.dataset.stepPanel !== step;
+          });
+          accountFlow.querySelectorAll<HTMLElement>("[data-account-email]").forEach((element) => {
+            element.textContent = accountEmail;
+          });
+          signedOutTitle.textContent = stepTitles[step];
+          footerText.textContent = step === "sign-up" ? "Already have an account?" : "Don’t have an account?";
+          footerLink.textContent = step === "sign-up" ? "Sign in" : "Sign up";
+          (footerLink.closest("footer") as HTMLElement).style.display = step === "password" || step === "code" ? "none" : "";
+          clearAccountErrors();
+          const focusTarget = { start: emailInput, password: passwordInput, code: codeInput, "sign-up": firstNameInput.closest("[hidden]") ? signUpEmail : firstNameInput }[step];
+          if (accountDialog.open) requestAnimationFrame(() => focusTarget.focus());
+        };
+        const clearAccountErrors = () => {
+          accountFlow.querySelectorAll<HTMLElement>(".account-error").forEach((element) => {
+            element.hidden = true;
+            element.replaceChildren();
+          });
+          accountFlow.querySelectorAll("input").forEach((input) => input.removeAttribute("aria-invalid"));
+        };
+        const showAccountError = (form: HTMLFormElement, message: string, action?: { label: string; run: () => void }) => {
+          const element = form.querySelector<HTMLElement>(".account-error");
+          if (!element) return;
+          element.textContent = message;
+          if (action) {
+            const button = document.createElement("button");
+            button.type = "button";
+            button.textContent = action.label;
+            button.addEventListener("click", action.run);
+            element.append(button);
+          }
+          element.hidden = false;
+          form.querySelector("input:not([type=hidden])")?.setAttribute("aria-invalid", "true");
+        };
+        const clerkErrorCode = (error: unknown) => (error as { errors?: { code?: string }[] })?.errors?.[0]?.code;
+        const clerkErrorMessage = (error: unknown, fallback: string) => {
+          const first = (error as { errors?: { longMessage?: string; message?: string }[] })?.errors?.[0];
+          return first?.longMessage || first?.message || (error instanceof Error ? error.message : fallback);
+        };
+        const withBusyForm = async (form: HTMLFormElement, work: () => Promise<void>) => {
+          const buttons = form.querySelectorAll<HTMLButtonElement>("button");
+          buttons.forEach((button) => (button.disabled = true));
+          try {
+            await work();
+          } finally {
+            buttons.forEach((button) => (button.disabled = false));
+          }
+        };
+        const finishAccountFlow = async (clerk: NonNullable<ReturnType<typeof loadedClerk>>, sessionId: string | null) => {
+          await clerk.setActive({ session: sessionId });
+          passwordInput.value = "";
+          codeInput.value = "";
+          newPasswordInput.value = "";
+          showAccountStep("start");
+        };
+        const userAttributes = () => {
+          const clerk = $clerkStore.get() as unknown as {
+            __internal_environment?: { userSettings?: { attributes?: Record<string, { enabled?: boolean; required?: boolean }> } };
+            __unstable__environment?: { userSettings?: { attributes?: Record<string, { enabled?: boolean; required?: boolean }> } };
+          } | null;
+          return (clerk?.__internal_environment ?? clerk?.__unstable__environment)?.userSettings?.attributes ?? {};
+        };
+        const openSignUpStep = (email = accountEmail || emailInput.value.trim()) => {
+          const attributes = userAttributes();
+          const passwordField = document.getElementById("account-new-password-field") as HTMLElement;
+          const firstNameField = document.getElementById("account-first-name-field") as HTMLElement;
+          passwordField.hidden = !attributes.password?.enabled;
+          newPasswordInput.required = Boolean(attributes.password?.required);
+          firstNameField.hidden = !attributes.first_name?.enabled;
+          firstNameInput.required = Boolean(attributes.first_name?.required);
+          (document.getElementById("account-first-name-optional") as HTMLElement).hidden = firstNameInput.required;
+          signUpEmail.value = email;
+          showAccountStep("sign-up");
+        };
+        const sendEmailCode = async (clerk: NonNullable<ReturnType<typeof loadedClerk>>, mode: CodeMode) => {
+          const client = clerk.client!;
+          if (mode === "sign-up") {
+            await client.signUp.prepareEmailAddressVerification({ strategy: "email_code" });
+          } else if (mode === "second-factor") {
+            await client.signIn.prepareSecondFactor({ strategy: "email_code", emailAddressId: secondFactorEmailId } as Parameters<typeof client.signIn.prepareSecondFactor>[0]);
+          } else {
+            const factor = client.signIn.supportedFirstFactors?.find((item) => item.strategy === "email_code") as { emailAddressId?: string } | undefined;
+            if (!factor?.emailAddressId) throw new Error("Email codes aren’t available for this account. Please use your password.");
+            await client.signIn.prepareFirstFactor({ strategy: "email_code", emailAddressId: factor.emailAddressId });
+          }
+          codeMode = mode;
+          codeMessage.textContent = mode === "second-factor"
+            ? "This is a new device, so we sent a 6-digit code to your email to confirm it’s you."
+            : "Enter the 6-digit code we sent to your email.";
+        };
+        // Clerk resets client.signIn once sign-in finishes, so use the resource returned by each attempt.
+        type SignInResource = NonNullable<NonNullable<ReturnType<typeof loadedClerk>>["client"]>["signIn"];
+        const handleSignInStatus = async (clerk: NonNullable<ReturnType<typeof loadedClerk>>, signIn: SignInResource, form: HTMLFormElement) => {
+          if (signIn.status === "complete") {
+            await finishAccountFlow(clerk, signIn.createdSessionId);
+            return;
+          }
+          if (signIn.status === "needs_second_factor" || (signIn.status as string) === "needs_client_trust") {
+            const factor = signIn.supportedSecondFactors?.find((item) => item.strategy === "email_code") as { emailAddressId?: string } | undefined;
+            if (!factor) {
+              showAccountError(form, "This account needs another verification step that isn’t supported here yet.");
+              return;
+            }
+            secondFactorEmailId = factor.emailAddressId;
+            await sendEmailCode(clerk, "second-factor");
+            showAccountStep("code");
+            return;
+          }
+          showAccountError(form, "Couldn’t finish signing in. Please try again.");
+        };
+
         emailForm.addEventListener("submit", (event) => {
           event.preventDefault();
           const clerk = loadedClerk();
-          if (!clerk) return;
-          accountDialog.close();
-          clerk.openSignIn({ forceRedirectUrl: "/", signUpForceRedirectUrl: "/", initialValues: emailInitialValues(), appearance: clerkEmailAppearance });
+          if (!clerk?.client) return;
+          const email = emailInput.value.trim();
+          if (!emailInput.checkValidity() || !email) {
+            showAccountError(emailForm, "Enter a valid email address.");
+            return;
+          }
+          clearAccountErrors();
+          void withBusyForm(emailForm, async () => {
+            try {
+              const signIn = await clerk.client!.signIn.create({ identifier: email });
+              accountEmail = email;
+              if (signIn.supportedFirstFactors?.some((factor) => factor.strategy === "password")) {
+                showAccountStep("password");
+              } else {
+                await sendEmailCode(clerk, "first-factor");
+                showAccountStep("code");
+              }
+            } catch (error) {
+              if (clerkErrorCode(error) === "form_identifier_not_found") {
+                accountEmail = email;
+                showAccountError(emailForm, "Couldn’t find an account with this email.", { label: "Create one", run: () => openSignUpStep(email) });
+              } else {
+                showAccountError(emailForm, clerkErrorMessage(error, "Could not sign in. Please try again."));
+              }
+            }
+          });
         });
-        document.getElementById("account-sign-up")?.addEventListener("click", () => {
+        passwordForm.addEventListener("submit", (event) => {
+          event.preventDefault();
           const clerk = loadedClerk();
-          if (!clerk) return;
-          accountDialog.close();
-          clerk.openSignUp({ forceRedirectUrl: "/", signInForceRedirectUrl: "/", initialValues: emailInitialValues(), appearance: clerkEmailAppearance });
+          if (!clerk?.client) return;
+          if (!passwordInput.value) {
+            showAccountError(passwordForm, "Enter your password.");
+            return;
+          }
+          clearAccountErrors();
+          void withBusyForm(passwordForm, async () => {
+            try {
+              const signIn = await clerk.client!.signIn.attemptFirstFactor({ strategy: "password", password: passwordInput.value });
+              await handleSignInStatus(clerk, signIn, passwordForm);
+            } catch (error) {
+              showAccountError(passwordForm, clerkErrorMessage(error, "Incorrect password. Please try again."));
+            }
+          });
+        });
+        document.getElementById("account-use-code")?.addEventListener("click", () => {
+          const clerk = loadedClerk();
+          if (!clerk?.client) return;
+          void withBusyForm(passwordForm, async () => {
+            try {
+              await sendEmailCode(clerk, "first-factor");
+              showAccountStep("code");
+            } catch (error) {
+              showAccountError(passwordForm, clerkErrorMessage(error, "Could not send a code. Please try again."));
+            }
+          });
+        });
+        codeForm.addEventListener("submit", (event) => {
+          event.preventDefault();
+          const clerk = loadedClerk();
+          if (!clerk?.client) return;
+          const code = codeInput.value.replace(/\s/g, "");
+          if (!/^\d{6}$/.test(code)) {
+            showAccountError(codeForm, "Enter the 6-digit code from your email.");
+            return;
+          }
+          clearAccountErrors();
+          void withBusyForm(codeForm, async () => {
+            try {
+              const client = clerk.client!;
+              if (codeMode === "sign-up") {
+                const signUp = await client.signUp.attemptEmailAddressVerification({ code });
+                if (signUp.status === "complete") await finishAccountFlow(clerk, signUp.createdSessionId);
+                else showAccountError(codeForm, "Some account details are still missing. Please go back and fill them in.");
+              } else if (codeMode === "second-factor") {
+                const signIn = await client.signIn.attemptSecondFactor({ strategy: "email_code", code });
+                await handleSignInStatus(clerk, signIn, codeForm);
+              } else {
+                const signIn = await client.signIn.attemptFirstFactor({ strategy: "email_code", code });
+                await handleSignInStatus(clerk, signIn, codeForm);
+              }
+            } catch (error) {
+              showAccountError(codeForm, clerkErrorMessage(error, "That code didn’t work. Please try again."));
+            }
+          });
+        });
+        codeInput.addEventListener("input", () => {
+          if (/^\d{6}$/.test(codeInput.value.trim())) codeForm.requestSubmit();
+        });
+        document.getElementById("account-resend-code")?.addEventListener("click", () => {
+          const clerk = loadedClerk();
+          if (!clerk?.client) return;
+          void withBusyForm(codeForm, async () => {
+            try {
+              await sendEmailCode(clerk, codeMode);
+              codeMessage.textContent = "We sent a new code. Check your email.";
+            } catch (error) {
+              showAccountError(codeForm, clerkErrorMessage(error, "Could not send a new code. Please try again."));
+            }
+          });
+        });
+        signUpForm.addEventListener("submit", (event) => {
+          event.preventDefault();
+          const clerk = loadedClerk();
+          if (!clerk?.client) return;
+          const email = signUpEmail.value.trim();
+          if (!signUpEmail.checkValidity() || !email) {
+            showAccountError(signUpForm, "Enter a valid email address.");
+            return;
+          }
+          if (newPasswordInput.required && newPasswordInput.value.length < 8) {
+            showAccountError(signUpForm, "Your password must be at least 8 characters.");
+            return;
+          }
+          if (firstNameInput.required && !firstNameInput.value.trim()) {
+            showAccountError(signUpForm, "Enter your first name.");
+            return;
+          }
+          clearAccountErrors();
+          void withBusyForm(signUpForm, async () => {
+            try {
+              const details: { emailAddress: string; password?: string; firstName?: string } = { emailAddress: email };
+              if (!newPasswordInput.closest("[hidden]") && newPasswordInput.value) details.password = newPasswordInput.value;
+              if (!firstNameInput.closest("[hidden]") && firstNameInput.value.trim()) details.firstName = firstNameInput.value.trim();
+              await clerk.client!.signUp.create(details);
+              accountEmail = email;
+              await sendEmailCode(clerk, "sign-up");
+              showAccountStep("code");
+            } catch (error) {
+              if (clerkErrorCode(error) === "form_identifier_exists") {
+                showAccountError(signUpForm, "This email already has an account.", {
+                  label: "Sign in",
+                  run: () => {
+                    emailInput.value = email;
+                    showAccountStep("start");
+                    emailForm.requestSubmit();
+                  },
+                });
+              } else {
+                showAccountError(signUpForm, clerkErrorMessage(error, "Could not create your account. Please try again."));
+              }
+            }
+          });
+        });
+        accountFlow.querySelectorAll<HTMLButtonElement>("[data-account-back]").forEach((button) => {
+          button.addEventListener("click", () => {
+            passwordInput.value = "";
+            codeInput.value = "";
+            showAccountStep(codeMode === "sign-up" && accountFlow.dataset.step === "code" ? "sign-up" : "start");
+          });
+        });
+        footerLink.addEventListener("click", () => {
+          if (accountFlow.dataset.step === "sign-up") showAccountStep("start");
+          else openSignUpStep();
+        });
+        accountDialog.addEventListener("close", () => {
+          passwordInput.value = "";
+          codeInput.value = "";
+          newPasswordInput.value = "";
+          codeMode = "first-factor";
+          showAccountStep("start");
         });
         profile.addEventListener("click", () => {
           const clerk = $clerkStore.get();
