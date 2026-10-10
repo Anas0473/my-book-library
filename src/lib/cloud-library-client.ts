@@ -214,10 +214,5 @@ export function createCloudLibraryClient(options: ClientOptions) {
     options.message('Saved on this device. Sign in to sync between devices.');
   }
 
-  function legacyChanges(owner: string) {
-    capture();
-    return loadState(owner)?.pending || [];
-  }
-
-  return { capture, schedule, connect, disconnect, sync, enterGuest, legacyChanges };
+  return { capture, schedule, connect, disconnect, sync, enterGuest };
 }

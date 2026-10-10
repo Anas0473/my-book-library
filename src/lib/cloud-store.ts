@@ -85,43 +85,6 @@ export async function cloudLibraryOwner(cookies: AstroCookies, locals: App.Local
   return links.length ? null : legacyOwner;
 }
 
-export async function linkOpenLibraryAccount(owner: string, username: string, changes: CloudChange[]) {
-  await ensureSchema();
-  const sql = database();
-  // Claim and merge in one transaction; existing website records (including deletions) win.
-  const results = await sql.transaction([
-    sql`INSERT INTO library_account_links (openlibrary_username, website_owner)
-      VALUES (${username}, ${owner}) ON CONFLICT DO NOTHING`,
-    sql`INSERT INTO cloud_libraries (username)
-      SELECT ${owner} WHERE EXISTS (
-        SELECT 1 FROM library_account_links
-        WHERE openlibrary_username = ${username} AND website_owner = ${owner}
-      ) ON CONFLICT DO NOTHING`,
-    sql`INSERT INTO cloud_libraries (username)
-      SELECT ${username} WHERE EXISTS (
-        SELECT 1 FROM library_account_links
-        WHERE openlibrary_username = ${username} AND website_owner = ${owner}
-      ) ON CONFLICT DO NOTHING`,
-    sql`UPDATE cloud_libraries SET books = books || (
-        SELECT coalesce(jsonb_object_agg(entry->>'id', entry->'book'), '{}'::jsonb)
-        FROM jsonb_array_elements(${JSON.stringify(changes)}::jsonb) AS entry
-        WHERE NOT coalesce((entry->>'importOnly')::boolean, false) OR NOT books ? (entry->>'id')
-      ), revision = revision + 1
-      WHERE username = ${username} AND EXISTS (
-        SELECT 1 FROM library_account_links
-        WHERE openlibrary_username = ${username} AND website_owner = ${owner}
-      )`,
-    sql`UPDATE cloud_libraries AS target SET
-        books = coalesce((SELECT books FROM cloud_libraries WHERE username = ${username}), '{}'::jsonb)
-          || target.books,
-        revision = target.revision + 1
-      WHERE target.username = ${owner} AND EXISTS (
-        SELECT 1 FROM library_account_links
-        WHERE openlibrary_username = ${username} AND website_owner = ${owner}
-      ) RETURNING revision`,
-  ]);
-  return results[4].length > 0;
-}
 
 export async function clearCloudSession(cookies: AstroCookies) {
   const token = cookies.get(SESSION_COOKIE)?.value;

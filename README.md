@@ -197,20 +197,6 @@ Keep the policy's contact address and data practices accurate as the service
 changes. Cloud data deletion requests currently require operator handling:
 deleting a Clerk account alone does not delete its separate Neon library.
 
-### Existing Open Library cloud libraries
-
-Existing users may continue using their verified Open Library cloud sessions.
-To migrate, sign in to the website, connect/re-authenticate with Open Library,
-then open the Open Library dialog and choose **Import books synced here before
-you had an account**.
-The server verifies both sessions before claiming that library for the website
-account. The merge includes the old account's queued cloud changes on this
-browser, preserves existing website books and deletion markers, and keeps a
-browser backup when switching accounts. A legacy library can be claimed by only
-one website account. After linking, website sign-in is required for cloud access;
-an Open Library session alone cannot access the linked website library.
-Linking is separate from optional two-way shelf syncing.
-
 ### Database configuration
 
 Connect a Neon Postgres database to the Vercel project. The server reads

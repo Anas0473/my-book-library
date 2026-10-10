@@ -512,28 +512,61 @@ const splitAuthors = (author: string) =>
         line-height: 1.6;
       }
       .open-library-account-card {
-        display: flex;
-        align-items: center;
-        gap: 0.75rem;
-        padding: 0.85rem 0.95rem;
+        display: grid;
+        gap: 0.9rem;
+        padding: 1rem;
         border: 1px solid var(--border-dark);
         border-radius: 11px;
         background: var(--surface-dark-2);
       }
-      .open-library-account-card > div {
+      .open-library-account-head {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+      }
+      .open-library-account-head > div {
         display: grid;
         flex: 1;
-        gap: 0.15rem;
+        gap: 0.1rem;
         min-width: 0;
       }
-      .open-library-account-card strong {
-        font-size: 0.9rem;
+      .open-library-account-head strong {
+        font-size: 1rem;
         overflow-wrap: anywhere;
       }
-      .open-library-account-card small {
+      .open-library-account-head small {
         color: var(--text-dark-muted);
         font-size: 0.76rem;
-        line-height: 1.4;
+      }
+      .open-library-disconnect {
+        flex: none;
+        padding: 0.4rem 0.75rem;
+        border: 1px solid var(--border-dark);
+        border-radius: 8px;
+        background: transparent;
+        color: var(--danger);
+        font: inherit;
+        font-size: 0.8rem;
+        font-weight: 500;
+        cursor: pointer;
+      }
+      .open-library-disconnect:hover {
+        background: color-mix(in srgb, var(--danger) 12%, transparent);
+      }
+      .open-library-disconnect:disabled {
+        cursor: progress;
+        opacity: 0.6;
+      }
+      .open-library-account-facts {
+        margin: 0;
+        padding: 0.85rem 0 0 1.1rem;
+        border-top: 1px solid var(--border-dark);
+        color: var(--text-dark-muted);
+        font-size: 0.82rem;
+        line-height: 1.55;
+      }
+      .open-library-account-facts li + li {
+        margin-top: 0.3rem;
       }
       .open-library-account-dot {
         flex: none;
@@ -1862,13 +1895,18 @@ const splitAuthors = (author: string) =>
           <button type="button" class="open-library-link-button open-library-method-toggle" id="open-library-method-toggle">Signed up with Google? Use your Internet Archive keys</button>
         </div>
         <div class="open-library-account-card" id="open-library-logged-in" hidden>
-          <span class="open-library-account-dot" aria-hidden="true"></span>
-          <div>
-            <strong id="open-library-logged-in-text"></strong>
-            <small>Changes sync both ways. Open Library changes arrive every 15 minutes.</small>
-            <button type="button" class="open-library-link-button" id="website-link-openlibrary" hidden>Import books synced here before you had an account</button>
+          <div class="open-library-account-head">
+            <span class="open-library-account-dot" aria-hidden="true"></span>
+            <div>
+              <small>Connected as</small>
+              <strong id="open-library-logged-in-text"></strong>
+            </div>
+            <button type="button" class="open-library-disconnect" id="open-library-logout">Disconnect</button>
           </div>
-          <button type="button" class="open-library-link-button" id="open-library-logout">Disconnect Open Library</button>
+          <ul class="open-library-account-facts">
+            <li>Books you add, move or delete here update Open Library.</li>
+            <li>Changes made on Open Library arrive every 15 minutes, or when you sync.</li>
+          </ul>
         </div>
         <p class="open-library-sync-message" id="open-library-sync-message" role="status" aria-live="polite"></p>
         <div class="open-library-sync-actions">
@@ -1927,12 +1965,12 @@ const splitAuthors = (author: string) =>
       let websiteAccountGeneration = 0;
       let pendingOpenLibraryDisconnectOwner: string | null = null;
       let websiteAccountCheck: Promise<void> = Promise.resolve();
-      const websiteLinkOpenLibrary = document.getElementById("website-link-openlibrary") as HTMLButtonElement;
       const openLibrarySyncSubmit = document.getElementById("open-library-sync-submit") as HTMLButtonElement;
       const openLibrarySyncCancel = document.getElementById("open-library-sync-cancel") as HTMLButtonElement;
       const openLibraryLoginFields = document.getElementById("open-library-login-fields") as HTMLElement;
       const openLibraryLoggedIn = document.getElementById("open-library-logged-in") as HTMLElement;
       const openLibraryLoggedInText = document.getElementById("open-library-logged-in-text") as HTMLElement;
+      const openLibrarySyncTitle = document.getElementById("open-library-sync-title") as HTMLElement;
       const openLibraryEmailInput = document.getElementById("open-library-email") as HTMLInputElement;
       const openLibraryPasswordInput = document.getElementById("open-library-password") as HTMLInputElement;
       const openLibraryLogoutButton = document.getElementById("open-library-logout") as HTMLButtonElement;
@@ -2505,7 +2543,6 @@ const splitAuthors = (author: string) =>
             if (!data.owner) data.cloudOwner = null;
           }
           websiteOwner = data.owner;
-          websiteLinkOpenLibrary.hidden = !websiteOwner;
           if (data.cloudOwner) {
             await cloudLibrary?.connect(data.cloudOwner, { sync: data.cloudConfigured });
             if (!data.cloudConfigured) {
@@ -2531,35 +2568,6 @@ const splitAuthors = (author: string) =>
         websiteAccountCheck = websiteAccountCheck.then(checkWebsiteAccount);
         return websiteAccountCheck;
       }
-
-      websiteLinkOpenLibrary.addEventListener("click", async () => {
-        if (!websiteOwner) return;
-        const username = getOpenLibraryPushUser();
-        if (!username) {
-          openOpenLibrarySyncDialog();
-          openLibrarySyncMessage.textContent = "Connect Open Library first.";
-          return;
-        }
-        if (!window.confirm(`Import the books this site synced for ${username} before you had an account? Books already in your account stay as they are.`)) return;
-        websiteLinkOpenLibrary.disabled = true;
-        cloudLibrary?.disconnect();
-        try {
-          const response = await fetch("/api/website-account.json", {
-            method: "POST", headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ changes: cloudLibrary?.legacyChanges(username) || [] }),
-            signal: AbortSignal.timeout(30000),
-          });
-          const data = await response.json();
-          if (!response.ok || data.linked !== true) throw new Error(data.error || "Could not link your existing library.");
-          await refreshWebsiteAccount();
-          await checkOpenLibraryAccount();
-          openLibrarySyncMessage.textContent = "Older synced books imported into your account.";
-        } catch (error) {
-          openLibrarySyncMessage.textContent = error instanceof Error ? error.message : "Could not import your older books.";
-        } finally {
-          websiteLinkOpenLibrary.disabled = false;
-        }
-      });
 
       if (document.getElementById("website-account")?.dataset.configured === "true") {
         let observedUser: string | null | undefined;
@@ -2666,7 +2674,6 @@ const splitAuthors = (author: string) =>
             cloudLibrary?.disconnect();
             verifiedOpenLibraryUser = null;
             websiteOwner = null;
-            websiteLinkOpenLibrary.hidden = true;
             cloudLibrary?.enterGuest();
             void refreshWebsiteAccount();
           });
@@ -2823,7 +2830,8 @@ const splitAuthors = (author: string) =>
         openLibraryLoginFields.hidden = Boolean(pushUser) && !cloudReauthenticationRequired;
         openLibraryLoggedIn.hidden = !pushUser || cloudReauthenticationRequired;
         updateOpenLibraryLoginMethod();
-        openLibraryLoggedInText.textContent = pushUser ? `Logged in as ${pushUser}` : "";
+        openLibraryLoggedInText.textContent = pushUser || "";
+        openLibrarySyncTitle.textContent = pushUser && !cloudReauthenticationRequired ? "Open Library" : "Connect Open Library";
         updateOpenLibrarySyncSubmitLabel();
         updateOpenLibrarySyncLabel();
       }
