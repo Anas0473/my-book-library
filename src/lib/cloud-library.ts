@@ -25,8 +25,9 @@ export function cloudBookId(book: CloudBook) {
   return `book:${book.key || book.workKey || `${book.title}:${book.author || ''}`}`;
 }
 
+// Copies the books so later edits (like a new rating) still show up as changes.
 export function cloudSnapshot(books: CloudBook[]): CloudBooks {
-  return Object.fromEntries(books.map((book) => [cloudBookId(book), book]));
+  return Object.fromEntries(books.map((book) => [cloudBookId(book), structuredClone(book)]));
 }
 
 // The cloud database reorders a book's fields, so compare them in a fixed order.

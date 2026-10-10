@@ -41,6 +41,15 @@ test('removing one edition does not remove other editions', () => {
   assert.deepEqual(activeCloudBooks(applyCloudChanges(before, changes)), [second]);
 });
 
+test('editing a book in place is still seen as a change', () => {
+  const book = { ...edition('/books/OL1M'), status: 'Read' } as CloudBook;
+  const before = cloudSnapshot([book]);
+  book.rating = 4;
+  const changes = diffCloudBooks(before, cloudSnapshot([book]));
+  assert.equal(changes.length, 1);
+  assert.equal(changes[0].book?.rating, 4);
+});
+
 test('reordered fields are not a change, so an old copy cannot overwrite a rating', () => {
   const rated = { ...edition('/books/OL1M'), status: 'Read', rating: 4 };
   const reordered = Object.fromEntries(Object.entries(rated).reverse()) as CloudBook;
@@ -346,4 +355,25 @@ test('PC and mobile share additions, shelf changes and deletions without an Open
   await mobile.sync();
   assert.equal(mobileBooks.length, 0);
   assert.equal(remote['book:archive:example'], null);
+});
+test('a rating added to a book that came from the cloud is uploaded and kept', async () => {
+  let remote: CloudBooks = { 'edition:OL1M': { ...edition('/books/OL1M'), status: 'Read' } };
+  let revision = 1;
+  const request: typeof fetch = async (_url, init) => {
+    if (init?.method === 'PUT') {
+      remote = applyCloudChanges(remote, JSON.parse(String(init.body)).changes);
+      revision++;
+    }
+    return Response.json({ username: 'clerk:user_reader', revision, books: JSON.parse(JSON.stringify(remote)) });
+  };
+  let books: CloudBook[] = [];
+  const client = createCloudLibraryClient({
+    storage: memoryStorage(), getBooks: () => books, setBooks: (next) => { books = next; },
+    message: () => {}, request,
+  });
+  await client.connect('clerk:user_reader');
+  books[0].rating = 5;
+  await client.sync();
+  assert.equal(remote['edition:OL1M']?.rating, 5);
+  assert.equal(books[0].rating, 5);
 });
