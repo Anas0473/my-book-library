@@ -144,9 +144,11 @@ Website accounts are independent of Open Library. Guests keep their books in
 this browser; signed-in users sync their library across PC and mobile using Neon.
 Open Library is an optional, separate shelf integration.
 
-Create a Clerk application and enable Google and email verification codes in
-its authentication settings. Disable password authentication if you want the
-passwordless experience. Configure your production domain and Google's production
+Create a Clerk application and enable Google, passwords, and email verification
+codes in its authentication settings. In the Password tab, turn on
+"Sign-up with password" and "Add password to account" so new email users choose
+a password and existing users can add one under "Your account" → Security.
+Email codes remain available as a fallback. Configure your production domain and Google's production
 OAuth credentials in Clerk before deploying. Enable email codes for both sign-up
 verification and sign-in, and disable email verification links in both places.
 Users can read the code on another device and enter it in the browser where

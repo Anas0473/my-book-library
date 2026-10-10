@@ -23,7 +23,7 @@ const signedIn = Boolean(websiteCloudOwner(Astro.locals));
   <p id="cloud-library-status" role="status" aria-live="polite">
     Saved on this device. {configured ? 'Sign in to use your library on PC and mobile.' : 'Account sign-in is not configured yet.'}
   </p>
-  {configured && <p>No Open Library account needed. Sign in with Google or an emailed verification code.</p>}
+  {configured && <p>No Open Library account needed. Sign in with Google, a password, or an emailed code.</p>}
   <div class="sync-controls">
     <button type="button" id="website-sync-now" hidden>Sync now</button>
     <button type="button" id="website-link-openlibrary" hidden>Link existing Open Library library</button>
