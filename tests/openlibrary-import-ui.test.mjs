@@ -18,6 +18,7 @@ function setup() {
     importForm: { addEventListener: (_, handler) => { submit = handler; } },
     websiteOwner: 'clerk:A', websiteUserId: 'A', websiteAccountGeneration: 1,
     importUsername: { value: 'reader' }, importSubmit: {}, importMessage: {},
+    importDialog: { open: true, close() { this.open = false; } },
     localBooks: [{ title: 'Existing', status: 'Read' }],
     fetch: (url, options) => {
       context.request = { url, options };
@@ -51,6 +52,7 @@ test('one-time import makes only a credential-free public read and updates the w
   assert.equal(context.localBooks.length, 2);
   assert.match(context.importMessage.textContent, /Imported 1 new book/);
   assert.equal(context.importSubmit.disabled, false);
+  assert.equal(context.importDialog.open, false);
 });
 
 test('switching website accounts while importing prevents applying the old response', async () => {
@@ -64,6 +66,7 @@ test('switching website accounts while importing prevents applying the old respo
   assert.equal(context.saved, false);
   assert.equal(context.localBooks.length, 1);
   assert.match(context.importMessage.textContent, /account changed/);
+  assert.equal(context.importDialog.open, true);
 });
 
 test('signed-out visitors cannot import into a website account', async () => {
@@ -81,4 +84,5 @@ test('incomplete import explicitly reports partial results', async () => {
   finish({ username: 'reader', books: [], incompleteShelves: [{ status: 'Read' }] });
   await pending;
   assert.match(context.importMessage.textContent, /Some shelves were incomplete/);
+  assert.equal(context.importDialog.open, true);
 });

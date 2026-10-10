@@ -3616,6 +3616,8 @@ const splitAuthors = (author: string) =>
           importMessage.textContent = `Imported ${imported.added} new ${imported.added === 1 ? "book" : "books"} into your website account. This import does not connect Open Library.`;
           if (data.incompleteShelves.length || data.truncated) {
             importMessage.textContent += " Some shelves were incomplete. You can import again later; existing books will be kept.";
+          } else {
+            importDialog.close();
           }
         } catch (error) {
           importMessage.textContent = error instanceof Error

@@ -156,7 +156,8 @@ required. This does not sign in to Open Library, link accounts, enable ongoing
 sync, or send shelf changes back. Existing books and statuses are preserved,
 and repeated imports skip books already present. Imported copies are marked
 local-only for Open Library and still sync through the website account.
-Private reading logs cannot be imported this way. Partial imports show a warning.
+Private reading logs cannot be imported this way. Successful imports close the
+dialog automatically; partial imports keep it open with a warning.
 The separate **Continue with Open Library** sign-in flow retains two-way sync;
 pre-existing Open Library connections are not disconnected by an import.
 
