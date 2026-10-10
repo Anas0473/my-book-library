@@ -4,8 +4,9 @@ Detailed behavior and setup notes. For an overview, see the [README](../README.m
 
 ## Reading list controls
 
-The privacy policy link sits below the desktop sidebar account card. On mobile,
-it appears at the bottom of the account dialog, whether signed in or signed out.
+The privacy policy link appears at the bottom of the account dialog on desktop
+and mobile, whether signed in or signed out. The sidebar account card stays in
+its original bottom-corner position.
 
 Account and sync controls sit at the bottom of the desktop sidebar. Signed-in
 users see their profile picture when available, with a generic avatar otherwise.

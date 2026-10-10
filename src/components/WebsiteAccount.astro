@@ -131,18 +131,14 @@ const signedIn = Boolean(websiteCloudOwner(Astro.locals));
 
 
 <style>
-  .account-privacy-footer { display: none; }
-  @media (max-width: 700px) {
-    .account-privacy-footer {
-      display: block;
-      padding: .75rem;
-      text-align: center;
-      font-size: .8rem;
-    }
-    .account-privacy-footer a { color: var(--muted); text-underline-offset: .2em; }
-    .account-privacy-footer a:hover { color: var(--fg); }
-    .account-privacy-footer a:focus-visible { outline: 2px solid var(--page-focus); outline-offset: 4px; }
+  .account-privacy-footer {
+    padding: .75rem;
+    text-align: center;
+    font-size: .8rem;
   }
+  .account-privacy-footer a { color: var(--muted); text-underline-offset: .2em; }
+  .account-privacy-footer a:hover { color: var(--fg); }
+  .account-privacy-footer a:focus-visible { outline: 2px solid var(--page-focus); outline-offset: 4px; }
   .account-dialog {
     box-sizing: border-box;
     width: min(25rem, calc(100vw - 2rem));
