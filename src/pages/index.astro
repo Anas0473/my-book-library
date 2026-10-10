@@ -1886,7 +1886,7 @@ const splitAuthors = (author: string) =>
       const accountButtonLabel = document.getElementById("account-button-label") as HTMLElement;
       const mobileAccountButton = document.getElementById("mobile-account-button") as HTMLButtonElement;
       const accountSummary = document.getElementById("account-summary") as HTMLElement;
-      const accountIntro = document.getElementById("account-intro");
+      const openLibrarySyncButtonSignedIn = document.getElementById("open-library-sync-button-signed-in") as HTMLButtonElement;
       let websiteUserName: string | null = null;
       // undefined until Clerk loads; the server-rendered state is used until then.
       let websiteUserId: string | null | undefined;
@@ -2547,17 +2547,50 @@ const splitAuthors = (author: string) =>
 
       if (document.getElementById("website-account")?.dataset.configured === "true") {
         let observedUser: string | null | undefined;
-        const signIn = document.getElementById("website-sign-in") as HTMLButtonElement;
         const profile = document.getElementById("website-profile") as HTMLButtonElement;
         const signOut = document.getElementById("website-sign-out") as HTMLButtonElement;
-        signIn.addEventListener("click", () => {
+        const googleButton = document.getElementById("account-google") as HTMLButtonElement;
+        const emailForm = document.getElementById("account-email-form") as HTMLFormElement;
+        const emailInput = document.getElementById("account-email") as HTMLInputElement;
+        const loadedClerk = () => {
           const clerk = $clerkStore.get();
           if (!clerk?.loaded) {
             cloudLibraryStatus.textContent = "Sign-in is still loading. Please try again shortly.";
-            return;
+            return null;
           }
+          return clerk;
+        };
+        const emailInitialValues = () => {
+          const emailAddress = emailInput.value.trim();
+          return emailAddress ? { emailAddress } : undefined;
+        };
+        googleButton.addEventListener("click", async () => {
+          const clerk = loadedClerk();
+          if (!clerk?.client) return;
+          googleButton.disabled = true;
+          try {
+            await clerk.client.signIn.authenticateWithRedirect({
+              strategy: "oauth_google",
+              redirectUrl: "/sso-callback",
+              redirectUrlComplete: "/",
+            });
+          } catch (error) {
+            cloudLibraryStatus.textContent = error instanceof Error ? error.message : "Could not start Google sign-in.";
+            googleButton.disabled = false;
+          }
+        });
+        emailForm.addEventListener("submit", (event) => {
+          event.preventDefault();
+          const clerk = loadedClerk();
+          if (!clerk) return;
           accountDialog.close();
-          clerk.openSignIn({ forceRedirectUrl: "/", signUpForceRedirectUrl: "/" });
+          clerk.openSignIn({ forceRedirectUrl: "/", signUpForceRedirectUrl: "/", initialValues: emailInitialValues() });
+        });
+        document.getElementById("account-sign-up")?.addEventListener("click", () => {
+          const clerk = loadedClerk();
+          if (!clerk) return;
+          accountDialog.close();
+          clerk.openSignUp({ forceRedirectUrl: "/", signInForceRedirectUrl: "/", initialValues: emailInitialValues() });
         });
         profile.addEventListener("click", () => {
           const clerk = $clerkStore.get();
@@ -2594,9 +2627,6 @@ const splitAuthors = (author: string) =>
             const userId = user?.id || null;
             websiteUserId = userId;
             websiteUserName = user?.firstName || user?.username || null;
-            signIn.hidden = Boolean(userId);
-            profile.hidden = !userId;
-            signOut.hidden = !userId;
             updateAccountButton();
             if (observedUser === undefined) {
               observedUser = userId;
@@ -2922,11 +2952,13 @@ const splitAuthors = (author: string) =>
 
       function updateOpenLibrarySyncLabel() {
         const username = cloudReauthenticationRequired ? null : getOpenLibraryPushUser();
-        openLibrarySyncButton.textContent = username
-          ? "Open Library connected"
-          : "Connect Open Library";
-        openLibrarySyncButton.title = username ? "Sync Open Library" : "";
-        openLibrarySyncButton.classList.toggle("is-connected", Boolean(username));
+        for (const button of [openLibrarySyncButton, openLibrarySyncButtonSignedIn]) {
+          button.textContent = username
+            ? "Open Library connected"
+            : button === openLibrarySyncButton ? "Continue with Open Library" : "Connect Open Library";
+          button.title = username ? "Sync Open Library" : "";
+          button.classList.toggle("is-connected", Boolean(username));
+        }
         updateAccountButton();
       }
 
@@ -2944,10 +2976,7 @@ const splitAuthors = (author: string) =>
         mobileAccountButton.classList.toggle("is-connected", connected);
         mobileAccountButton.textContent = connected ? "Account" : "Sign in";
         accountDialog.dataset.signedIn = String(signedIn);
-        accountSummary.textContent = signedIn
-          ? (websiteUserName ? `Signed in as ${websiteUserName}` : "Signed in")
-          : "Not signed in";
-        if (accountIntro) accountIntro.hidden = signedIn;
+        accountSummary.textContent = websiteUserName ? `Signed in as ${websiteUserName}` : "Signed in";
       }
 
       function openAccountDialog() {
@@ -3180,6 +3209,7 @@ const splitAuthors = (author: string) =>
       }
 
       openLibrarySyncButton.addEventListener("click", () => openOpenLibrarySyncDialog());
+      openLibrarySyncButtonSignedIn.addEventListener("click", () => openOpenLibrarySyncDialog());
       accountButton.addEventListener("click", openAccountDialog);
       mobileAccountButton.addEventListener("click", openAccountDialog);
       document.getElementById("account-dialog-close")?.addEventListener("click", () => accountDialog.close());

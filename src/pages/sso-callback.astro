@@ -1,0 +1,45 @@
+---
+import { websiteAuthConfigured } from '../lib/website-auth';
+
+if (!websiteAuthConfigured()) return Astro.redirect('/');
+---
+
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="robots" content="noindex" />
+    <title>Signing in… | My Reading List</title>
+    <style>
+      body {
+        display: grid;
+        place-items: center;
+        min-height: 100vh;
+        margin: 0;
+        background: #1c1c1c;
+        color: #a8a39a;
+        font-family: system-ui, sans-serif;
+        text-align: center;
+      }
+      a { color: #ececec; }
+    </style>
+  </head>
+  <body>
+    <p id="sso-message">Signing you in…</p>
+    <script>
+      import { $clerkStore } from '@clerk/astro/client';
+
+      let handled = false;
+      $clerkStore.subscribe((clerk) => {
+        if (!clerk?.loaded || handled) return;
+        handled = true;
+        clerk
+          .handleRedirectCallback({ signInFallbackRedirectUrl: '/', signUpFallbackRedirectUrl: '/' })
+          .catch(() => {
+            const message = document.getElementById('sso-message');
+            if (message) message.innerHTML = 'Sign-in could not be completed. <a href="/">Return to My Reading List</a> and try again.';
+          });
+      });
+    </script>
+  </body>
+</html>

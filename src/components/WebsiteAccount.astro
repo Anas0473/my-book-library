@@ -12,62 +12,63 @@ const signedIn = Boolean(websiteCloudOwner(Astro.locals));
   data-signed-in={String(signedIn)}
   aria-labelledby="account-dialog-title"
 >
-  <div class="account-dialog-body">
-    <h2 id="account-dialog-title">Account &amp; sync</h2>
+  <button type="button" class="account-close" id="account-dialog-close" aria-label="Close">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18" /></svg>
+  </button>
 
-    <div class="account-card">
-      <span class="account-dot" aria-hidden="true"></span>
-      <div>
-        <strong id="account-summary">{signedIn ? 'Signed in' : 'Not signed in'}</strong>
-        <small id="cloud-library-status" role="status" aria-live="polite">
-          Saved on this device. {configured ? 'Sign in to use your library on PC and mobile.' : 'Account sign-in is not configured yet.'}
-        </small>
-      </div>
-    </div>
-
-    {configured ? (
-      <p class="account-intro" id="account-intro" hidden={signedIn}>
-        Sign in with Google, a password, or an emailed code. No Open Library account needed.
+  <div class="account-main">
+    <header class="account-header">
+      <h2 id="account-dialog-title">
+        <span class="when-signed-out">Sign in to My Reading List</span>
+        <span class="when-signed-in" id="account-summary">Signed in</span>
+      </h2>
+      <p id="cloud-library-status" role="status" aria-live="polite">
+        {configured ? 'Sync your library between PC and mobile.' : 'Account sign-in is not configured yet.'}
       </p>
-    ) : (
-      <p id="website-auth-setup">Google and email sign-in require Clerk setup by the site owner.</p>
-    )}
+    </header>
 
-    <div class="account-actions">
-      <button type="button" class="account-primary" id="website-sign-in" hidden={configured && signedIn} disabled={!configured}>
-        Sign in to sync
+    <div class="when-signed-out account-options">
+      <button type="button" class="account-option" id="account-google" disabled={!configured}>
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="#4285F4" d="M23.5 12.3c0-.8-.1-1.6-.2-2.3H12v4.5h6.5a5.6 5.6 0 0 1-2.4 3.6v3h3.9c2.3-2.1 3.5-5.2 3.5-8.8z"/><path fill="#34A853" d="M12 24c3.2 0 6-1.1 8-2.9l-3.9-3c-1.1.7-2.5 1.2-4.1 1.2-3.1 0-5.8-2.1-6.7-5H1.3v3.1A12 12 0 0 0 12 24z"/><path fill="#FBBC05" d="M5.3 14.3a7.2 7.2 0 0 1 0-4.6V6.6h-4a12 12 0 0 0 0 10.8l4-3.1z"/><path fill="#EA4335" d="M12 4.8c1.8 0 3.3.6 4.6 1.8l3.4-3.4A12 12 0 0 0 1.3 6.6l4 3.1c.9-2.8 3.6-4.9 6.7-4.9z"/></svg>
+        Continue with Google
       </button>
-      {configured && (
-        <>
-          <button type="button" id="website-profile" hidden={!signedIn}>Your account</button>
-          <button type="button" id="website-sync-now" hidden>Sync now</button>
-          <button type="button" id="website-sign-out" hidden={!signedIn}>Sign out</button>
-        </>
-      )}
+      <button type="button" class="account-option open-library-button" id="open-library-sync-button">Continue with Open Library</button>
+
+      <div class="account-divider"><span>or</span></div>
+
+      <form class="account-email" id="account-email-form">
+        <label for="account-email">Email address</label>
+        <input id="account-email" type="email" autocomplete="email" placeholder="Enter your email address" disabled={!configured} />
+        <button type="submit" class="account-continue" id="website-sign-in" disabled={!configured}>Continue</button>
+      </form>
+      {!configured && <p id="website-auth-setup">Google and email sign-in require Clerk setup by the site owner.</p>}
     </div>
 
-    <section class="account-open-library" aria-labelledby="account-open-library-title">
-      <h3 id="account-open-library-title">Open Library <span>(optional)</span></h3>
-      <p>Keep your reading lists in sync with your Open Library shelves.</p>
-      <div class="account-actions">
-        <button type="button" class="open-library-button" id="open-library-sync-button">Connect Open Library</button>
-        <button type="button" id="website-link-openlibrary" hidden>Link existing Open Library library</button>
-      </div>
-      <p class="account-open-library-status" id="open-library-sync-status" role="status" aria-live="polite" hidden></p>
-    </section>
-
-    <div class="account-footer">
-      <button type="button" id="account-dialog-close">Close</button>
+    <div class="when-signed-in account-options">
+      <button type="button" class="account-option" id="website-profile">Manage account</button>
+      <button type="button" class="account-option" id="website-sync-now" hidden>Sync now</button>
+      <button type="button" class="account-option open-library-button" id="open-library-sync-button-signed-in">Connect Open Library</button>
+      <button type="button" class="account-option" id="website-link-openlibrary" hidden>Link existing Open Library library</button>
+      <button type="button" class="account-option account-sign-out" id="website-sign-out">Sign out</button>
     </div>
+
+    <p class="account-open-library-status" id="open-library-sync-status" role="status" aria-live="polite" hidden></p>
   </div>
+
+  {configured && (
+    <footer class="account-footer when-signed-out">
+      Don’t have an account? <button type="button" class="account-link" id="account-sign-up">Sign up</button>
+    </footer>
+  )}
 </dialog>
 
 <style>
   .account-dialog {
     box-sizing: border-box;
-    width: min(26rem, calc(100vw - 2rem));
+    width: min(25rem, calc(100vw - 2rem));
     max-width: none;
-    padding: 1.6rem 1.7rem;
+    padding: 0;
+    overflow: hidden;
     border: 1px solid var(--border-dark);
     border-radius: 14px;
     background: var(--surface-dark);
@@ -77,97 +78,69 @@ const signedIn = Boolean(websiteCloudOwner(Astro.locals));
   }
   .account-dialog::backdrop { background: rgba(0, 0, 0, 0.6); }
   .account-dialog:focus { outline: none; }
-  .account-dialog-body { display: grid; gap: 1.15rem; }
+  .account-dialog[data-signed-in="true"] .when-signed-out,
+  .account-dialog:not([data-signed-in="true"]) .when-signed-in { display: none; }
+  .account-main {
+    display: grid;
+    gap: 1.4rem;
+    padding: 2.2rem 2rem 1.9rem;
+  }
+  .account-close {
+    position: absolute;
+    top: 0.85rem;
+    right: 0.85rem;
+    display: grid;
+    place-items: center;
+    width: 2rem;
+    height: 2rem;
+    padding: 0;
+    border: 0;
+    border-radius: 7px;
+    background: transparent;
+    color: var(--text-dark-muted);
+    cursor: pointer;
+  }
+  .account-close svg { width: 1rem; height: 1rem; }
+  .account-close:hover { background: var(--surface-dark-2); color: var(--text-dark); }
+  .account-header { display: grid; gap: 0.4rem; text-align: center; }
   h2 {
     margin: 0;
-    font-family: var(--font-serif);
-    font-size: 1.7rem;
-    font-weight: 400;
-    line-height: 1.1;
-  }
-  h3 {
-    margin: 0;
-    font-size: 0.9rem;
+    font-size: 1.15rem;
     font-weight: 600;
+    line-height: 1.3;
+    overflow-wrap: anywhere;
   }
-  h3 span { color: var(--text-dark-muted); font-weight: 400; }
   p {
     margin: 0;
     color: var(--text-dark-muted);
-    font-size: 0.84rem;
-    line-height: 1.6;
+    font-size: 0.85rem;
+    line-height: 1.5;
   }
   p[hidden], button[hidden] { display: none; }
-  .account-card {
+  .account-options { display: grid; gap: 0.6rem; }
+  .account-option {
     display: flex;
     align-items: center;
-    gap: 0.75rem;
-    padding: 0.85rem 0.95rem;
-    border: 1px solid var(--border-dark);
-    border-radius: 11px;
-    background: var(--surface-dark-2);
-  }
-  .account-card > div { display: grid; gap: 0.15rem; min-width: 0; }
-  .account-card strong { font-size: 0.92rem; overflow-wrap: anywhere; }
-  .account-card small {
-    color: var(--text-dark-muted);
-    font-size: 0.78rem;
-    line-height: 1.45;
-  }
-  .account-card small[hidden] { display: none; }
-  .account-dot {
-    flex: none;
-    width: 0.55rem;
-    height: 0.55rem;
-    border-radius: 50%;
-    background: var(--text-dark-muted);
-  }
-  .account-dialog[data-signed-in="true"] .account-dot {
-    background: var(--ok);
-    box-shadow: 0 0 0 3px color-mix(in srgb, var(--ok) 22%, transparent);
-  }
-  .account-actions {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.5rem;
-  }
-  .account-open-library {
-    display: grid;
-    gap: 0.55rem;
-    padding-top: 1.1rem;
-    border-top: 1px solid var(--border-dark);
-  }
-  button {
-    min-height: 2.3rem;
-    padding: 0.4rem 0.8rem;
+    justify-content: center;
+    gap: 0.65rem;
+    width: 100%;
+    min-height: 2.5rem;
+    padding: 0.45rem 0.9rem;
     border: 1px solid var(--border-dark);
     border-radius: 9px;
     background: transparent;
     color: var(--text-dark);
     font: inherit;
-    font-size: 0.84rem;
+    font-size: 0.88rem;
+    font-weight: 500;
     cursor: pointer;
   }
-  button:hover:not(:disabled) { background: var(--surface-dark-2); }
-  button:disabled { opacity: 0.6; cursor: not-allowed; }
-  button:focus-visible {
-    outline: 2px solid var(--accent);
-    outline-offset: 2px;
-  }
-  .account-primary {
-    border-color: var(--accent);
-    background: var(--accent);
-    color: var(--accent-ink);
-    font-weight: 600;
-  }
-  .account-primary:hover:not(:disabled) { background: var(--accent-strong); }
-  .open-library-button {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.5rem;
-  }
+  .account-option:hover:not(:disabled) { background: var(--surface-dark-2); }
+  .account-option svg { flex: none; width: 1.05rem; height: 1.05rem; }
+  .account-sign-out { color: var(--danger); }
   .open-library-button::before {
     content: "";
+    flex: none;
     width: 0.5rem;
     height: 0.5rem;
     border-radius: 50%;
@@ -177,12 +150,72 @@ const signedIn = Boolean(websiteCloudOwner(Astro.locals));
     background: var(--ok);
     box-shadow: 0 0 0 3px color-mix(in srgb, var(--ok) 22%, transparent);
   }
-  .account-footer { display: flex; justify-content: flex-end; }
+  .account-divider {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    margin: 0.35rem 0;
+    color: var(--text-dark-muted);
+    font-size: 0.85rem;
+  }
+  .account-divider::before, .account-divider::after {
+    content: "";
+    flex: 1;
+    border-top: 1px solid var(--border-dark);
+  }
+  .account-email { display: grid; gap: 0.5rem; }
+  .account-email label { font-size: 0.85rem; font-weight: 600; }
+  .account-email input {
+    box-sizing: border-box;
+    width: 100%;
+    padding: 0.6rem 0.75rem;
+    border: 1px solid var(--border-dark);
+    border-radius: 9px;
+    background: var(--surface-dark-2);
+    color: var(--text-dark);
+    font: inherit;
+    font-size: 0.9rem;
+    outline: none;
+  }
+  .account-email input:focus { border-color: var(--accent); }
+  .account-continue {
+    margin-top: 0.6rem;
+    min-height: 2.5rem;
+    border: 0;
+    border-radius: 9px;
+    background: var(--text-dark);
+    color: var(--surface-dark);
+    font: inherit;
+    font-size: 0.9rem;
+    font-weight: 600;
+    cursor: pointer;
+  }
+  .account-continue:hover:not(:disabled) { background: #fff; }
+  button:disabled { opacity: 0.6; cursor: not-allowed; }
+  button:focus-visible, input:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+  }
+  .account-footer {
+    padding: 1rem;
+    border-top: 1px solid var(--border-dark);
+    background: var(--surface-dark-2);
+    color: var(--text-dark-muted);
+    font-size: 0.86rem;
+    text-align: center;
+  }
+  .account-link {
+    padding: 0;
+    border: 0;
+    background: none;
+    color: var(--text-dark);
+    font: inherit;
+    font-weight: 600;
+    cursor: pointer;
+  }
+  .account-link:hover { text-decoration: underline; }
   @media (max-width: 700px) {
-    .account-dialog {
-      width: calc(100vw - 1.5rem);
-      max-height: calc(100dvh - 1.5rem);
-      padding: 1.4rem 1.25rem;
-    }
+    .account-dialog { width: calc(100vw - 1.5rem); max-height: calc(100dvh - 1.5rem); overflow-y: auto; }
+    .account-main { padding: 2rem 1.25rem 1.5rem; }
   }
 </style>
