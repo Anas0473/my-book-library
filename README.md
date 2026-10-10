@@ -176,6 +176,19 @@ It also disconnects Open Library on this device to prevent the next website
 account from inheriting that integration. Disconnecting Open Library alone does
 **not** sign out of the website or stop website cloud sync.
 
+### Production Google consent screen
+
+The public privacy policy is at `/privacy`, linked from the library page and
+available without sign-in. Before publishing the Google OAuth app, deploy this
+page and set the Google Auth Platform Branding homepage to
+`https://www.myreadinglist.online` and privacy policy URL to
+`https://www.myreadinglist.online/privacy`. Use `myreadinglist.online` as the
+authorized domain. Then save Branding and publish from Audience.
+
+Keep the policy's contact address and data practices accurate as the service
+changes. Cloud data deletion requests currently require operator handling:
+deleting a Clerk account alone does not delete its separate Neon library.
+
 ### Existing Open Library cloud libraries
 
 Existing users may continue using their verified Open Library cloud sessions.

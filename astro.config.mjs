@@ -13,7 +13,7 @@ const clerkEnabled = Boolean(env.PUBLIC_CLERK_PUBLISHABLE_KEY && env.CLERK_SECRE
 
 // https://astro.build/config
 export default defineConfig({
-  site: 'https://example.com',
+  site: 'https://www.myreadinglist.online',
   output: 'server',
   integrations: [mdx(), sitemap(), ...(clerkEnabled ? [clerk()] : [])],
 

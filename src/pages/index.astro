@@ -601,6 +601,19 @@ const splitAuthors = (author: string) =>
         min-width: 0;
         padding: 2rem 2.5rem 3rem;
       }
+      .privacy-footer {
+        margin-top: 2rem;
+        font-size: 0.8rem;
+      }
+      .privacy-footer a {
+        color: var(--muted);
+        text-underline-offset: 0.2em;
+      }
+      .privacy-footer a:hover { color: var(--fg); }
+      .privacy-footer a:focus-visible {
+        outline: 2px solid var(--page-focus);
+        outline-offset: 4px;
+      }
       .category-panel {
         display: none;
         width: 100%;
@@ -1759,6 +1772,9 @@ const splitAuthors = (author: string) =>
             </div>
           ))
         }
+        <footer class="privacy-footer">
+          <a href="/privacy">Privacy policy</a>
+        </footer>
       </main>
     </div>
 

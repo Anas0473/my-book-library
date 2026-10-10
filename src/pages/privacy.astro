@@ -1,0 +1,163 @@
+---
+export const prerender = true;
+---
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Privacy Policy | My Reading List</title>
+    <meta name="description" content="How My Reading List handles account information, reading lists, browser storage, and optional Open Library connections." />
+    <link rel="canonical" href="https://www.myreadinglist.online/privacy" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+  </head>
+  <body>
+    <main>
+      <a class="back-link" href="/">Back to My Reading List</a>
+      <h1>Privacy Policy</h1>
+      <p class="updated">Last updated: October 10, 2026</p>
+      <p>
+        My Reading List at <a href="https://www.myreadinglist.online">www.myreadinglist.online</a> is operated by Anas, the maintainer of the My Reading List project.
+        This policy explains how information is handled when you browse books,
+        save reading lists, sign in, or connect Open Library.
+      </p>
+
+      <h2>Information used by the website</h2>
+      <ul>
+        <li>
+          <strong>Guest libraries:</strong> Books, reading statuses, preferences,
+          cached book information, and pending changes are saved in your browser.
+          Guest use does not require a website account. Connecting Open Library
+          can also enable cloud storage through your verified Open Library account.
+        </li>
+        <li>
+          <strong>Website accounts:</strong> Clerk handles authentication with email
+          or Google. Clerk processes account information such as your email address
+          and, for Google sign-in, basic profile information such as your name and
+          profile picture. The website uses your verified Clerk user ID to associate
+          your account with your cloud library. It does not receive your Google password.
+        </li>
+        <li>
+          <strong>Cloud libraries:</strong> Neon stores saved book metadata, reading
+          statuses, sync revisions, deletion markers, and account identifiers.
+          Linking an existing Open Library library stores the association between
+          your Open Library username and your website account.
+        </li>
+        <li>
+          <strong>Technical information:</strong> Hosting and authentication providers
+          may process IP addresses, browser and device information, request times,
+          and diagnostic logs to deliver and secure the service. Application errors
+          may also be logged for troubleshooting.
+        </li>
+      </ul>
+
+      <h2>Why this information is used</h2>
+      <p>
+        Information is used to authenticate you, save and synchronize your library,
+        recover pending offline changes, provide book search and recommendations,
+        operate an optional Open Library connection, and diagnose service problems.
+        Recommendations use subjects and languages from your reading lists to look
+        up related books. Website cloud libraries are not published as a public
+        profile by this application.
+      </p>
+
+      <h2>Cookies and browser storage</h2>
+      <p>
+        Authentication uses cookies managed by Clerk. An Open Library connection
+        uses an HTTP-only session cookie, and legacy cloud access uses a separate
+        HTTP-only session cookie. Local storage keeps reading lists, preferences,
+        account-specific caches, backups made during account switches, and queued
+        sync changes on your device.
+      </p>
+      <p>
+        Signing out hides the active website account's library, but does not erase
+        its browser cache or pending changes. Clearing this site's browser data
+        removes local copies and can permanently lose unsynced guest books.
+        It does not delete copies already stored in the cloud or on Open Library.
+      </p>
+
+      <h2>Service providers and external requests</h2>
+      <ul>
+        <li><a href="https://clerk.com/legal/privacy">Clerk</a> provides website authentication and account management.</li>
+        <li><a href="https://policies.google.com/privacy">Google</a> provides optional Google sign-in and fonts loaded on the main library page.</li>
+        <li><a href="https://neon.com/privacy-policy">Neon</a> provides the cloud database.</li>
+        <li><a href="https://vercel.com/legal/privacy-policy">Vercel</a> hosts the website and handles requests.</li>
+        <li><a href="https://archive.org/about/terms.php">Open Library and Internet Archive</a> provide book search, metadata, cover images, and optional shelf synchronization.</li>
+      </ul>
+      <p>
+        Book searches and recommendation queries are sent through the website's
+        server to Open Library, or Internet Archive when search fallback is used.
+        Cover images and fonts can be loaded directly from external services, which
+        receive the technical information needed to serve those requests.
+        These providers process information under their own policies and may
+        process it outside your country.
+      </p>
+
+      <h2>Optional Open Library connection</h2>
+      <p>
+        Open Library is separate from your website account. If you choose to connect,
+        your Open Library email and password, or Internet Archive access and secret
+        keys, pass through this website's server to Open Library for login. The
+        application does not save those passwords or keys in browser storage or
+        the cloud database; it retains the resulting session in an HTTP-only cookie.
+      </p>
+      <p>
+        While connected, adding, moving, or removing supported books can update
+        your Open Library shelves, and shelf changes can be imported here.
+        Shelf visibility is governed by Open Library's settings and policies.
+        Disconnecting stops this integration on the current browser but does not
+        delete your Open Library account or its shelves.
+      </p>
+
+      <h2>Retention and your choices</h2>
+      <p>
+        Local data remains until it is removed by you, the browser, or application
+        storage updates. Cloud libraries remain available for synchronization;
+        removing a book leaves a deletion marker to prevent older devices from
+        restoring it. Signing out or deleting an authentication account does not
+        automatically erase the separate Neon library or other local copies.
+        Service providers may retain logs and backups according to their policies.
+      </p>
+      <p>
+        You can use the site without a website account, remove books from your
+        lists, disconnect Open Library, sign out, and clear this site's browser
+        storage. For access, correction, or deletion of your website cloud data,
+        contact <a href="mailto:anasbutthussain@gmail.com">anasbutthussain@gmail.com</a> using your account email and identify the request. Account ownership must
+        be verified before private data can be provided or deleted. Please do not
+        send passwords, access keys, or session tokens.
+      </p>
+
+      <h2>Contact and policy updates</h2>
+      <p>
+        For privacy questions, contact <a href="mailto:anasbutthussain@gmail.com">anasbutthussain@gmail.com</a>.
+        This page will be updated when the service's data practices change, with
+        the revision date shown above.
+      </p>
+    </main>
+    <style>
+      :global(body) {
+        margin: 0;
+        background: #1c1c1c;
+        color: #ececec;
+        font-family: system-ui, -apple-system, sans-serif;
+        line-height: 1.7;
+      }
+      main {
+        max-width: 48rem;
+        margin: 0 auto;
+        padding: 2rem 1.25rem 4rem;
+        overflow-wrap: anywhere;
+      }
+      h1 { font-size: 2.25rem; line-height: 1.2; }
+      h2 { margin-top: 2rem; font-size: 1.3rem; line-height: 1.4; }
+      a { color: #f3b94d; text-underline-offset: 0.2em; }
+      a:hover { color: #ffe0a3; }
+      a:focus-visible { outline: 2px solid #f3b94d; outline-offset: 4px; }
+      .updated, .back-link { font-size: 0.9rem; }
+      .updated { color: #bcb8b0; }
+      ul { padding-left: 1.25rem; }
+      li { margin: 0.75rem 0; }
+    </style>
+  </body>
+</html>
