@@ -29,10 +29,19 @@ export function cloudSnapshot(books: CloudBook[]): CloudBooks {
   return Object.fromEntries(books.map((book) => [cloudBookId(book), book]));
 }
 
+// The cloud database reorders a book's fields, so compare them in a fixed order.
+function sameBook(first: CloudBook | null | undefined, second: CloudBook | null | undefined) {
+  const sorted = (book: CloudBook | null | undefined) => book
+    ? JSON.stringify(Object.keys(book).filter((field) => book[field] !== undefined).sort()
+      .map((field) => [field, book[field]]))
+    : String(book);
+  return sorted(first) === sorted(second);
+}
+
 export function diffCloudBooks(before: CloudBooks, after: CloudBooks): CloudChange[] {
   const changes: CloudChange[] = [];
   for (const [id, book] of Object.entries(after)) {
-    if (JSON.stringify(book) !== JSON.stringify(before[id])) changes.push({ id, book });
+    if (!sameBook(book, before[id])) changes.push({ id, book });
   }
   for (const [id, book] of Object.entries(before)) {
     if (book && !(id in after)) changes.push({ id, book: null });

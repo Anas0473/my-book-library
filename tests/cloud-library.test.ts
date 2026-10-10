@@ -41,6 +41,14 @@ test('removing one edition does not remove other editions', () => {
   assert.deepEqual(activeCloudBooks(applyCloudChanges(before, changes)), [second]);
 });
 
+test('reordered fields are not a change, so an old copy cannot overwrite a rating', () => {
+  const rated = { ...edition('/books/OL1M'), status: 'Read', rating: 4 };
+  const reordered = Object.fromEntries(Object.entries(rated).reverse()) as CloudBook;
+  assert.deepEqual(diffCloudBooks(cloudSnapshot([rated]), cloudSnapshot([reordered])), []);
+  assert.deepEqual(diffCloudBooks(cloudSnapshot([rated]), cloudSnapshot([{ ...reordered, subtitle: undefined }])), []);
+  assert.equal(diffCloudBooks(cloudSnapshot([rated]), cloudSnapshot([{ ...rated, rating: 5 }])).length, 1);
+});
+
 test('cloud change validation rejects spoofed identities, unsafe URLs and invalid shelves', () => {
   const book = edition('/books/OL1M');
   const change = { id: 'edition:OL1M', book };
