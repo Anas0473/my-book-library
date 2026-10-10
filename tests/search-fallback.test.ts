@@ -1,10 +1,14 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { GET } from '../src/pages/api/search-books.json';
+import { GET } from '../src/pages/api/search-books.json.ts';
 
 test('search falls back on outages, but not on genuinely missing covers', async () => {
   const originalFetch = globalThis.fetch;
   const originalNow = Date.now;
+  let clockOffset = 0;
+  Date.now = () => originalNow() + clockOffset;
+  // After an outage, search skips Open Library for a minute; move past that window between scenarios.
+  const passOutageWindow = () => { clockOffset += 61 * 1000; };
   let mode = 'healthy';
   let searchRequests = 0;
   let fullSearchRequests = 0;
@@ -93,8 +97,15 @@ test('search falls back on outages, but not on genuinely missing covers', async 
     assert.equal(unavailable.books[0].provider, 'internet-archive');
     assert.equal(unavailable.books[0].workKey, null);
 
+    mode = 'healthy';
+    const skippedRequests = searchRequests;
+    const skipped = await search('Test');
+    assert.equal(skipped.searchProvider, 'internet-archive', 'recent outage goes straight to the fallback');
+    assert.equal(searchRequests, skippedRequests, 'recent outage does not wait on Open Library again');
+
     for (const failure of ['network-down', 'probe-timeout', 'probe-malformed']) {
       mode = failure;
+      passOutageWindow();
       const data = await search('Test');
       assert.equal(data.searchProvider, 'internet-archive', failure);
       assert.equal(fullSearchRequests, fullBefore, 'failed probe never serves or refetches full results');
@@ -102,6 +113,7 @@ test('search falls back on outages, but not on genuinely missing covers', async 
 
     for (const failure of ['editions-down', 'edition-timeout', 'edition-rate-limit']) {
       mode = failure;
+      passOutageWindow();
       const data = await search(`Test-${failure}`);
       assert.equal(data.searchProvider, undefined, 'an edition failure is not a search outage');
       assert.equal(data.books.length, 1);
@@ -110,21 +122,24 @@ test('search falls back on outages, but not on genuinely missing covers', async 
     }
 
     mode = 'outage-after-search';
+    passOutageWindow();
     const midSearchOutage = await search('Test-outage-after-search');
     assert.equal(midSearchOutage.searchProvider, 'internet-archive');
 
     mode = 'both-down';
+    passOutageWindow();
     const bothDown = await search('Different-query');
     assert.equal(bothDown.searchUnavailable, true);
     assert.deepEqual(bothDown.books, []);
 
     mode = 'healthy';
+    passOutageWindow();
     const recovered = await search('Test');
     assert.equal(recovered.searchProvider, undefined);
     assert.equal(recovered.books[0].workKey, '/works/OL1W');
 
     const fullBeforeExpiry = fullSearchRequests;
-    Date.now = () => originalNow() + 11 * 60 * 1000;
+    clockOffset += 11 * 60 * 1000;
     const refreshed = await search('Test');
     assert.equal(refreshed.searchProvider, undefined);
     assert.equal(fullSearchRequests, fullBeforeExpiry + 1, 'expired results must be fetched again');

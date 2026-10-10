@@ -35,7 +35,17 @@ const languageEditionCache = new Map<string, { expiresAt: number; edition: any |
 const searchResponseCache = new Map<string, { expiresAt: number; data: any }>();
 const selectedEditionCache = new Map<string, { expiresAt: number; edition: any | null }>();
 
+// After Open Library fails, skip it briefly so searches go straight to the fallback instead of waiting again.
+const OPEN_LIBRARY_SEARCH_TIMEOUT_MS = 8000;
+const OPEN_LIBRARY_OUTAGE_SKIP_MS = 60 * 1000;
+let openLibrarySkipUntil = 0;
+
+function markOpenLibraryUnavailable() {
+  openLibrarySkipUntil = Date.now() + OPEN_LIBRARY_OUTAGE_SKIP_MS;
+}
+
 async function fetchOpenLibrarySearch(apiUrl: string) {
+  if (Date.now() < openLibrarySkipUntil) return null;
   const cached = searchResponseCache.get(apiUrl);
   if (cached && cached.expiresAt > Date.now()) {
     // Check the search service itself, not just the homepage, before using cached data.
@@ -51,11 +61,15 @@ async function fetchOpenLibrarySearch(apiUrl: string) {
         cache: 'no-store',
         headers: { 'User-Agent': 'my-book-library/0.0.1' },
       });
-      if (!response.ok) return null;
+      if (!response.ok) {
+        if (response.status >= 500 || response.status === 429) markOpenLibraryUnavailable();
+        return null;
+      }
       const data = await response.json();
       return Array.isArray(data.docs) ? cached.data : null;
     } catch {
       // A failed availability check must never serve cached Open Library results.
+      markOpenLibraryUnavailable();
       return null;
     } finally {
       clearTimeout(timeout);
@@ -64,7 +78,8 @@ async function fetchOpenLibrarySearch(apiUrl: string) {
 
   for (let attempt = 0; attempt < 2; attempt++) {
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 15000);
+    const timeout = setTimeout(() => controller.abort(), OPEN_LIBRARY_SEARCH_TIMEOUT_MS);
+    const startedAt = Date.now();
     try {
       const response = await fetch(apiUrl, {
         signal: controller.signal,
@@ -77,12 +92,16 @@ async function fetchOpenLibrarySearch(apiUrl: string) {
         searchResponseCache.set(apiUrl, { expiresAt: Date.now() + 10 * 60 * 1000, data });
         return data;
       }
+      if (response.status < 500 && response.status !== 429) return null;
     } catch {
-      // Retry once; Open Library's large searches intermittently time out.
+      // Fall through to the retry decision below.
     } finally {
       clearTimeout(timeout);
     }
+    // Retry only quick hiccups; a slow failure means Open Library is down, so don't make the user wait twice.
+    if (Date.now() - startedAt > 3000) break;
   }
+  markOpenLibraryUnavailable();
   return null;
 }
 
@@ -155,7 +174,7 @@ async function fetchInternetArchiveFallback({
   let data = cached && cached.expiresAt > Date.now() ? cached.data : null;
   if (!data) {
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 12000);
+    const timeout = setTimeout(() => controller.abort(), 10000);
     try {
       const response = await fetch(apiUrl, { signal: controller.signal });
       if (!response.ok) return null;
