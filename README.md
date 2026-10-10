@@ -202,7 +202,8 @@ deleting a Clerk account alone does not delete its separate Neon library.
 
 Existing users may continue using their verified Open Library cloud sessions.
 To migrate, sign in to the website, connect/re-authenticate with Open Library,
-then choose **Link existing Open Library library** in the account dialog.
+then open the Open Library dialog and choose **Import books synced here before
+you had an account**.
 The server verifies both sessions before claiming that library for the website
 account. The merge includes the old account's queued cloud changes on this
 browser, preserves existing website books and deletion markers, and keeps a

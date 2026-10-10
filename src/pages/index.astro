@@ -1846,6 +1846,7 @@ const splitAuthors = (author: string) =>
           <div>
             <strong id="open-library-logged-in-text"></strong>
             <small>Changes sync both ways. Open Library changes arrive every 15 minutes.</small>
+            <button type="button" class="open-library-link-button" id="website-link-openlibrary" hidden>Import books synced here before you had an account</button>
           </div>
           <button type="button" class="open-library-link-button" id="open-library-logout">Disconnect Open Library</button>
         </div>
@@ -2527,10 +2528,10 @@ const splitAuthors = (author: string) =>
         const username = getOpenLibraryPushUser();
         if (!username) {
           openOpenLibrarySyncDialog();
-          openLibrarySyncMessage.textContent = "Connect Open Library first, then choose Link existing Open Library library.";
+          openLibrarySyncMessage.textContent = "Connect Open Library first.";
           return;
         }
-        if (!window.confirm(`Link ${username}'s existing cloud library to this website account? Existing website books and deletions take priority. Future cloud access will require this website account.`)) return;
+        if (!window.confirm(`Import the books this site synced for ${username} before you had an account? Books already in your account stay as they are.`)) return;
         websiteLinkOpenLibrary.disabled = true;
         cloudLibrary?.disconnect();
         try {
@@ -2543,8 +2544,9 @@ const splitAuthors = (author: string) =>
           if (!response.ok || data.linked !== true) throw new Error(data.error || "Could not link your existing library.");
           await refreshWebsiteAccount();
           await checkOpenLibraryAccount();
+          openLibrarySyncMessage.textContent = "Older synced books imported into your account.";
         } catch (error) {
-          cloudLibraryStatus.textContent = error instanceof Error ? error.message : "Could not link your existing library.";
+          openLibrarySyncMessage.textContent = error instanceof Error ? error.message : "Could not import your older books.";
         } finally {
           websiteLinkOpenLibrary.disabled = false;
         }
@@ -2951,9 +2953,15 @@ const splitAuthors = (author: string) =>
             updateOpenLibraryAccountView();
             flushOpenLibraryChanges();
           } else {
+            const wasConnected = Boolean(getOpenLibraryPushUser()) || readPendingOpenLibraryChanges().length > 0;
             if (!websiteOwner) cloudLibrary?.disconnect();
             cloudReauthenticationRequired = false;
-            handleOpenLibraryLoggedOut();
+            if (wasConnected) handleOpenLibraryLoggedOut();
+            else {
+              verifiedOpenLibraryUser = null;
+              updateOpenLibraryAccountView();
+              showOpenLibraryStatus("");
+            }
           }
         } catch {
           showOpenLibraryStatus("Could not check the Open Library connection. Your saved books were kept.");
