@@ -652,6 +652,19 @@ const accountSignedIn = Boolean(websiteCloudOwner(Astro.locals));
       .shelf-jump-button[hidden] {
         display: none;
       }
+      :global(.local-book-details) { display: flex; flex: 1; flex-direction: column; align-items: flex-start; }
+      :global(.local-book-details > .cover-img),
+      :global(.local-book-details > .cover-placeholder) { align-self: stretch; }
+      :global(.saved-book-rating) { display: block; margin: auto 0 0; padding: .5rem 0 0; border: 0; background: none; color: var(--accent); font: inherit; font-size: 1rem; cursor: pointer; }
+      :global(.saved-book-rating:hover) { opacity: .8; }
+      :global(.selection-mode .saved-book-rating) { cursor: inherit; }
+      :global(.book-rating) { display: grid; gap: .35rem; margin: .75rem 0; }
+      :global(.book-rating-label) { font-size: .85rem; font-weight: 600; }
+      :global(.book-rating-stars) { display: flex; gap: .2rem; }
+      :global(.book-rating-stars button) { background: transparent; border: 0; color: var(--accent); font-size: 1.8rem; padding: .1rem .2rem; cursor: pointer; }
+      :global(.book-rating-summary) { font-size: .8rem; color: var(--muted); }
+      :global(.book-rating-clear) { justify-self: start; background: transparent; border: 0; color: var(--muted); text-decoration: underline; padding: .25rem 0; cursor: pointer; }
+      :global(.book-rating button:focus-visible) { outline: 2px solid var(--page-focus); outline-offset: 2px; }
       .controls {
         display: grid;
         grid-template-columns: minmax(0, 1fr) max-content max-content max-content max-content;
@@ -1767,6 +1780,7 @@ const accountSignedIn = Boolean(websiteCloudOwner(Astro.locals));
     </dialog>
 
     <script>
+      import { createBookRating, isBookRating } from "../lib/book-rating";
       import { mergeOpenLibraryImport } from "../lib/openlibrary-import";
       import { createCloudLibraryClient } from "../lib/cloud-library-client";
       import { $clerkStore } from "@clerk/astro/client";
@@ -2135,6 +2149,7 @@ const accountSignedIn = Boolean(websiteCloudOwner(Astro.locals));
         card.appendChild(selectionLabel);
 
         const details = document.createElement("div");
+        details.className = "local-book-details";
         const fallbackImage = book.heroImage;
         const selectedEditionImage = book.editionHeroImage;
         if (selectedEditionImage || fallbackImage) {
@@ -2213,6 +2228,16 @@ const accountSignedIn = Boolean(websiteCloudOwner(Astro.locals));
           removedNotice.className = "open-library-removed";
           removedNotice.textContent = "Extra edition, only on this site";
           details.appendChild(removedNotice);
+        }
+
+        if (book.status === "Read" && isBookRating(book.rating)) {
+          const rating = document.createElement("button");
+          rating.type = "button";
+          rating.className = "saved-book-rating";
+          rating.title = "View book details";
+          rating.textContent = "\u2605".repeat(book.rating) + "\u2606".repeat(5 - book.rating);
+          rating.setAttribute("aria-label", `Your rating: ${book.rating} out of 5 stars. View book details`);
+          details.appendChild(rating);
         }
 
         card.appendChild(details);
@@ -3678,11 +3703,32 @@ const accountSignedIn = Boolean(websiteCloudOwner(Astro.locals));
         openSavedBookDetails(card, cover || document.createElement("img"), book);
       });
 
-      function openSavedBookDetails(card: HTMLElement, cover: HTMLImageElement, searchBook: any = null) {
+      function ratingControlForBook(book: any) {
+        return createBookRating(book.rating, (rating) => {
+          const currentBook = localBooks.find((item) => isSameBook(item, book));
+          if (!currentBook || currentBook.status !== "Read") {
+            throw new Error("This book is no longer in Read. Reopen its details to rate it.");
+          }
+          const previousRating = currentBook.rating;
+          if (rating === null) delete currentBook.rating;
+          else currentBook.rating = rating;
+          try {
+            saveLocalBooksWithoutPush();
+          } catch (error) {
+            if (previousRating === undefined) delete currentBook.rating;
+            else currentBook.rating = previousRating;
+            throw error;
+          }
+          refreshLibraryView();
+        });
+      }
+
+      function openSavedBookDetails(card: HTMLElement, cover: HTMLImageElement | null, searchBook: any = null) {
+        const coverSrc = cover?.src || "";
         const localBook = searchBook || (card.dataset.localBookKey
           ? localBooks.find((book) => String(getBookIdentity(book)) === card.dataset.localBookKey)
           : null);
-        const title = String(localBook?.title || card.querySelector("h4")?.textContent || cover.alt).trim();
+        const title = String(localBook?.title || card.querySelector("h4")?.textContent || cover?.alt || "").trim();
         const subtitle = String(localBook?.subtitle || card.querySelector(".subtitle-text")?.textContent || "").trim();
         const author = String(localBook?.author || card.querySelector(".author-text")?.textContent || "Not listed").trim();
         const published = String(
@@ -3720,21 +3766,21 @@ const accountSignedIn = Boolean(websiteCloudOwner(Astro.locals));
 
         const body = document.createElement("div");
         body.className = "category-edition-preview-body";
-        if (cover.src) {
+        if (coverSrc) {
           const image = document.createElement("img");
           image.className = "category-edition-preview-cover";
           image.alt = `Cover of ${title}`;
           image.referrerPolicy = "no-referrer";
-          const largeSrc = cover.src
+          const largeSrc = coverSrc
             .replace(/-M\.jpg(?=\?|$)/, "-L.jpg")
             .replace(
               /^https:\/\/archive\.org\/services\/img\/([^/?#]+)$/,
               "https://archive.org/download/$1/page/cover_w800.jpg",
             );
-          if (largeSrc !== cover.src) {
+          if (largeSrc !== coverSrc) {
             image.onerror = () => {
               image.onerror = null;
-              image.src = cover.src;
+              image.src = coverSrc;
             };
           }
           image.src = largeSrc;
@@ -3781,6 +3827,11 @@ const accountSignedIn = Boolean(websiteCloudOwner(Astro.locals));
         });
         details.appendChild(metadata);
 
+        const savedBook = localBooks.find((book) => localBook && isSameBook(book, localBook));
+        if (savedBook?.status === "Read") {
+          details.appendChild(ratingControlForBook(savedBook));
+        }
+
         if (editionLink) {
           const openLink = document.createElement("a");
           openLink.className = "category-edition-open-link";
@@ -3804,6 +3855,15 @@ const accountSignedIn = Boolean(websiteCloudOwner(Astro.locals));
           event.preventDefault();
           event.stopPropagation();
           openSavedBookDetails(card, savedCover);
+          return;
+        }
+        const savedRating = target.closest<HTMLElement>(".local-book-card .saved-book-rating");
+        if (savedRating && !savedRating.closest(".selection-mode")) {
+          const card = savedRating.closest<HTMLElement>(".card");
+          if (!card) return;
+          event.preventDefault();
+          event.stopPropagation();
+          openSavedBookDetails(card, card.querySelector<HTMLImageElement>(".cover-img"));
           return;
         }
 
@@ -4142,6 +4202,11 @@ const accountSignedIn = Boolean(websiteCloudOwner(Astro.locals));
             shelfMenu.hidden = true;
             const updateEditionShelfControl = (status: string | null) => {
               currentStatus = status;
+              details.querySelector(".book-rating")?.remove();
+              const ratedEdition = localBooks.find((book) =>
+                normalizeEditionId(book.editionKey || "") === normalizeEditionId(edition.key),
+              );
+              if (status === "Read" && ratedEdition) details.appendChild(ratingControlForBook(ratedEdition));
               const shelf = shelfDefinitions.find((item) => item.status === status);
               primaryButton.textContent = `${status ? "✓ " : ""}${shelf?.label || "Plan to Read"}`;
               primaryButton.title = status ? "Remove from My Lists" : "Add to Plan to Read";
@@ -4828,7 +4893,7 @@ const accountSignedIn = Boolean(websiteCloudOwner(Astro.locals));
         grid.addEventListener("click", (event) => {
           if (!panel.classList.contains("selection-mode")) return;
           const target = event.target as HTMLElement;
-          if (target.closest("button, input, select, label, a, .shelf-control")) return;
+          if (target.closest("button:not(.saved-book-rating), input, select, label, a, .shelf-control")) return;
 
           const card = target.closest<HTMLElement>(".local-book-card");
           const checkbox = card?.querySelector<HTMLInputElement>(".local-book-checkbox");

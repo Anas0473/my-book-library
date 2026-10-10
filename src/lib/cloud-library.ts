@@ -7,6 +7,7 @@ export interface CloudBook {
   workKey?: string;
   isbn?: string;
   author?: string;
+  rating?: number;
 }
 
 export type CloudBooks = Record<string, CloudBook | null>;
@@ -89,6 +90,11 @@ export function validateCloudChanges(value: unknown): CloudChange[] {
       if (change.book[field] === undefined) continue;
       if (typeof change.book[field] !== 'boolean') throw new Error('Invalid book flag.');
       book[field] = change.book[field];
+    }
+    if (change.book.rating !== undefined && change.book.rating !== null) {
+      if (typeof change.book.rating !== 'number' || !Number.isInteger(change.book.rating)
+        || change.book.rating < 1 || change.book.rating > 5) throw new Error('Invalid book rating.');
+      book.rating = change.book.rating;
     }
     if (typeof book.title !== 'string' || !book.title.trim()
       || !['Plan to Read', 'Reading', 'Read'].includes(String(book.status))) {

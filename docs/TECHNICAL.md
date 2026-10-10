@@ -4,6 +4,13 @@ Detailed behavior and setup notes. For an overview, see the [README](../README.m
 
 ## Reading list controls
 
+Books in Read can be given an optional personal whole-star rating from 1 to 5
+in Book details. Ratings can be changed or cleared and appear on Read cards.
+They are stored per saved edition and included in website cloud sync, not sent
+to Open Library. Moving a book to another shelf keeps its rating but hides the
+rating controls and stars until it returns to Read. Ratings do not yet affect
+recommendations.
+
 The privacy policy link appears at the bottom of the account dialog on desktop
 and mobile, whether signed in or signed out. The sidebar account card stays in
 its original bottom-corner position.
