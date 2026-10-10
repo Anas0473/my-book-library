@@ -1927,7 +1927,6 @@ const splitAuthors = (author: string) =>
       let websiteAccountGeneration = 0;
       let pendingOpenLibraryDisconnectOwner: string | null = null;
       let websiteAccountCheck: Promise<void> = Promise.resolve();
-      const websiteSyncNow = document.getElementById("website-sync-now") as HTMLButtonElement;
       const websiteLinkOpenLibrary = document.getElementById("website-link-openlibrary") as HTMLButtonElement;
       const openLibrarySyncSubmit = document.getElementById("open-library-sync-submit") as HTMLButtonElement;
       const openLibrarySyncCancel = document.getElementById("open-library-sync-cancel") as HTMLButtonElement;
@@ -2506,7 +2505,6 @@ const splitAuthors = (author: string) =>
             if (!data.owner) data.cloudOwner = null;
           }
           websiteOwner = data.owner;
-          websiteSyncNow.hidden = !data.cloudOwner || !data.cloudConfigured;
           websiteLinkOpenLibrary.hidden = !websiteOwner;
           if (data.cloudOwner) {
             await cloudLibrary?.connect(data.cloudOwner, { sync: data.cloudConfigured });
@@ -2533,15 +2531,6 @@ const splitAuthors = (author: string) =>
         websiteAccountCheck = websiteAccountCheck.then(checkWebsiteAccount);
         return websiteAccountCheck;
       }
-
-      websiteSyncNow.addEventListener("click", async () => {
-        websiteSyncNow.disabled = true;
-        try {
-          await refreshWebsiteAccount();
-        } finally {
-          websiteSyncNow.disabled = false;
-        }
-      });
 
       websiteLinkOpenLibrary.addEventListener("click", async () => {
         if (!websiteOwner) return;
@@ -2677,7 +2666,6 @@ const splitAuthors = (author: string) =>
             cloudLibrary?.disconnect();
             verifiedOpenLibraryUser = null;
             websiteOwner = null;
-            websiteSyncNow.hidden = true;
             websiteLinkOpenLibrary.hidden = true;
             cloudLibrary?.enterGuest();
             void refreshWebsiteAccount();

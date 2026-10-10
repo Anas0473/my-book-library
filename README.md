@@ -175,10 +175,9 @@ dot with "Sign in to sync" or a green dot with "Signed in as …". Signed out, i
 opens a sign-in dialog with **Continue with Google**, **Continue with Open
 Library**, and an email field that opens Clerk's sign-in (or sign-up) for
 password or email-code login. Google sign-in returns through `/sso-callback`.
-Signed in, the dialog offers Manage account, Sync now, Open Library and sign
-out. It shows device-only
-storage, queued changes, sync progress, and successful cloud saves. Its Sync now
-button works without Open Library. First sign-in imports guest books without
+Signed in, the dialog offers Manage account, Open Library and sign out. Syncing
+is automatic; the dialog shows device-only storage, queued changes, sync
+progress, and successful cloud saves. First sign-in imports guest books without
 overwriting existing cloud records or restoring deleted books. Signing out hides
 account books and retains the per-account cache/outbox for the next sign-in.
 It also disconnects Open Library on this device to prevent the next website
@@ -231,7 +230,7 @@ imported without replacing cloud records. Upload failures keep a persistent
 per-account outbox, concurrent saves use revision checks, and deletion markers
 prevent stale first-time imports from restoring removed books. Account switching
 keeps a browser backup of the previous library. Cloud updates arrive on login,
-Sync now, returning to the page, reconnecting, and every minute while visible.
+returning to the page, reconnecting, and every minute while visible.
 
 For localhost, privately set the database connection in the ignored `.env` file
 and restart Astro, then sign in with the same website account (or the same Open
