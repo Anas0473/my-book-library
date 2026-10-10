@@ -147,7 +147,13 @@ const signedIn = Boolean(websiteCloudOwner(Astro.locals));
     max-height: none;
   }
   .profile-dialog[open] { display: flex; flex-direction: column; }
-  .profile-dialog .dialog-topbar { padding-bottom: 0.35rem; }
+  .profile-dialog .dialog-topbar {
+    position: absolute;
+    inset: 0 0 auto;
+    z-index: 1;
+    pointer-events: none;
+  }
+  .profile-dialog .dialog-topbar .account-close { pointer-events: auto; }
   .profile-mount { flex: 1; min-height: 0; }
   .account-dialog::backdrop { background: rgba(0, 0, 0, 0.6); }
   .account-dialog:focus { outline: none; }
@@ -161,7 +167,7 @@ const signedIn = Boolean(websiteCloudOwner(Astro.locals));
   .dialog-topbar {
     display: flex;
     align-items: center;
-    padding: 0.85rem 0.85rem 0;
+    padding: 0.6rem 0.6rem 0;
   }
   .dialog-topbar .account-close:last-child { margin-left: auto; }
   .account-close {
