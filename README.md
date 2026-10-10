@@ -43,9 +43,10 @@ Any static assets, like images, can be placed in the `public/` directory.
 
 ## Reading list controls
 
-The Appearance picker preserves your exact background color. Panel, input, and
-selected-state colors adapt to it, with contrast-checked primary and secondary
-text, accent text, and keyboard focus indicators.
+Account and sync controls sit at the bottom of the desktop sidebar. Signed-in
+users see their profile picture when available, with a generic avatar otherwise.
+On phones, account controls remain in the bottom navigation. The site uses its
+default dark appearance; the background color picker has been removed.
 
 Click an unsaved book's status button to add it to Plan to Read. Click a yellow
 status button to remove the book from My Lists; use the arrow to choose a different

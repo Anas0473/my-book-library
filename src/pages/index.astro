@@ -205,114 +205,49 @@ const splitAuthors = (author: string) =>
         cursor: progress;
         opacity: 0.7;
       }
-      .open-library-button.account-button {
+      .account-button {
+        width: 100%;
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        padding: 0.65rem;
+        gap: 0.65rem;
+        background: var(--fill);
         font-size: 0.88rem;
         white-space: normal;
         line-height: 1.25;
       }
+      .sidebar-account { margin-top: auto; }
+      .account-avatar {
+        position: relative;
+        display: grid;
+        place-items: center;
+        flex: 0 0 2.25rem;
+        width: 2.25rem;
+        height: 2.25rem;
+        border-radius: 50%;
+        background: var(--fill-strong);
+        color: var(--muted);
+      }
+      .account-avatar img { width: 100%; height: 100%; border-radius: 50%; object-fit: cover; }
+      .account-avatar svg { width: 1.25rem; height: 1.25rem; }
+      .account-avatar [hidden] { display: none; }
+      .account-button.is-connected .account-avatar::after {
+        content: "";
+        position: absolute;
+        bottom: 0;
+        right: 0;
+        width: 0.5rem;
+        height: 0.5rem;
+        border: 2px solid var(--page-background, #1c1c1c);
+        border-radius: 50%;
+        background: var(--ok);
+      }
+      .account-button-copy { display: grid; gap: 0.25rem; min-width: 0; text-align: left; }
+      .account-button-status { font-size: 0.7rem; color: var(--muted); }
       .account-button-label {
         min-width: 0;
         overflow: hidden;
         text-overflow: ellipsis;
-      }
-      .theme-picker {
-        position: relative;
-        margin-top: auto;
-      }
-      .appearance-toggle {
-        display: flex;
-        align-items: center;
-        gap: 0.6rem;
-        width: 100%;
-        box-sizing: border-box;
-        padding: 0.55rem 0.65rem;
-        border: 1px solid var(--line);
-        border-radius: 10px;
-        background: var(--fill);
-        color: var(--fg);
-        font: inherit;
-        font-size: 0.82rem;
-        cursor: pointer;
-      }
-      .appearance-toggle:hover,
-      .appearance-toggle[aria-expanded="true"] {
-        background: var(--fill-strong);
-      }
-      .appearance-swatch {
-        flex: 0 0 auto;
-        width: 1rem;
-        height: 1rem;
-        box-sizing: border-box;
-        border: 1.5px solid var(--muted);
-        border-radius: 50%;
-        background: var(--page-background, #1c1c1c);
-      }
-      .appearance-value {
-        margin-left: auto;
-        color: var(--faint);
-        font-size: 0.7rem;
-        font-variant-numeric: tabular-nums;
-        white-space: nowrap;
-      }
-      .appearance-panel {
-        position: absolute;
-        right: 0;
-        bottom: calc(100% + 0.5rem);
-        left: 0;
-        z-index: 40;
-        padding: 0.85rem;
-        border: 1px solid var(--border-dark);
-        border-radius: 12px;
-        background: var(--surface-dark);
-        color: var(--text-dark);
-        box-shadow: 0 14px 34px rgba(0, 0, 0, 0.4);
-      }
-      .appearance-panel[hidden] {
-        display: none;
-      }
-      .appearance-panel h3 {
-        margin: 0 0 0.6rem;
-        padding: 0;
-        color: var(--text-dark-muted);
-      }
-      .theme-custom-controls {
-        display: flex;
-        align-items: center;
-        gap: 0.5rem;
-      }
-      .theme-color-input {
-        width: 2.25rem;
-        height: 2.25rem;
-        flex: 0 0 2.25rem;
-        padding: 2px;
-        border: 1px solid var(--border-dark);
-        border-radius: 8px;
-        background: var(--surface-dark-2);
-        cursor: pointer;
-      }
-      .theme-color-input::-webkit-color-swatch-wrapper {
-        padding: 1px;
-      }
-      .theme-color-input::-webkit-color-swatch {
-        border: 0;
-        border-radius: 5px;
-      }
-      .theme-rgb-input {
-        box-sizing: border-box;
-        width: 100%;
-        min-width: 0;
-        height: 2.25rem;
-        padding: 0.35rem 0.55rem;
-        border: 1px solid var(--border-dark);
-        border-radius: 8px;
-        background: var(--surface-dark-2);
-        color: var(--text-dark);
-        font: inherit;
-        font-size: 0.8rem;
-        outline: none;
-      }
-      .theme-rgb-input:focus {
-        border-color: var(--accent);
       }
       :global(.shelf-undo-stack) {
         position: fixed;
@@ -1470,16 +1405,7 @@ const splitAuthors = (author: string) =>
           padding: 0;
           font-size: 1.65rem;
         }
-        .theme-picker {
-          margin-top: 0;
-        }
-        .appearance-toggle {
-          justify-content: center;
-          width: 2.25rem;
-          height: 2.25rem;
-          padding: 0;
-          border-radius: 50%;
-        }
+        .sidebar-account { display: none; }
         :global(.category-edition-preview-body) {
           grid-template-columns: minmax(0, 1fr);
         }
@@ -1494,20 +1420,6 @@ const splitAuthors = (author: string) =>
         }
         :global(.category-edition-preview-cover.category-book-detail-no-cover) {
           justify-self: center;
-        }
-        .appearance-label,
-        .appearance-value {
-          display: none;
-        }
-        .appearance-swatch {
-          width: 1.05rem;
-          height: 1.05rem;
-        }
-        .appearance-panel {
-          top: calc(100% + 0.5rem);
-          bottom: auto;
-          left: auto;
-          width: 15rem;
         }
         main {
           padding: 0.75rem 1rem 6.5rem;
@@ -1650,13 +1562,6 @@ const splitAuthors = (author: string) =>
           <button class="category-btn search-tab active" data-target="search-db"
             ><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7" /><path d="m20 20-3.5-3.5" /></svg>Search books</button
           >
-          <button
-            type="button"
-            class:list={["category-btn", "open-library-button", "account-button", { "is-connected": accountSignedIn }]}
-            id="account-button"
-            data-initial-signed-in={String(accountSignedIn)}
-            aria-haspopup="dialog"
-          ><span class="account-button-label" id="account-button-label">{accountSignedIn ? "Signed in" : "Sign in to sync"}</span></button>
         </div>
         <div class="sidebar-section">
           <h3>My Lists</h3>
@@ -1670,19 +1575,23 @@ const splitAuthors = (author: string) =>
             >Read <span class="category-count">{read.length}</span></button
           >
         </div>
-        <section class="theme-picker" aria-labelledby="theme-picker-title">
-          <button type="button" class="appearance-toggle" id="appearance-toggle" aria-expanded="false" aria-controls="appearance-panel" aria-label="Appearance">
-            <span class="appearance-swatch" aria-hidden="true"></span>
-            <span class="appearance-label">Appearance</span>
-            <span class="appearance-value" id="appearance-value" aria-hidden="true"></span>
+        <section class="sidebar-account" aria-label="Account and sync">
+          <button
+            type="button"
+            class:list={["category-btn", "account-button", { "is-connected": accountSignedIn }]}
+            id="account-button"
+            data-initial-signed-in={String(accountSignedIn)}
+            aria-haspopup="dialog"
+          >
+            <span class="account-avatar" aria-hidden="true">
+              <img id="account-avatar-image" alt="" hidden referrerpolicy="no-referrer" />
+              <span id="account-avatar-fallback"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="8" r="4" /><path d="M4 21v-2a8 8 0 0 1 16 0v2" /></svg></span>
+            </span>
+            <span class="account-button-copy">
+              <span class="account-button-label" id="account-button-label">{accountSignedIn ? "Signed in" : "Sign in"}</span>
+              <span class="account-button-status" id="account-button-status">{accountSignedIn ? "Your account and sync" : "Sync your reading lists"}</span>
+            </span>
           </button>
-          <div class="appearance-panel" id="appearance-panel" hidden>
-            <h3 id="theme-picker-title">Background</h3>
-            <div class="theme-custom-controls">
-              <input class="theme-color-input" id="theme-color-input" type="color" value="#1c1c1c" aria-label="Choose a custom background color" />
-              <input class="theme-rgb-input" id="theme-rgb-input" type="text" inputmode="text" placeholder="RGB or #hex" aria-label="RGB values or hex color" autocomplete="off" />
-            </div>
-          </div>
         </section>
       </sidebar>
 
@@ -1962,7 +1871,6 @@ const splitAuthors = (author: string) =>
     </dialog>
 
     <script>
-      import { createTheme } from "../lib/theme";
       import { createCloudLibraryClient } from "../lib/cloud-library-client";
       import { $clerkStore } from "@clerk/astro/client";
       import { createSyncBookIndex } from "../lib/sync-book-index";
@@ -1997,6 +1905,14 @@ const splitAuthors = (author: string) =>
       const accountSummary = document.getElementById("account-summary") as HTMLElement;
       const openLibrarySyncButtonSignedIn = document.getElementById("open-library-sync-button-signed-in") as HTMLButtonElement;
       let websiteUserName: string | null = null;
+      let websiteUserImage: string | null = null;
+      const accountAvatarImage = document.getElementById("account-avatar-image") as HTMLImageElement;
+      const accountAvatarFallback = document.getElementById("account-avatar-fallback") as HTMLElement;
+      const accountButtonStatus = document.getElementById("account-button-status") as HTMLElement;
+      accountAvatarImage.addEventListener("error", () => {
+        accountAvatarImage.hidden = true;
+        accountAvatarFallback.hidden = false;
+      });
       // undefined until Clerk loads; the server-rendered state is used until then.
       let websiteUserId: string | null | undefined;
       const openLibrarySyncStatus = document.getElementById("open-library-sync-status") as HTMLElement;
@@ -2026,82 +1942,6 @@ const splitAuthors = (author: string) =>
       const openLibrarySecretKeyInput = document.getElementById("open-library-secret-key") as HTMLInputElement;
       const openLibraryMethodToggle = document.getElementById("open-library-method-toggle") as HTMLButtonElement;
       const openLibraryLoginMethodKey = "my-book-library:openlibrary-login-method";
-      // v2: the old key auto-saved white on every load, so it can't tell a real choice from the old default.
-      const backgroundPreferenceKey = "my-book-library:page-background-v2";
-      localStorage.removeItem("my-book-library:page-background");
-      const backgroundColorInput = document.getElementById("theme-color-input") as HTMLInputElement;
-      const backgroundRgbInput = document.getElementById("theme-rgb-input") as HTMLInputElement;
-      const appearanceToggle = document.getElementById("appearance-toggle") as HTMLButtonElement;
-      const appearancePanel = document.getElementById("appearance-panel") as HTMLElement;
-      const appearanceValue = document.getElementById("appearance-value") as HTMLElement;
-      const savedBackground = localStorage.getItem(backgroundPreferenceKey);
-      const selectedBackground = /^#[0-9a-f]{6}$/i.test(savedBackground || "")
-        ? savedBackground || "#1c1c1c"
-        : "#1c1c1c";
-      function setPageForeground(background: string) {
-        const theme = createTheme(background);
-        for (const [property, value] of Object.entries(theme.variables)) {
-          document.body.style.setProperty(property, value);
-        }
-        document.documentElement.style.colorScheme = theme.colorScheme;
-      }
-
-      function setPageBackground(background: string, persist = true) {
-        document.body.style.backgroundColor = background;
-        setPageForeground(background);
-        if (persist) localStorage.setItem(backgroundPreferenceKey, background);
-        backgroundColorInput.value = background;
-        const rgb = background.match(/[0-9a-f]{2}/gi) || [];
-        backgroundRgbInput.value = rgb.map((value) => parseInt(value, 16)).join(", ");
-        backgroundRgbInput.setCustomValidity("");
-        document.body.style.setProperty("--page-background", background);
-        appearanceValue.textContent = backgroundRgbInput.value;
-      }
-
-      setPageBackground(selectedBackground, false);
-
-      function setAppearanceOpen(open: boolean) {
-        appearancePanel.hidden = !open;
-        appearanceToggle.setAttribute("aria-expanded", String(open));
-      }
-      appearanceToggle.addEventListener("click", () =>
-        setAppearanceOpen(appearanceToggle.getAttribute("aria-expanded") !== "true"),
-      );
-      document.addEventListener("click", (event) => {
-        if (!appearancePanel.hidden && !(event.target as Element).closest?.(".theme-picker")) {
-          setAppearanceOpen(false);
-        }
-      });
-      document.addEventListener("keydown", (event) => {
-        if (event.key === "Escape" && !appearancePanel.hidden) {
-          setAppearanceOpen(false);
-          appearanceToggle.focus();
-        }
-      });
-
-      backgroundColorInput.addEventListener("input", () => {
-        setPageBackground(backgroundColorInput.value);
-      });
-      backgroundRgbInput.addEventListener("change", () => {
-        const inputValue = backgroundRgbInput.value.trim();
-        const hexValue = inputValue.match(/^#?([0-9a-f]{3}|[0-9a-f]{6})$/i)?.[1];
-        const rgbValues = inputValue.match(/^rgb\(\s*(\d{1,3})\s*,\s*(\d{1,3})\s*,\s*(\d{1,3})\s*\)$/i)
-          || inputValue.match(/^(\d{1,3})\s*,\s*(\d{1,3})\s*,\s*(\d{1,3})$/);
-        const channels = rgbValues?.slice(1).map(Number);
-        if (!hexValue && (!channels || channels.some((channel) => channel > 255))) {
-          backgroundRgbInput.setCustomValidity("Enter a hex color or three RGB values from 0 to 255.");
-          backgroundRgbInput.reportValidity();
-          return;
-        }
-        if (hexValue) {
-          const fullHex = hexValue.length === 3
-            ? hexValue.split("").map((channel) => channel + channel).join("")
-            : hexValue;
-          setPageBackground(`#${fullHex.toLowerCase()}`);
-        } else {
-          setPageBackground(`#${channels?.map((channel) => channel.toString(16).padStart(2, "0")).join("")}`);
-        }
-      });
       const shelfDefinitions = [
         { id: "plan-to-read", status: "Plan to Read", label: "Plan to Read" },
         { id: "reading", status: "Reading", label: "Reading" },
@@ -3026,6 +2866,7 @@ const splitAuthors = (author: string) =>
             const userId = user?.id || null;
             websiteUserId = userId;
             websiteUserName = user?.firstName || user?.username || null;
+            websiteUserImage = user?.imageUrl || null;
             updateAccountButton();
             if (!userId && profileMounted) {
               profileDialog.close();
@@ -3383,8 +3224,23 @@ const splitAuthors = (author: string) =>
         const openLibraryOnly = !signedIn && Boolean(cloudReauthenticationRequired ? null : getOpenLibraryPushUser());
         const connected = signedIn || openLibraryOnly;
         accountButtonLabel.textContent = signedIn
-          ? (websiteUserName ? `Signed in as ${websiteUserName}` : "Signed in")
+          ? (websiteUserName || "Signed in")
           : openLibraryOnly ? "Open Library connected" : "Sign in to sync";
+        accountButtonStatus.textContent = signedIn
+          ? "Your account and sync"
+          : openLibraryOnly ? "Your reading lists are connected" : "Sync your reading lists";
+        const avatarUrl = signedIn ? websiteUserImage : null;
+        if (avatarUrl) {
+          if (accountAvatarImage.getAttribute("src") !== avatarUrl) {
+            accountAvatarImage.src = avatarUrl;
+            accountAvatarImage.hidden = false;
+            accountAvatarFallback.hidden = true;
+          }
+        } else {
+          accountAvatarImage.removeAttribute("src");
+          accountAvatarImage.hidden = true;
+          accountAvatarFallback.hidden = false;
+        }
         accountButton.title = accountButtonLabel.textContent;
         accountButton.classList.toggle("is-connected", connected);
         mobileAccountButton.classList.toggle("is-connected", connected);
