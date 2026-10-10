@@ -661,26 +661,6 @@ const splitAuthors = (author: string) =>
       .open-library-sync-message:empty {
         display: none;
       }
-      :global(.open-library-sync-dots) {
-        display: inline-block;
-        width: 3ch;
-        vertical-align: bottom;
-      }
-      :global(.open-library-sync-dots::after) {
-        content: "...";
-        display: inline-block;
-        overflow: hidden;
-        vertical-align: bottom;
-        animation: open-library-sync-dots 1.5s steps(1, end) infinite;
-      }
-      @keyframes open-library-sync-dots {
-        0%, 100% { width: 1ch; }
-        33.333% { width: 2ch; }
-        66.666% { width: 3ch; }
-      }
-      @media (prefers-reduced-motion: reduce) {
-        :global(.open-library-sync-dots::after) { animation: none; }
-      }
       .open-library-sync-actions {
         display: flex;
         justify-content: flex-end;
@@ -3423,11 +3403,7 @@ const splitAuthors = (author: string) =>
 
       type OpenLibrarySyncOptions = { confirmed?: boolean; quiet?: boolean; sendLocalOnlyBooks?: boolean };
       function showOpenLibraryCheckingMessage() {
-        openLibrarySyncMessage.textContent = "Your synced books are ready to use.\nChecking for updates from Open Library";
-        const dots = document.createElement("span");
-        dots.className = "open-library-sync-dots";
-        dots.setAttribute("aria-hidden", "true");
-        openLibrarySyncMessage.appendChild(dots);
+        openLibrarySyncMessage.textContent = "Your synced books are ready to use.\nChecking for updates from Open Library...";
       }
       // A sync of a large reading log can take half a minute, so a manual sync joins one already running.
       let openLibrarySyncInProgress: {
