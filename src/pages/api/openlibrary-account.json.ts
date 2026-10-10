@@ -1,5 +1,6 @@
 import type { APIRoute } from 'astro';
-import { clearCloudSession, cloudConfigured, cloudSessionUser, createCloudSession } from '../../lib/cloud-store';
+import { clearCloudSession, cloudConfigured, cloudLibraryOwner, createCloudSession } from '../../lib/cloud-store';
+import { websiteCloudOwner } from '../../lib/website-auth';
 import {
   clearSession,
   getSession,
@@ -14,11 +15,11 @@ function jsonResponse(body: unknown, status = 200) {
   });
 }
 
-export const GET: APIRoute = async ({ cookies }) => {
+export const GET: APIRoute = async ({ cookies, locals }) => {
   const session = getSession(cookies);
   let cloudConnected = false;
   try {
-    cloudConnected = Boolean(session && await cloudSessionUser(cookies) === session.username);
+    cloudConnected = Boolean(session && await cloudLibraryOwner(cookies, locals) === session.username);
   } catch {
     return jsonResponse({ connected: Boolean(session), username: session?.username || null,
       cloudConfigured: cloudConfigured(), cloudConnected: false, cloudError: 'Cloud library is temporarily unavailable.' });
@@ -27,7 +28,7 @@ export const GET: APIRoute = async ({ cookies }) => {
     cloudConfigured: cloudConfigured(), cloudConnected });
 };
 
-export const POST: APIRoute = async ({ request, cookies, url }) => {
+export const POST: APIRoute = async ({ request, cookies, url, locals }) => {
   if (request.headers.get('origin') && request.headers.get('origin') !== url.origin) {
     return jsonResponse({ error: 'Cross-site login is not allowed.' }, 403);
   }
@@ -49,15 +50,21 @@ export const POST: APIRoute = async ({ request, cookies, url }) => {
     const { session, username } = await loginToOpenLibrary(usesKeys
       ? { access: field('access'), secret: field('secret') }
       : { email: field('email'), password: String(body.password) });
+    let cloudError: string | undefined;
     if (cloudConfigured()) {
       try {
         await createCloudSession(cookies, username, url.protocol === 'https:');
       } catch {
-        return jsonResponse({ error: 'Cloud storage could not be reached. Your saved books were kept; please try logging in again.' }, 503);
+        if (!websiteCloudOwner(locals)) {
+          return jsonResponse({ error: 'Cloud storage could not be reached. Your saved books were kept; please try logging in again.' }, 503);
+        }
+        cloudError = 'Open Library connected, but account linking is unavailable. Try again later.';
       }
     }
     setSession(cookies, session, url.protocol === 'https:');
-    return jsonResponse({ connected: true, username, cloudConfigured: cloudConfigured(), cloudConnected: cloudConfigured() });
+    const cloudConnected = !cloudError && cloudConfigured()
+      && await cloudLibraryOwner(cookies, locals) === username;
+    return jsonResponse({ connected: true, username, cloudConfigured: cloudConfigured(), cloudConnected, cloudError });
   } catch (error) {
     const message = error instanceof Error && error.name !== 'AbortError'
       ? error.message

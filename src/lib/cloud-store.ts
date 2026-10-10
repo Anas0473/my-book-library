@@ -2,6 +2,7 @@ import { createHash, randomBytes } from 'node:crypto';
 import { neon } from '@neondatabase/serverless';
 import type { AstroCookies } from 'astro';
 import type { CloudBooks, CloudChange } from './cloud-library.ts';
+import { websiteCloudOwner } from './website-auth.ts';
 
 const SESSION_COOKIE = 'library_session';
 const SESSION_SECONDS = 30 * 24 * 60 * 60;
@@ -33,6 +34,9 @@ async function ensureSchema() {
         username text PRIMARY KEY, revision integer NOT NULL DEFAULT 0,
         books jsonb NOT NULL DEFAULT '{}'::jsonb,
         CHECK (octet_length(books::text) <= 4000000)
+      )`,
+      sql`CREATE TABLE IF NOT EXISTS library_account_links (
+        openlibrary_username text PRIMARY KEY, website_owner text NOT NULL
       )`,
     ]).then(() => {}).catch(() => {
       schemaReady = undefined;
@@ -68,6 +72,55 @@ export async function cloudSessionUser(cookies: AstroCookies): Promise<string | 
   const rows = await sql`SELECT username FROM library_sessions
     WHERE token_hash = ${tokenHash(token)} AND expires_at > now()`;
   return rows[0]?.username || null;
+}
+
+export async function cloudLibraryOwner(cookies: AstroCookies, locals: App.Locals) {
+  const websiteOwner = websiteCloudOwner(locals);
+  if (websiteOwner) return websiteOwner;
+  const legacyOwner = await cloudSessionUser(cookies);
+  if (!legacyOwner) return null;
+  const sql = database();
+  const links = await sql`SELECT website_owner FROM library_account_links
+    WHERE openlibrary_username = ${legacyOwner}`;
+  return links.length ? null : legacyOwner;
+}
+
+export async function linkOpenLibraryAccount(owner: string, username: string, changes: CloudChange[]) {
+  await ensureSchema();
+  const sql = database();
+  // Claim and merge in one transaction; existing website records (including deletions) win.
+  const results = await sql.transaction([
+    sql`INSERT INTO library_account_links (openlibrary_username, website_owner)
+      VALUES (${username}, ${owner}) ON CONFLICT DO NOTHING`,
+    sql`INSERT INTO cloud_libraries (username)
+      SELECT ${owner} WHERE EXISTS (
+        SELECT 1 FROM library_account_links
+        WHERE openlibrary_username = ${username} AND website_owner = ${owner}
+      ) ON CONFLICT DO NOTHING`,
+    sql`INSERT INTO cloud_libraries (username)
+      SELECT ${username} WHERE EXISTS (
+        SELECT 1 FROM library_account_links
+        WHERE openlibrary_username = ${username} AND website_owner = ${owner}
+      ) ON CONFLICT DO NOTHING`,
+    sql`UPDATE cloud_libraries SET books = books || (
+        SELECT coalesce(jsonb_object_agg(entry->>'id', entry->'book'), '{}'::jsonb)
+        FROM jsonb_array_elements(${JSON.stringify(changes)}::jsonb) AS entry
+        WHERE NOT coalesce((entry->>'importOnly')::boolean, false) OR NOT books ? (entry->>'id')
+      ), revision = revision + 1
+      WHERE username = ${username} AND EXISTS (
+        SELECT 1 FROM library_account_links
+        WHERE openlibrary_username = ${username} AND website_owner = ${owner}
+      )`,
+    sql`UPDATE cloud_libraries AS target SET
+        books = coalesce((SELECT books FROM cloud_libraries WHERE username = ${username}), '{}'::jsonb)
+          || target.books,
+        revision = target.revision + 1
+      WHERE target.username = ${owner} AND EXISTS (
+        SELECT 1 FROM library_account_links
+        WHERE openlibrary_username = ${username} AND website_owner = ${owner}
+      ) RETURNING revision`,
+  ]);
+  return results[4].length > 0;
 }
 
 export async function clearCloudSession(cookies: AstroCookies) {

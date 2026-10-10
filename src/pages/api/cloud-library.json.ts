@@ -1,6 +1,6 @@
 import type { APIRoute } from 'astro';
 import { validateCloudChanges } from '../../lib/cloud-library.ts';
-import { cloudConfigured, cloudSessionUser, readCloudLibrary, writeCloudLibrary } from '../../lib/cloud-store.ts';
+import { cloudConfigured, cloudLibraryOwner, readCloudLibrary, writeCloudLibrary } from '../../lib/cloud-store.ts';
 
 function json(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {
@@ -8,24 +8,24 @@ function json(body: unknown, status = 200) {
   });
 }
 
-export const GET: APIRoute = async ({ cookies }) => {
+export const GET: APIRoute = async ({ cookies, locals }) => {
   if (!cloudConfigured()) return json({ error: 'Cloud storage is not configured.' }, 503);
   try {
-    const username = await cloudSessionUser(cookies);
-    if (!username) return json({ error: 'Log in again to enable cloud library sync.' }, 401);
+    const username = await cloudLibraryOwner(cookies, locals);
+    if (!username) return json({ error: 'Sign in to enable cloud library sync.' }, 401);
     return json({ username, ...await readCloudLibrary(username) });
   } catch {
     return json({ error: 'Cloud library could not be loaded. Your browser books were kept.' }, 503);
   }
 };
 
-export const PUT: APIRoute = async ({ request, cookies, url }) => {
+export const PUT: APIRoute = async ({ request, cookies, url, locals }) => {
   if (request.headers.get('origin') !== url.origin) return json({ error: 'Cross-site writes are not allowed.' }, 403);
   if (!request.headers.get('content-type')?.includes('application/json')) return json({ error: 'Expected JSON.' }, 415);
   if (!cloudConfigured()) return json({ error: 'Cloud storage is not configured.' }, 503);
   try {
-    const username = await cloudSessionUser(cookies);
-    if (!username) return json({ error: 'Log in again to enable cloud library sync.' }, 401);
+    const username = await cloudLibraryOwner(cookies, locals);
+    if (!username) return json({ error: 'Sign in to enable cloud library sync.' }, 401);
     const reader = request.body?.getReader();
     if (!reader) return json({ error: 'Missing changes.' }, 400);
     const chunks: Uint8Array[] = [];
@@ -46,7 +46,7 @@ export const PUT: APIRoute = async ({ request, cookies, url }) => {
       body = JSON.parse(Buffer.concat(chunks).toString('utf8'));
       if (!Number.isSafeInteger(body.revision) || body.revision < 0) throw new Error('Invalid revision.');
       changes = validateCloudChanges(body.changes);
-      if (changes.some((change) => change.book?.openLibrarySyncUsername
+      if (!username.startsWith('clerk:') && changes.some((change) => change.book?.openLibrarySyncUsername
         && change.book.openLibrarySyncUsername !== username)) throw new Error('Wrong book owner.');
     } catch {
       return json({ error: 'Invalid cloud library changes.' }, 400);

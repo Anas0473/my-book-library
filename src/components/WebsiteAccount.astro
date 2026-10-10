@@ -1,0 +1,74 @@
+---
+import { websiteAuthConfigured, websiteCloudOwner } from '../lib/website-auth';
+
+const configured = websiteAuthConfigured();
+const signedIn = Boolean(websiteCloudOwner(Astro.locals));
+---
+
+<section class="website-account" id="website-account" data-configured={String(configured)} aria-label="Library account">
+  <div class="account-controls">
+    {configured ? (
+      <>
+        <button type="button" id="website-sign-in" hidden={signedIn}>Sign in to sync</button>
+        <button type="button" id="website-profile" hidden={!signedIn}>Your account</button>
+        <button type="button" id="website-sign-out" hidden={!signedIn}>Sign out</button>
+      </>
+    ) : (
+      <button type="button" id="website-sign-in" disabled aria-describedby="website-auth-setup">
+        Sign in to sync
+      </button>
+    )}
+  </div>
+  {!configured && <p id="website-auth-setup">Google and email sign-in require Clerk setup by the site owner.</p>}
+  <p id="cloud-library-status" role="status" aria-live="polite">
+    Saved on this device. {configured ? 'Sign in to use your library on PC and mobile.' : 'Account sign-in is not configured yet.'}
+  </p>
+  {configured && <p>No Open Library account needed. Open email sign-in links in the same browser.</p>}
+  <div class="sync-controls">
+    <button type="button" id="website-sync-now" hidden>Sync now</button>
+    <button type="button" id="website-link-openlibrary" hidden>Link existing Open Library library</button>
+  </div>
+</section>
+
+<style>
+  .website-account {
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 0.7rem;
+    background: var(--fill);
+    min-width: 0;
+  }
+  .account-controls, .sync-controls {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.5rem;
+  }
+  .account-controls { font-size: 0.8rem; }
+  p {
+    margin: 0.5rem 0 0;
+    font-size: 0.72rem;
+    line-height: 1.5;
+    color: var(--muted);
+  }
+  .sync-controls { margin-top: 0.5rem; }
+  button {
+    border: 1px solid var(--line);
+    border-radius: 7px;
+    padding: 0.4rem 0.6rem;
+    background: var(--fill-strong);
+    color: var(--fg);
+    font: inherit;
+    font-size: 0.75rem;
+    cursor: pointer;
+  }
+  button[hidden] { display: none; }
+  button:disabled { opacity: 0.6; cursor: not-allowed; }
+  button:focus-visible, :global(.website-account button:focus-visible) {
+    outline: 2px solid var(--page-focus);
+    outline-offset: 3px;
+  }
+  @media (max-width: 700px) {
+    .website-account { flex-basis: 100%; }
+  }
+</style>

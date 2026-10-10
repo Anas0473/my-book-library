@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { activeCloudBooks, applyCloudChanges, cloudSnapshot, diffCloudBooks, validateCloudChanges } from '../src/lib/cloud-library.ts';
+import { activeCloudBooks, applyCloudChanges, cloudSnapshot, diffCloudBooks, validateCloudChanges, type CloudBook, type CloudBooks } from '../src/lib/cloud-library.ts';
 import { createCloudLibraryClient } from '../src/lib/cloud-library-client.ts';
 import { GET, PUT } from '../src/pages/api/cloud-library.json.ts';
 
@@ -184,4 +184,158 @@ test('cloud API rejects cross-origin writes and unauthenticated reads without qu
     if (originalUrl === undefined) delete process.env.STORAGE_URL;
     else process.env.STORAGE_URL = originalUrl;
   }
+});
+
+test('website accounts sync Open Library metadata and fallback books without treating it as account ownership', async () => {
+  let books = [
+    { ...edition('/books/OL1M'), openLibrarySyncUsername: 'openlibrary-reader' },
+    { title: 'Fallback book', status: 'Read', key: 'archive:example' },
+  ];
+  let remote = {};
+  const client = createCloudLibraryClient({
+    storage: memoryStorage(), getBooks: () => books,
+    setBooks: (next) => { books = next as typeof books; }, message: () => {},
+    request: async (_url, init) => {
+      if (init?.method === 'PUT') remote = applyCloudChanges(remote, JSON.parse(String(init.body)).changes);
+      return Response.json({ username: 'clerk:user_reader', revision: 1, books: remote });
+    },
+  });
+  await client.connect('clerk:user_reader');
+  assert.equal(activeCloudBooks(remote).length, 2);
+});
+
+test('signing out hides account books and signing back in merges guest additions without deleting the account library', async () => {
+  const storage = memoryStorage();
+  let books = [edition('/books/OL1M')];
+  let remote = {};
+  const client = createCloudLibraryClient({
+    storage, getBooks: () => books, setBooks: (next) => { books = next as typeof books; },
+    message: () => {},
+    request: async (_url, init) => {
+      if (init?.method === 'PUT') remote = applyCloudChanges(remote, JSON.parse(String(init.body)).changes);
+      return Response.json({ username: 'clerk:user_reader', revision: 1, books: remote });
+    },
+  });
+  await client.connect('clerk:user_reader');
+  client.enterGuest();
+  assert.equal(books.length, 0);
+  assert.equal(storage.getItem('my-book-library:cloud-owner'), null);
+  books.push(edition('/books/OL2M'));
+  await client.connect('clerk:user_reader');
+  assert.equal(books.length, 2);
+  assert.equal(activeCloudBooks(remote).length, 2);
+  assert.notEqual(remote['edition:OL1M' as keyof typeof remote], null);
+});
+
+test('signing out keeps unsent edits for the same account without transferring them to another account', async () => {
+  const storage = memoryStorage();
+  let books = [edition('/books/OL1M')];
+  let owner = 'clerk:user_first';
+  let online = false;
+  let remote = {};
+  const client = createCloudLibraryClient({
+    storage, getBooks: () => books, setBooks: (next) => { books = next as typeof books; },
+    message: () => {},
+    request: async (_url, init) => {
+      if (!online) throw new TypeError('Offline');
+      if (init?.method === 'PUT') remote = applyCloudChanges(remote, JSON.parse(String(init.body)).changes);
+      return Response.json({ username: owner, revision: 1, books: remote });
+    },
+  });
+  await client.connect(owner);
+  books.push(edition('/books/OL2M'));
+  client.enterGuest();
+  online = true;
+  owner = 'clerk:user_second';
+  await client.connect(owner);
+  assert.deepEqual(remote, {});
+  client.enterGuest();
+  owner = 'clerk:user_first';
+  await client.connect(owner);
+  assert.equal(activeCloudBooks(remote).length, 2);
+});
+
+test('accounts without configured cloud storage still keep separate local caches', async () => {
+  let books = [edition('/books/OL1M')];
+  const client = createCloudLibraryClient({
+    storage: memoryStorage(), getBooks: () => books,
+    setBooks: (next) => { books = next as typeof books; }, message: () => {},
+    request: async () => { throw new Error('Must not contact cloud storage'); },
+  });
+  await client.connect('clerk:user_first', { sync: false });
+  await client.connect('clerk:user_second', { sync: false });
+  assert.equal(books.length, 0);
+  await client.connect('clerk:user_first', { sync: false });
+  assert.equal(books[0].editionKey, '/books/OL1M');
+});
+
+test('signing out during a cloud read cannot restore private books into the guest library', async () => {
+  let books = [edition('/books/OL1M')];
+  let resolveRead!: (response: Response) => void;
+  const client = createCloudLibraryClient({
+    storage: memoryStorage(), getBooks: () => books,
+    setBooks: (next) => { books = next as typeof books; }, message: () => {},
+    request: () => new Promise((resolve) => { resolveRead = resolve; }),
+  });
+  const connecting = client.connect('clerk:user_reader');
+  client.enterGuest();
+  resolveRead(Response.json({ username: 'clerk:user_reader', revision: 0,
+    books: cloudSnapshot([edition('/books/OL2M')]) }));
+  assert.equal(await connecting, false);
+  assert.deepEqual(books, []);
+});
+
+test('a queued reconnect cannot re-enable an account after sign-out', async () => {
+  let books = [edition('/books/OL1M')];
+  let resolveRead!: (response: Response) => void;
+  const client = createCloudLibraryClient({
+    storage: memoryStorage(), getBooks: () => books,
+    setBooks: (next) => { books = next as typeof books; }, message: () => {},
+    request: () => new Promise((resolve) => { resolveRead = resolve; }),
+  });
+  const firstConnect = client.connect('clerk:user_reader');
+  const reconnect = client.connect('clerk:user_reader');
+  client.enterGuest();
+  resolveRead(Response.json({ username: 'clerk:user_reader', revision: 0, books: {} }));
+  assert.equal(await firstConnect, false);
+  assert.equal(await reconnect, false);
+  assert.equal(books.length, 0);
+});
+
+test('PC and mobile share additions, shelf changes and deletions without an Open Library account', async () => {
+  let remote: CloudBooks = {};
+  let revision = 0;
+  const request: typeof fetch = async (_url, init) => {
+    if (init?.method === 'PUT') {
+      const body = JSON.parse(String(init.body));
+      if (body.revision !== revision) {
+        return Response.json({ username: 'clerk:user_reader', revision, books: remote }, { status: 409 });
+      }
+      remote = applyCloudChanges(remote, body.changes);
+      revision++;
+    }
+    return Response.json({ username: 'clerk:user_reader', revision, books: remote });
+  };
+  let pcBooks: CloudBook[] = [{ title: 'Archive book', key: 'archive:example', status: 'Plan to Read' }];
+  let mobileBooks: CloudBook[] = [];
+  const pc = createCloudLibraryClient({
+    storage: memoryStorage(), getBooks: () => pcBooks, setBooks: (books) => { pcBooks = books; },
+    message: () => {}, request,
+  });
+  const mobile = createCloudLibraryClient({
+    storage: memoryStorage(), getBooks: () => mobileBooks, setBooks: (books) => { mobileBooks = books; },
+    message: () => {}, request,
+  });
+  await pc.connect('clerk:user_reader');
+  await mobile.connect('clerk:user_reader');
+  assert.equal(mobileBooks.length, 1);
+  mobileBooks[0] = { ...mobileBooks[0], status: 'Read' };
+  await mobile.sync();
+  await pc.sync();
+  assert.equal(pcBooks[0].status, 'Read');
+  pcBooks = [];
+  await pc.sync();
+  await mobile.sync();
+  assert.equal(mobileBooks.length, 0);
+  assert.equal(remote['book:archive:example'], null);
 });

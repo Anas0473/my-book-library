@@ -14,6 +14,7 @@ interface ClientOptions {
   getBooks: () => CloudBook[];
   setBooks: (books: CloudBook[]) => void;
   message: (message: string) => void;
+  accountChanged?: () => void;
   request?: typeof fetch;
 }
 
@@ -46,7 +47,7 @@ export function createCloudLibraryClient(options: ClientOptions) {
   function capture() {
     if (!state) return;
     const ownedBooks = options.getBooks().filter((book) =>
-      !book.openLibrarySyncUsername || book.openLibrarySyncUsername === username,
+      username.startsWith('clerk:') || !book.openLibrarySyncUsername || book.openLibrarySyncUsername === username,
     );
     const current = cloudSnapshot(ownedBooks);
     const changes = diffCloudBooks(state.observed, current);
@@ -63,6 +64,7 @@ export function createCloudLibraryClient(options: ClientOptions) {
   function schedule() {
     capture();
     if (!enabled) return;
+    options.message('Changes waiting to sync.');
     clearTimeout(timer);
     timer = setTimeout(() => { void sync(); }, 500);
   }
@@ -82,9 +84,9 @@ export function createCloudLibraryClient(options: ClientOptions) {
     if ((!response.ok && response.status !== 409) || data.username !== owner
       || !Number.isSafeInteger(data.revision) || data.revision < 0
       || !data.books || typeof data.books !== 'object' || Array.isArray(data.books)
-      || Object.values(data.books).some((book: any) => book !== null
-        && (!book || typeof book.title !== 'string'
-          || !['Plan to Read', 'Reading', 'Read'].includes(book.status)))) {
+      || Object.values(data.books).some((book) => book !== null
+        && (typeof book !== 'object' || !book || !('title' in book) || typeof book.title !== 'string'
+          || !('status' in book) || !['Plan to Read', 'Reading', 'Read'].includes(String(book.status))))) {
       throw new Error(data.error || 'Cloud library returned an invalid response. Your browser books were kept.');
     }
     return data as { username: string; revision: number; books: CloudBooks };
@@ -131,7 +133,8 @@ export function createCloudLibraryClient(options: ClientOptions) {
     } catch (error) {
       if (sessionGeneration === generation) {
         options.message(error instanceof Error && error.name !== 'TimeoutError'
-          ? error.message : 'Cloud library is unavailable. Your browser books and queued changes were kept.');
+          ? `${error.message} Changes waiting to sync are kept on this device.`
+          : 'Cloud library is unavailable. Your browser books and queued changes were kept.');
       }
       return false;
     }
@@ -144,8 +147,11 @@ export function createCloudLibraryClient(options: ClientOptions) {
     return running;
   }
 
-  async function connect(owner: string) {
+  async function connect(owner: string, { sync: shouldSync = true } = {}) {
+    const sessionGeneration = generation;
     if (running) await running;
+    if (sessionGeneration !== generation) return false;
+    if (username !== owner) options.accountChanged?.();
     if (username && username !== owner) {
       capture();
       const previous = options.getBooks();
@@ -154,6 +160,22 @@ export function createCloudLibraryClient(options: ClientOptions) {
       options.setBooks(state?.cache || []);
     } else {
       state = loadState(owner);
+      if (!username && state) {
+        const guestBooks = options.getBooks();
+        const cached = cloudSnapshot(state.cache);
+        const imports = diffCloudBooks({}, cloudSnapshot(guestBooks))
+          .filter((change) => !Object.hasOwn(cached, change.id))
+          .map((change) => ({ ...change, importOnly: true }));
+        const pending = new Map(state.pending.map((change) => [change.id, change]));
+        for (const change of imports) {
+          if (!pending.has(change.id)) pending.set(change.id, change);
+        }
+        state.pending = [...pending.values()];
+        const restored = activeCloudBooks(applyCloudChanges(cached, imports));
+        state.observed = cloudSnapshot(restored);
+        state.cache = restored;
+        options.setBooks(restored);
+      }
     }
     username = owner;
     generation++;
@@ -161,14 +183,15 @@ export function createCloudLibraryClient(options: ClientOptions) {
     if (!state) {
       options.storage.setItem(`my-book-library:cloud-initial-backup:${owner}`, JSON.stringify(options.getBooks()));
       const books = options.getBooks().filter((book) =>
-        !book.openLibrarySyncUsername || book.openLibrarySyncUsername === owner,
+        owner.startsWith('clerk:') || !book.openLibrarySyncUsername || book.openLibrarySyncUsername === owner,
       );
       const observed = cloudSnapshot(books);
       state = { observed, cache: books, pending: diffCloudBooks({}, observed)
         .map((change) => ({ ...change, importOnly: true })) };
-      saveState();
     }
-    enabled = true;
+    saveState();
+    enabled = shouldSync;
+    if (!shouldSync) return false;
     return sync();
   }
 
@@ -179,5 +202,22 @@ export function createCloudLibraryClient(options: ClientOptions) {
     clearTimeout(timer);
   }
 
-  return { capture, schedule, connect, disconnect, sync };
+  function enterGuest() {
+    disconnect();
+    if (username) {
+      options.accountChanged?.();
+      username = '';
+      options.storage.setItem(ownerKey, '');
+      state = null;
+      options.setBooks([]);
+    }
+    options.message('Saved on this device. Sign in to sync between devices.');
+  }
+
+  function legacyChanges(owner: string) {
+    capture();
+    return loadState(owner)?.pending || [];
+  }
+
+  return { capture, schedule, connect, disconnect, sync, enterGuest, legacyChanges };
 }

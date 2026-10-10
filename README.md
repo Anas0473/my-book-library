@@ -138,12 +138,66 @@ incomplete shelves keep their existing books and show a warning.
 
 ## Cloud Library
 
+### Website accounts (Clerk)
+
+Website accounts are independent of Open Library. Guests keep their books in
+this browser; signed-in users sync their library across PC and mobile using Neon.
+Open Library is an optional, separate shelf integration.
+
+Create a Clerk application and enable Google and email verification links in
+its authentication settings. Disable password authentication if you want the
+passwordless experience. Configure your production domain and Google's production
+OAuth credentials in Clerk before deploying. Email links expire; if Clerk's
+same-device/browser requirement is enabled, users must open the link in the
+browser where they started signing in (not on their phone when signing in on PC).
+
+Set these environment variables locally in the ignored `.env` file and in the
+appropriate Vercel environment **before building**, then restart/redeploy:
+
+```text
+PUBLIC_CLERK_PUBLISHABLE_KEY=<Clerk publishable key>
+CLERK_SECRET_KEY=<Clerk secret key>
+STORAGE_URL=<Neon Postgres connection string>
+```
+
+Only the publishable key may be public. Never put the secret key or database URL
+in client code. Use Clerk development keys locally and production keys for the
+production deployment. Without Clerk keys, guest mode and existing Open Library
+connections remain available; the account panel shows a disabled sign-in button
+and explains the required Clerk setup. Clerk configuration alone does not enable
+sync: Neon must also be set.
+
+The library account panel is available on desktop and mobile and shows device-only
+storage, queued changes, sync progress, and successful cloud saves. Its Sync now
+button works without Open Library. First sign-in imports guest books without
+overwriting existing cloud records or restoring deleted books. Signing out hides
+account books and retains the per-account cache/outbox for the next sign-in.
+It also disconnects Open Library on this device to prevent the next website
+account from inheriting that integration. Disconnecting Open Library alone does
+**not** sign out of the website or stop website cloud sync.
+
+### Existing Open Library cloud libraries
+
+Existing users may continue using their verified Open Library cloud sessions.
+To migrate, sign in to the website, connect/re-authenticate with Open Library,
+then choose **Link existing Open Library library** in the account panel.
+The server verifies both sessions before claiming that library for the website
+account. The merge includes the old account's queued cloud changes on this
+browser, preserves existing website books and deletion markers, and keeps a
+browser backup when switching accounts. A legacy library can be claimed by only
+one website account. After linking, website sign-in is required for cloud access;
+an Open Library session alone cannot access the linked website library.
+Linking is separate from optional two-way shelf syncing.
+
+### Database configuration
+
 Connect a Neon Postgres database to the Vercel project. The server reads
 `STORAGE_URL`, `DATABASE_URL`, or `POSTGRES_URL`; these values must stay private
 and must never use a `PUBLIC_` prefix. The required tables are created on the
-first cloud login. Database access stays on the server.
+first cloud access. Database access stays on the server.
 
-Log in to Open Library again after enabling the database. A successful login
+For legacy Open Library-only cloud access, log in to Open Library again after
+enabling the database. A successful login
 creates a separate HTTP-only cloud session; existing username cookies cannot
 authorize database access. No Open Library password or access keys are stored
 in the database. Logging out revokes the current cloud session.
@@ -157,7 +211,8 @@ keeps a browser backup of the previous library. Cloud updates arrive on login,
 Sync now, returning to the page, reconnecting, and every minute while visible.
 
 For localhost, privately set the database connection in the ignored `.env` file
-and restart Astro, then log in with the same Open Library account. Connecting the
+and restart Astro, then sign in with the same website account (or the same Open
+Library account for legacy access). Connecting the
 database only to Vercel Production does not configure localhost or Preview.
 Localhost and Production must use the same database to share their libraries;
 Preview should use a separate database.
@@ -194,6 +249,13 @@ All commands are run from the root of the project, from a terminal:
 | `npm run preview`         | Preview your build locally, before deploying     |
 | `npm run astro ...`       | Run CLI commands like `astro add`, `astro check` |
 | `npm run astro -- --help` | Get help using the Astro CLI                     |
+
+Run `npm run astro -- check` for Astro/TypeScript diagnostics. Account and cloud
+sync regressions use Node's built-in runner:
+
+```sh
+node --experimental-strip-types --test tests/cloud-library.test.ts tests/website-account.test.ts
+```
 
 ## 👀 Want to learn more?
 
