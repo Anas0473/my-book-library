@@ -2344,7 +2344,7 @@ const splitAuthors = (author: string) =>
         editionButton.dataset.heroImage = book.heroImage || "";
         editionButton.textContent = `Browse editions${book.editionCount ? ` (${book.editionCount})` : ""}`;
         details.appendChild(editionButton);
-        if (book.openLibraryLocalOnly) {
+        if (book.openLibraryLocalOnly && isLocalOnlyEdition(book, localBooks)) {
           const removedNotice = document.createElement("span");
           removedNotice.className = "open-library-removed";
           removedNotice.textContent = "Extra edition, only on this site";

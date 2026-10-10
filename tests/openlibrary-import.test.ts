@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { mergeOpenLibraryImport } from '../src/lib/openlibrary-import.ts';
-import { shelfSnapshot } from '../src/lib/openlibrary-push.ts';
+import { isLocalOnlyEdition, shelfSnapshot } from '../src/lib/openlibrary-push.ts';
 
 const book = { key: '/works/OL1W', title: 'A book', status: 'Read', editionKey: '/books/OL1M' };
 
@@ -14,6 +14,15 @@ test('import adds copies without Open Library connection metadata or queued shel
   assert.equal(imported.books[0].openLibraryRemoved, undefined);
   assert.equal(imported.books[0].openLibraryLocalOnly, true);
   assert.equal(shelfSnapshot(imported.books).size, 0);
+  assert.equal(isLocalOnlyEdition(imported.books[0], imported.books), false,
+    'an imported book is not an extra edition');
+});
+
+test('previously imported local-only books are not extra editions, but genuine extra copies are', () => {
+  const imported = { ...book, openLibraryLocalOnly: true };
+  assert.equal(isLocalOnlyEdition(imported, [imported]), false);
+  const otherEdition = { ...book, editionKey: '/books/OL2M' };
+  assert.equal(isLocalOnlyEdition(imported, [imported, otherEdition]), true);
 });
 
 test('repeat imports and duplicates preserve existing books and statuses', () => {
