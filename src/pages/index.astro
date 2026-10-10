@@ -2527,6 +2527,18 @@ const splitAuthors = (author: string) =>
       let openLibraryFlush: Promise<void> | null = null;
       let openLibraryRetryTimer = 0;
 
+      function refreshLibraryView() {
+        document.querySelectorAll("[data-local-book-key]").forEach((card) => card.remove());
+        localBooks.forEach((book) => {
+          removeMatchingContentBooks(book);
+          renderLocalBook(book);
+        });
+        updateShelfCounts();
+        panelRefreshers.forEach((refreshPanel) => refreshPanel());
+        syncShelfControls();
+        window.dispatchEvent(new Event("library:cloud-updated"));
+      }
+
       cloudLibrary = createCloudLibraryClient({
         storage: localStorage,
         getBooks: () => localBooks,
@@ -2538,15 +2550,7 @@ const splitAuthors = (author: string) =>
         setBooks: (books) => {
           localBooks = books;
           saveLocalBooksWithoutPush(false);
-          document.querySelectorAll("[data-local-book-key]").forEach((card) => card.remove());
-          localBooks.forEach((book) => {
-            removeMatchingContentBooks(book);
-            renderLocalBook(book);
-          });
-          updateShelfCounts();
-          panelRefreshers.forEach((refreshPanel) => refreshPanel());
-          syncShelfControls();
-          window.dispatchEvent(new Event("library:cloud-updated"));
+          refreshLibraryView();
         },
         message: (message) => {
           cloudLibraryStatus.hidden = !message;
@@ -3412,7 +3416,7 @@ const splitAuthors = (author: string) =>
           }
           if (!options.quiet) {
             running.state.quiet = false;
-            openLibrarySyncMessage.textContent = "Syncing your reading log…";
+            openLibrarySyncMessage.textContent = "Checking for updates from Open Library… Your saved books are ready to use.";
             openLibrarySyncSubmit.disabled = true;
           }
           if (options.sendLocalOnlyBooks) running.state.sendLocalOnlyBooks = true;
@@ -3460,8 +3464,8 @@ const splitAuthors = (author: string) =>
             throw new Error(`${waitingChanges} ${waitingChanges === 1 ? "change hasn't" : "changes haven't"} reached Open Library yet, so syncing was skipped to keep them. Try again in a minute.`);
           }
 
-          openLibrarySyncMessage.textContent = "Syncing your reading log…";
-          if (!state.quiet) showOpenLibraryStatus("Syncing Open Library…");
+          openLibrarySyncMessage.textContent = "Checking for updates from Open Library… Your saved books are ready to use.";
+          if (!state.quiet) showOpenLibraryStatus("Checking for updates from Open Library…");
           const response = await fetch(
             `/api/openlibrary-reading-log.json?username=${encodeURIComponent(username)}`,
           );
@@ -3550,6 +3554,7 @@ const splitAuthors = (author: string) =>
           const listChanged = JSON.stringify(nextBooks) !== JSON.stringify(localBooks);
           localBooks = nextBooks;
           saveLocalBooksWithoutPush();
+          if (listChanged) refreshLibraryView();
           await cloudLibrary?.sync();
           localStorage.setItem(openLibraryUsernameKey, username);
           localStorage.setItem(openLibraryLastSyncKey, String(Date.now()));
@@ -3561,13 +3566,8 @@ const splitAuthors = (author: string) =>
             ? `Synced ${syncedBooks.length} books from ${username}. ${syncWarnings}.`
             : `Synced ${syncedBooks.length} books from ${username}.`;
           localStorage.setItem(openLibraryLastSyncResultKey, syncWarnings);
-          openLibrarySyncMessage.textContent = syncWarnings
-            ? syncResult
-            : `Synced ${syncedBooks.length} books.`;
           updateOpenLibrarySyncLabel();
-          showOpenLibraryStatus(syncWarnings ? syncResult : "");
 
-          let sentLocalOnlyBooks = false;
           if (state.sendLocalOnlyBooks && getOpenLibraryPushUser() === username) {
             // Books added only here go to Open Library, unless Open Library already has that work.
             const syncedWorkIds = new Set(syncedBooks.map((book: any) => workIdOf(book)));
@@ -3579,18 +3579,14 @@ const splitAuthors = (author: string) =>
               openLibrarySyncMessage.textContent = `Sending ${localOnlyChanges.length} books that were only here to Open Library…`;
               queueOpenLibraryChanges(localOnlyChanges);
               await flushOpenLibraryChanges();
-              sentLocalOnlyBooks = true;
+              if (readPendingOpenLibraryChanges().length > 0) {
+                throw new Error("Some changes are still waiting to reach Open Library. Your saved books were kept.");
+              }
             }
           }
 
-          if (!listChanged && !sentLocalOnlyBooks) {
-            if (!state.quiet) window.setTimeout(() => openLibrarySyncDialog.close(), 900);
-            return;
-          }
-          window.setTimeout(() => {
-            openLibrarySyncDialog.close();
-            window.location.reload();
-          }, 900);
+          openLibrarySyncMessage.textContent = syncWarnings ? syncResult : "Up to date.";
+          showOpenLibraryStatus(syncWarnings ? syncResult : "");
         } catch (error) {
           const message = error instanceof Error ? error.message : "Could not sync Open Library.";
           openLibrarySyncMessage.textContent = message;
@@ -3613,10 +3609,14 @@ const splitAuthors = (author: string) =>
         updateOpenLibraryAccountView();
         const browserOnlyCount = getOpenLibraryPushUser() ? countBrowserOnlyBooks() : 0;
         openLibrarySyncMessage.textContent = openLibrarySyncInProgress
-          ? "Syncing your reading log…"
+          ? "Checking for updates from Open Library… Your saved books are ready to use."
           : browserOnlyCount > 0
             ? `${browserOnlyCount} ${browserOnlyCount === 1 ? "book is" : "books are"} saved only in this browser. Sync now sends ${browserOnlyCount === 1 ? "it" : "them"} to Open Library.`
-            : "";
+            : getOpenLibraryPushUser()
+              && getOpenLibraryPushUser() === localStorage.getItem(openLibraryUsernameKey)
+              && localStorage.getItem(openLibraryLastSyncKey)
+              ? localStorage.getItem(openLibraryLastSyncResultKey) || "Up to date."
+              : "";
         openLibrarySyncDialog.showModal();
         if (getOpenLibraryPushUser()) openLibrarySyncSubmit.focus();
         else if (!canAutoFocusTextFields()) openLibrarySyncDialog.focus();
