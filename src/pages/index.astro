@@ -3247,10 +3247,9 @@ const splitAuthors = (author: string) =>
           openLibraryAccessKeyInput.value = "";
           openLibrarySecretKeyInput.value = "";
 
-          const previousUsername = localStorage.getItem(openLibraryUsernameKey);
+          const previousUsername = otherOpenLibraryAccountInList(data.username);
           if (
             previousUsername &&
-            previousUsername !== data.username &&
             !window.confirm(`Switch from ${previousUsername} to ${data.username}? Books synced from ${previousUsername} will be replaced. Books added only in this app will stay.`)
           ) {
             await fetch("/api/openlibrary-account.json", { method: "DELETE" });
@@ -3426,16 +3425,24 @@ const splitAuthors = (author: string) =>
         return promise;
       }
 
+      // The last synced Open Library name is shared by every website account in this browser,
+      // so only treat it as a switch when the current list still holds that account's books.
+      function otherOpenLibraryAccountInList(username: string) {
+        const previousUsername = localStorage.getItem(openLibraryUsernameKey);
+        if (!previousUsername || previousUsername === username) return null;
+        return localBooks.some((book) => book.openLibrarySyncUsername === previousUsername) ? previousUsername : null;
+      }
+
       async function runOpenLibrarySync(
         username: string,
         confirmed: boolean,
         state: { quiet: boolean; sendLocalOnlyBooks: boolean },
       ) {
-        const previousUsername = localStorage.getItem(openLibraryUsernameKey);
+        const previousUsername = confirmed ? null : otherOpenLibraryAccountInList(username);
+        // Background syncs must never pop up a question; the user can confirm by syncing manually.
+        if (previousUsername && state.quiet) return;
         if (
-          !confirmed &&
           previousUsername &&
-          previousUsername !== username &&
           !window.confirm(`Switch from ${previousUsername} to ${username}? Books synced from ${previousUsername} will be replaced. Books added only in this app will stay.`)
         ) {
           openLibrarySyncMessage.textContent = "Account switch cancelled.";
