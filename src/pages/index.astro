@@ -656,6 +656,7 @@ const splitAuthors = (author: string) =>
       }
       .open-library-sync-message {
         min-height: 1.25rem;
+        white-space: pre-line;
       }
       .open-library-sync-message:empty {
         display: none;
@@ -3416,7 +3417,7 @@ const splitAuthors = (author: string) =>
           }
           if (!options.quiet) {
             running.state.quiet = false;
-            openLibrarySyncMessage.textContent = "Checking for updates from Open Library… Your saved books are ready to use.";
+            openLibrarySyncMessage.textContent = "Checking for updates from Open Library.\nYour saved books are ready to use.";
             openLibrarySyncSubmit.disabled = true;
           }
           if (options.sendLocalOnlyBooks) running.state.sendLocalOnlyBooks = true;
@@ -3464,8 +3465,8 @@ const splitAuthors = (author: string) =>
             throw new Error(`${waitingChanges} ${waitingChanges === 1 ? "change hasn't" : "changes haven't"} reached Open Library yet, so syncing was skipped to keep them. Try again in a minute.`);
           }
 
-          openLibrarySyncMessage.textContent = "Checking for updates from Open Library… Your saved books are ready to use.";
-          if (!state.quiet) showOpenLibraryStatus("Checking for updates from Open Library…");
+          openLibrarySyncMessage.textContent = "Checking for updates from Open Library.\nYour saved books are ready to use.";
+          if (!state.quiet) showOpenLibraryStatus("Checking for updates from Open Library.");
           const response = await fetch(
             `/api/openlibrary-reading-log.json?username=${encodeURIComponent(username)}`,
           );
@@ -3609,7 +3610,7 @@ const splitAuthors = (author: string) =>
         updateOpenLibraryAccountView();
         const browserOnlyCount = getOpenLibraryPushUser() ? countBrowserOnlyBooks() : 0;
         openLibrarySyncMessage.textContent = openLibrarySyncInProgress
-          ? "Checking for updates from Open Library… Your saved books are ready to use."
+          ? "Checking for updates from Open Library.\nYour saved books are ready to use."
           : browserOnlyCount > 0
             ? `${browserOnlyCount} ${browserOnlyCount === 1 ? "book is" : "books are"} saved only in this browser. Sync now sends ${browserOnlyCount === 1 ? "it" : "them"} to Open Library.`
             : getOpenLibraryPushUser()

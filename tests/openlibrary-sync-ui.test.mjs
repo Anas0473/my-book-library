@@ -55,7 +55,8 @@ function setup(books, responseBooks = books, incompleteShelves = []) {
       const promise = context.syncOpenLibrary('reader', options);
       // Let the cloud sync and pending-write checks finish before resolving the pull.
       await new Promise((resolve) => setImmediate(resolve));
-      assert.match(context.openLibrarySyncMessage.textContent, /saved books are ready to use/);
+      assert.equal(context.openLibrarySyncMessage.textContent,
+        'Checking for updates from Open Library.\nYour saved books are ready to use.');
       finishRequest({
         ok: true,
         json: async () => ({ books: structuredClone(responseBooks), incompleteShelves }),
