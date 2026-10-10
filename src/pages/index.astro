@@ -2561,7 +2561,9 @@ const splitAuthors = (author: string) =>
             cloudLibraryStatus.textContent = "Account controls are still loading. Please try again shortly.";
             return;
           }
-          if (!window.confirm("Sign out on this device? Your library and any unsynced changes will be kept in this browser for your next sign-in. Open Library will also be disconnected to protect your account.")) return;
+          const message = "Sign out of your website account on this device? Your library and any unsynced changes will be kept in this browser for your next sign-in."
+            + (verifiedOpenLibraryUser ? " Your connected Open Library account will also be disconnected on this device to protect your account." : "");
+          if (!window.confirm(message)) return;
           signOut.disabled = true;
           try {
             await cloudLibrary?.sync();
