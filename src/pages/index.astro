@@ -1589,7 +1589,7 @@ const splitAuthors = (author: string) =>
             </span>
             <span class="account-button-copy">
               <span class="account-button-label" id="account-button-label">{accountSignedIn ? "Signed in" : "Sign in"}</span>
-              <span class="account-button-status" id="account-button-status">{accountSignedIn ? "Your account and sync" : "Sync your reading lists"}</span>
+              <span class="account-button-status" id="account-button-status">{accountSignedIn ? "Manage account" : "Sync your reading lists"}</span>
             </span>
           </button>
         </section>
@@ -3227,7 +3227,7 @@ const splitAuthors = (author: string) =>
           ? (websiteUserName || "Signed in")
           : openLibraryOnly ? "Open Library connected" : "Sign in to sync";
         accountButtonStatus.textContent = signedIn
-          ? "Your account and sync"
+          ? "Manage account"
           : openLibraryOnly ? "Your reading lists are connected" : "Sync your reading lists";
         const avatarUrl = signedIn ? websiteUserImage : null;
         if (avatarUrl) {
