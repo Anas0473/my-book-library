@@ -15,7 +15,10 @@ function setup(books, responseBooks = books, incompleteShelves = []) {
   let finishRequest;
   const context = vm.createContext({
     localBooks: structuredClone(books),
-    openLibrarySyncMessage: { textContent: '' },
+    document: {
+      createElement: () => ({ className: '', setAttribute() {} }),
+    },
+    openLibrarySyncMessage: { textContent: '', appendChild(node) { this.dots = node; } },
     openLibrarySyncSubmit: { disabled: false },
     openLibrarySyncDialog: { open: true, close() { throw new Error('Unexpected dialog close'); } },
     window: {
@@ -56,7 +59,8 @@ function setup(books, responseBooks = books, incompleteShelves = []) {
       // Let the cloud sync and pending-write checks finish before resolving the pull.
       await new Promise((resolve) => setImmediate(resolve));
       assert.equal(context.openLibrarySyncMessage.textContent,
-        'Checking for updates from Open Library.\nYour saved books are ready to use.');
+        'Your synced books are ready to use.\nChecking for updates from Open Library');
+      assert.equal(context.openLibrarySyncMessage.dots.className, 'open-library-sync-dots');
       finishRequest({
         ok: true,
         json: async () => ({ books: structuredClone(responseBooks), incompleteShelves }),

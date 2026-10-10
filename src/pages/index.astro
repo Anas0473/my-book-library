@@ -661,6 +661,26 @@ const splitAuthors = (author: string) =>
       .open-library-sync-message:empty {
         display: none;
       }
+      :global(.open-library-sync-dots) {
+        display: inline-block;
+        width: 3ch;
+        vertical-align: bottom;
+      }
+      :global(.open-library-sync-dots::after) {
+        content: "...";
+        display: inline-block;
+        overflow: hidden;
+        vertical-align: bottom;
+        animation: open-library-sync-dots 1.5s steps(1, end) infinite;
+      }
+      @keyframes open-library-sync-dots {
+        0%, 100% { width: 1ch; }
+        33.333% { width: 2ch; }
+        66.666% { width: 3ch; }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        :global(.open-library-sync-dots::after) { animation: none; }
+      }
       .open-library-sync-actions {
         display: flex;
         justify-content: flex-end;
@@ -3402,6 +3422,13 @@ const splitAuthors = (author: string) =>
       }
 
       type OpenLibrarySyncOptions = { confirmed?: boolean; quiet?: boolean; sendLocalOnlyBooks?: boolean };
+      function showOpenLibraryCheckingMessage() {
+        openLibrarySyncMessage.textContent = "Your synced books are ready to use.\nChecking for updates from Open Library";
+        const dots = document.createElement("span");
+        dots.className = "open-library-sync-dots";
+        dots.setAttribute("aria-hidden", "true");
+        openLibrarySyncMessage.appendChild(dots);
+      }
       // A sync of a large reading log can take half a minute, so a manual sync joins one already running.
       let openLibrarySyncInProgress: {
         username: string;
@@ -3417,7 +3444,7 @@ const splitAuthors = (author: string) =>
           }
           if (!options.quiet) {
             running.state.quiet = false;
-            openLibrarySyncMessage.textContent = "Checking for updates from Open Library.\nYour saved books are ready to use.";
+            showOpenLibraryCheckingMessage();
             openLibrarySyncSubmit.disabled = true;
           }
           if (options.sendLocalOnlyBooks) running.state.sendLocalOnlyBooks = true;
@@ -3465,7 +3492,7 @@ const splitAuthors = (author: string) =>
             throw new Error(`${waitingChanges} ${waitingChanges === 1 ? "change hasn't" : "changes haven't"} reached Open Library yet, so syncing was skipped to keep them. Try again in a minute.`);
           }
 
-          openLibrarySyncMessage.textContent = "Checking for updates from Open Library.\nYour saved books are ready to use.";
+          showOpenLibraryCheckingMessage();
           if (!state.quiet) showOpenLibraryStatus("Checking for updates from Open Library.");
           const response = await fetch(
             `/api/openlibrary-reading-log.json?username=${encodeURIComponent(username)}`,
@@ -3609,15 +3636,17 @@ const splitAuthors = (author: string) =>
       function openOpenLibrarySyncDialog() {
         updateOpenLibraryAccountView();
         const browserOnlyCount = getOpenLibraryPushUser() ? countBrowserOnlyBooks() : 0;
-        openLibrarySyncMessage.textContent = openLibrarySyncInProgress
-          ? "Checking for updates from Open Library.\nYour saved books are ready to use."
-          : browserOnlyCount > 0
+        if (openLibrarySyncInProgress) {
+          showOpenLibraryCheckingMessage();
+        } else {
+          openLibrarySyncMessage.textContent = browserOnlyCount > 0
             ? `${browserOnlyCount} ${browserOnlyCount === 1 ? "book is" : "books are"} saved only in this browser. Sync now sends ${browserOnlyCount === 1 ? "it" : "them"} to Open Library.`
             : getOpenLibraryPushUser()
               && getOpenLibraryPushUser() === localStorage.getItem(openLibraryUsernameKey)
               && localStorage.getItem(openLibraryLastSyncKey)
               ? localStorage.getItem(openLibraryLastSyncResultKey) || "Up to date."
               : "";
+        }
         openLibrarySyncDialog.showModal();
         if (getOpenLibraryPushUser()) openLibrarySyncSubmit.focus();
         else if (!canAutoFocusTextFields()) openLibrarySyncDialog.focus();
