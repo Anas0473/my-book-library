@@ -607,7 +607,8 @@ const accountSignedIn = Boolean(websiteCloudOwner(Astro.locals));
         padding: 1.75rem 2.5rem 3rem;
       }
       .privacy-footer {
-        margin-top: 2rem;
+        margin-top: 0.65rem;
+        text-align: center;
         font-size: 0.8rem;
       }
       .privacy-footer a {
@@ -1574,6 +1575,9 @@ const accountSignedIn = Boolean(websiteCloudOwner(Astro.locals));
               <span class="account-button-status" id="account-button-status">{accountSignedIn ? "Manage account" : "Sync your reading lists"}</span>
             </span>
           </button>
+          <footer class="privacy-footer">
+            <a href="/privacy">Privacy policy</a>
+          </footer>
         </section>
       </sidebar>
 
@@ -1656,9 +1660,6 @@ const accountSignedIn = Boolean(websiteCloudOwner(Astro.locals));
             </div>
           ))
         }
-        <footer class="privacy-footer">
-          <a href="/privacy">Privacy policy</a>
-        </footer>
       </main>
     </div>
 
