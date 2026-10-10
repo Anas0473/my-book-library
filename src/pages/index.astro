@@ -380,10 +380,13 @@ const splitAuthors = (author: string) =>
       #open-library-sync-dialog:focus {
         outline: none;
       }
+      .open-library-topbar {
+        display: flex;
+        align-items: center;
+        margin: -0.9rem -1.05rem 0.35rem;
+      }
+      .open-library-topbar .open-library-sync-close:last-child { margin-left: auto; }
       .open-library-sync-close {
-        position: absolute;
-        top: 0.85rem;
-        right: 0.85rem;
         display: grid;
         place-items: center;
         width: 2rem;
@@ -395,8 +398,6 @@ const splitAuthors = (author: string) =>
         color: var(--text-dark-muted);
         cursor: pointer;
       }
-      .open-library-sync-back { top: 1.75rem; right: auto; left: 1.4rem; }
-      #open-library-sync-dialog:has(.open-library-sync-back:not([hidden])) #open-library-sync-title { padding-left: 2rem; }
       .open-library-sync-back[hidden] { display: none; }
       .open-library-sync-close svg { width: 1rem; height: 1rem; }
       .open-library-sync-close:hover { background: var(--surface-dark-2); color: var(--text-dark); }
@@ -614,6 +615,41 @@ const splitAuthors = (author: string) =>
         font: inherit;
         font-size: 0.92rem;
         outline: none;
+      }
+      :global(.dialog-input-wrap) {
+        position: relative;
+        display: block;
+      }
+      :global(.dialog-input-wrap > input) {
+        padding-right: 2.4rem !important;
+      }
+      :global(.dialog-input-clear) {
+        position: absolute;
+        top: 50%;
+        right: 0.45rem;
+        display: grid;
+        width: 1.75rem;
+        height: 1.75rem;
+        place-items: center;
+        box-sizing: border-box;
+        padding: 0 0 0.2rem;
+        transform: translateY(-50%);
+        border: 0;
+        border-radius: 50%;
+        background: transparent;
+        color: var(--text-dark-muted);
+        font: inherit;
+        font-size: 1.2rem;
+        line-height: 1;
+        cursor: pointer;
+      }
+      :global(.dialog-input-clear:hover) {
+        background: var(--surface-dark-2);
+        color: var(--text-dark);
+      }
+      :global(.dialog-input-wrap > input:placeholder-shown + .dialog-input-clear),
+      :global(.dialog-input-wrap > input:disabled + .dialog-input-clear) {
+        display: none;
       }
       .open-library-sync-form input:focus {
         border-color: var(--accent);
@@ -1850,12 +1886,14 @@ const splitAuthors = (author: string) =>
     <button type="button" class="shelf-jump-button" aria-label="Jump to start of list" title="Jump to start of list" hidden>↑</button>
 
     <dialog id="open-library-sync-dialog" aria-labelledby="open-library-sync-title" tabindex="-1">
-      <button type="button" class="open-library-sync-close open-library-sync-back" id="open-library-sync-back" aria-label="Back" hidden>
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 12H5M11 6l-6 6 6 6" /></svg>
-      </button>
-      <button type="button" class="open-library-sync-close" id="open-library-sync-close" aria-label="Close">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18" /></svg>
-      </button>
+      <div class="dialog-topbar open-library-topbar">
+        <button type="button" class="open-library-sync-close open-library-sync-back" id="open-library-sync-back" aria-label="Back" hidden>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 12H5M11 6l-6 6 6 6" /></svg>
+        </button>
+        <button type="button" class="open-library-sync-close" id="open-library-sync-close" aria-label="Close">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18" /></svg>
+        </button>
+      </div>
       <form class="open-library-sync-form" id="open-library-sync-form">
         <h2 id="open-library-sync-title">Connect Open Library</h2>
         <div class="open-library-mode-panel" id="open-library-login-fields">
@@ -2578,6 +2616,9 @@ const splitAuthors = (author: string) =>
       if (document.getElementById("website-account")?.dataset.configured === "true") {
         let observedUser: string | null | undefined;
         const profile = document.getElementById("website-profile") as HTMLButtonElement;
+        const profileDialog = document.getElementById("website-profile-dialog") as HTMLDialogElement;
+        const profileMount = document.getElementById("website-profile-mount") as HTMLDivElement;
+        let profileMounted = false;
         const signOut = document.getElementById("website-sign-out") as HTMLButtonElement;
         const googleButton = document.getElementById("account-google") as HTMLButtonElement;
         const emailForm = document.getElementById("account-email-form") as HTMLFormElement;
@@ -2927,7 +2968,30 @@ const splitAuthors = (author: string) =>
             return;
           }
           accountDialog.close();
-          clerk.openUserProfile();
+          profileDialog.showModal();
+          if (!profileMounted) {
+            // Clerk's own account panel, shown inside the site's box so it gets back/close buttons.
+            clerk.mountUserProfile(profileMount, {
+              appearance: {
+                elements: {
+                  rootBox: { width: "100%", height: "100%" },
+                  cardBox: { width: "100%", maxWidth: "100%", height: "100%", border: "0", borderRadius: "0", boxShadow: "none" },
+                },
+              },
+            });
+            profileMounted = true;
+          }
+        });
+        document.getElementById("website-profile-back")?.addEventListener("click", () => {
+          profileDialog.close();
+          accountDialog.showModal();
+        });
+        document.getElementById("website-profile-close")?.addEventListener("click", () => profileDialog.close());
+        profileDialog.addEventListener("click", (event) => {
+          if (event.target !== profileDialog) return;
+          const rect = profileDialog.getBoundingClientRect();
+          if (event.clientX < rect.left || event.clientX > rect.right
+            || event.clientY < rect.top || event.clientY > rect.bottom) profileDialog.close();
         });
         signOut.addEventListener("click", async () => {
           const clerk = $clerkStore.get();
@@ -2956,6 +3020,11 @@ const splitAuthors = (author: string) =>
             websiteUserId = userId;
             websiteUserName = user?.firstName || user?.username || null;
             updateAccountButton();
+            if (!userId && profileMounted) {
+              profileDialog.close();
+              clerk.unmountUserProfile(profileMount);
+              profileMounted = false;
+            }
             if (observedUser === undefined) {
               observedUser = userId;
               const cachedOwner = localStorage.getItem("my-book-library:cloud-owner");
@@ -3551,6 +3620,29 @@ const splitAuthors = (author: string) =>
           : "Log in and sync";
       }
 
+      // Give every text box in the account and Open Library boxes a clear (×) button, like the search boxes.
+      document.querySelectorAll<HTMLInputElement>(
+        "#website-account input, #open-library-sync-dialog input",
+      ).forEach((input) => {
+        if (!["text", "email", "password"].includes(input.type)) return;
+        // :placeholder-shown hides the × whenever the box is empty, including when code empties it.
+        if (!input.placeholder) input.placeholder = " ";
+        const wrap = document.createElement("span");
+        wrap.className = "dialog-input-wrap";
+        input.replaceWith(wrap);
+        const clear = document.createElement("button");
+        clear.type = "button";
+        clear.className = "dialog-input-clear";
+        clear.setAttribute("aria-label", "Clear");
+        clear.title = "Clear";
+        clear.textContent = "×";
+        clear.addEventListener("click", () => {
+          input.value = "";
+          input.dispatchEvent(new Event("input", { bubbles: true }));
+          input.focus();
+        });
+        wrap.append(input, clear);
+      });
       const openLibraryBackButton = document.getElementById("open-library-sync-back") as HTMLButtonElement;
       // Opened from the account box: swap boxes so the back arrow can return to it.
       const openOpenLibraryFromAccount = () => {
