@@ -47,6 +47,9 @@ Account and sync controls sit at the bottom of the desktop sidebar. Signed-in
 users see their profile picture when available, with a generic avatar otherwise.
 On phones, account controls remain in the bottom navigation. The site uses its
 default dark appearance; the background color picker has been removed.
+The "Extra edition, only on this site" badge is shown only in Open Library-only
+sign-in mode. Website accounts can save multiple editions without that badge;
+those editions remain part of the website's cloud library.
 
 Click an unsaved book's status button to add it to Plan to Read. Click a yellow
 status button to remove the book from My Lists; use the arrow to choose a different

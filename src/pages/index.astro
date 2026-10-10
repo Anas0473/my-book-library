@@ -1293,8 +1293,11 @@ const splitAuthors = (author: string) =>
         border-color: var(--accent);
         color: var(--accent);
       }
-      :global(.card .open-library-removed) {
+      :global(body:has(#website-account[data-open-library-only="true"]) .card .open-library-removed) {
         display: inline-block;
+      }
+      :global(.card .open-library-removed) {
+        display: none;
         margin: 0.35rem 0 0;
         padding: 0.2rem 0.45rem;
         border-radius: 6px;
@@ -3281,6 +3284,7 @@ const splitAuthors = (author: string) =>
         mobileAccountButton.classList.toggle("is-connected", connected);
         mobileAccountButton.textContent = connected ? "Account" : "Sign in";
         accountDialog.dataset.signedIn = String(signedIn);
+        accountDialog.dataset.openLibraryOnly = String(openLibraryOnly);
         accountSummary.textContent = websiteUserName ? `Signed in as ${websiteUserName}` : "Signed in";
       }
 

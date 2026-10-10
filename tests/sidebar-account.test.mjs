@@ -32,6 +32,7 @@ test('signed-in account shows its name and profile picture', () => {
   context.updateAccountButton();
   assert.equal(context.accountButtonLabel.textContent, 'Alice');
   assert.equal(context.accountButtonStatus.textContent, 'Manage account');
+  assert.equal(context.accountDialog.dataset.openLibraryOnly, 'false');
   assert.equal(context.accountAvatarImage.src, 'https://example.com/alice.jpg');
   assert.equal(context.accountAvatarImage.hidden, false);
   assert.equal(context.accountAvatarFallback.hidden, true);
@@ -56,5 +57,13 @@ test('accounts without a photo and Open Library-only accounts use the fallback',
   context.getOpenLibraryPushUser = () => 'reader';
   context.updateAccountButton();
   assert.equal(context.accountButtonLabel.textContent, 'Open Library connected');
+  assert.equal(context.accountDialog.dataset.openLibraryOnly, 'true');
   assert.equal(context.accountAvatarImage.hidden, true);
+});
+
+test('website accounts hide Open Library-only badges even with a legacy connection', () => {
+  const context = setup();
+  context.getOpenLibraryPushUser = () => 'reader';
+  context.updateAccountButton();
+  assert.equal(context.accountDialog.dataset.openLibraryOnly, 'false');
 });
