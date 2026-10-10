@@ -2609,18 +2609,63 @@ const splitAuthors = (author: string) =>
             googleButton.disabled = false;
           }
         });
+        // Make Clerk's email and account windows match the site's own sign-in popup.
+        const clerkAppearance = {
+          variables: {
+            colorBackground: "var(--surface-dark)",
+            colorForeground: "var(--text-dark)",
+            colorMutedForeground: "var(--text-dark-muted)",
+            colorMuted: "var(--surface-dark-2)",
+            colorInput: "var(--surface-dark-2)",
+            colorInputForeground: "var(--text-dark)",
+            colorNeutral: "var(--text-dark)",
+            colorBorder: "var(--border-dark)",
+            colorPrimary: "var(--text-dark)",
+            colorPrimaryForeground: "var(--surface-dark)",
+            colorDanger: "var(--danger)",
+            colorSuccess: "var(--ok)",
+            colorRing: "var(--accent)",
+            colorShadow: "transparent",
+            fontFamily: "var(--font-sans)",
+            borderRadius: "9px",
+            fontSize: "0.9rem",
+          },
+          elements: {
+            modalBackdrop: { background: "rgba(0, 0, 0, 0.6)" },
+            cardBox: { width: "min(25rem, calc(100vw - 2rem))", border: "1px solid var(--border-dark)", borderRadius: "14px", boxShadow: "0 20px 48px rgba(0, 0, 0, 0.45)" },
+            card: { padding: "2.2rem 2rem 1.9rem", border: "0", borderRadius: "0", boxShadow: "none", background: "var(--surface-dark)" },
+            headerTitle: { fontSize: "1.15rem", fontWeight: 600 },
+            headerSubtitle: { fontSize: "0.85rem", color: "var(--text-dark-muted)" },
+            formFieldLabel: { fontSize: "0.85rem", fontWeight: 600 },
+            formFieldInput: { minHeight: "2.6rem", border: "1px solid var(--border-dark)", boxShadow: "none", fontSize: "0.9rem" },
+            formButtonPrimary: { minHeight: "2.6rem", boxShadow: "none", fontSize: "0.9rem", fontWeight: 600, "&:hover": { background: "#fff" } },
+            buttonArrowIcon: { display: "none" },
+            footer: { background: "var(--surface-dark-2)", borderTop: "1px solid var(--border-dark)" },
+            footerActionText: { fontSize: "0.86rem" },
+            footerActionLink: { fontSize: "0.86rem", fontWeight: 600, color: "var(--text-dark)" },
+          },
+        };
+        // Google is already a button in the site's popup, so the email step only shows email.
+        const clerkEmailAppearance = {
+          ...clerkAppearance,
+          elements: {
+            ...clerkAppearance.elements,
+            socialButtonsRoot: { display: "none" },
+            dividerRow: { display: "none" },
+          },
+        };
         emailForm.addEventListener("submit", (event) => {
           event.preventDefault();
           const clerk = loadedClerk();
           if (!clerk) return;
           accountDialog.close();
-          clerk.openSignIn({ forceRedirectUrl: "/", signUpForceRedirectUrl: "/", initialValues: emailInitialValues() });
+          clerk.openSignIn({ forceRedirectUrl: "/", signUpForceRedirectUrl: "/", initialValues: emailInitialValues(), appearance: clerkEmailAppearance });
         });
         document.getElementById("account-sign-up")?.addEventListener("click", () => {
           const clerk = loadedClerk();
           if (!clerk) return;
           accountDialog.close();
-          clerk.openSignUp({ forceRedirectUrl: "/", signInForceRedirectUrl: "/", initialValues: emailInitialValues() });
+          clerk.openSignUp({ forceRedirectUrl: "/", signInForceRedirectUrl: "/", initialValues: emailInitialValues(), appearance: clerkEmailAppearance });
         });
         profile.addEventListener("click", () => {
           const clerk = $clerkStore.get();
@@ -2629,7 +2674,7 @@ const splitAuthors = (author: string) =>
             return;
           }
           accountDialog.close();
-          clerk.openUserProfile();
+          clerk.openUserProfile({ appearance: clerkAppearance });
         });
         signOut.addEventListener("click", async () => {
           const clerk = $clerkStore.get();
