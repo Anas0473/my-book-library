@@ -6,8 +6,6 @@
 
 ---
 
-<br>
-
 ## ✨ Features
 
 - 🔎 **Search millions of books** from Open Library, with an automatic Internet Archive fallback when Open Library is down
@@ -26,19 +24,13 @@
 
 - 📱 **Works on desktop and mobile**
 
-<br>
-
 ## 🛠️ Built with
 
 [Astro](https://astro.build) · TypeScript · [Clerk](https://clerk.com) (accounts) · [Neon](https://neon.tech) Postgres (cloud sync) · [Vercel](https://vercel.com) (hosting) · [Open Library](https://openlibrary.org) & [Internet Archive](https://archive.org) APIs
 
-<br>
-
 ## 📄 Documentation
 
 Detailed behavior, setup and configuration notes live in [docs/TECHNICAL.md](docs/TECHNICAL.md).
-
-<br>
 
 ## ©️ License
 
