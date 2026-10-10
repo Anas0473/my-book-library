@@ -380,6 +380,23 @@ const splitAuthors = (author: string) =>
       #open-library-sync-dialog:focus {
         outline: none;
       }
+      .open-library-sync-close {
+        position: absolute;
+        top: 0.85rem;
+        right: 0.85rem;
+        display: grid;
+        place-items: center;
+        width: 2rem;
+        height: 2rem;
+        padding: 0;
+        border: 0;
+        border-radius: 7px;
+        background: transparent;
+        color: var(--text-dark-muted);
+        cursor: pointer;
+      }
+      .open-library-sync-close svg { width: 1rem; height: 1rem; }
+      .open-library-sync-close:hover { background: var(--surface-dark-2); color: var(--text-dark); }
       #open-library-sync-dialog::backdrop {
         background: rgba(0, 0, 0, 0.6);
       }
@@ -1797,6 +1814,9 @@ const splitAuthors = (author: string) =>
     <button type="button" class="shelf-jump-button" aria-label="Jump to start of list" title="Jump to start of list" hidden>↑</button>
 
     <dialog id="open-library-sync-dialog" aria-labelledby="open-library-sync-title" tabindex="-1">
+      <button type="button" class="open-library-sync-close" id="open-library-sync-close" aria-label="Close">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18" /></svg>
+      </button>
       <form class="open-library-sync-form" id="open-library-sync-form">
         <h2 id="open-library-sync-title">Connect Open Library</h2>
         <div class="open-library-mode-panel" id="open-library-login-fields">
@@ -3258,6 +3278,7 @@ const splitAuthors = (author: string) =>
       openLibrarySyncCancel.addEventListener("click", () => {
         openLibrarySyncDialog.close();
       });
+      document.getElementById("open-library-sync-close")?.addEventListener("click", () => openLibrarySyncDialog.close());
 
       openLibrarySyncDialog.addEventListener("click", (event) => {
         if (event.target !== openLibrarySyncDialog) return;
