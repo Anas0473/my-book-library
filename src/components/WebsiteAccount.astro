@@ -5,70 +5,184 @@ const configured = websiteAuthConfigured();
 const signedIn = Boolean(websiteCloudOwner(Astro.locals));
 ---
 
-<section class="website-account" id="website-account" data-configured={String(configured)} aria-label="Library account">
-  <div class="account-controls">
+<dialog
+  class="account-dialog"
+  id="website-account"
+  data-configured={String(configured)}
+  data-signed-in={String(signedIn)}
+  aria-labelledby="account-dialog-title"
+>
+  <div class="account-dialog-body">
+    <h2 id="account-dialog-title">Account &amp; sync</h2>
+
+    <div class="account-card">
+      <span class="account-dot" aria-hidden="true"></span>
+      <div>
+        <strong id="account-summary">{signedIn ? 'Signed in' : 'Not signed in'}</strong>
+        <small id="cloud-library-status" role="status" aria-live="polite">
+          Saved on this device. {configured ? 'Sign in to use your library on PC and mobile.' : 'Account sign-in is not configured yet.'}
+        </small>
+      </div>
+    </div>
+
     {configured ? (
-      <>
-        <button type="button" id="website-sign-in" hidden={signedIn}>Sign in to sync</button>
-        <button type="button" id="website-profile" hidden={!signedIn}>Your account</button>
-        <button type="button" id="website-sign-out" hidden={!signedIn}>Sign out</button>
-      </>
+      <p class="account-intro" id="account-intro" hidden={signedIn}>
+        Sign in with Google, a password, or an emailed code. No Open Library account needed.
+      </p>
     ) : (
-      <button type="button" id="website-sign-in" disabled aria-describedby="website-auth-setup">
+      <p id="website-auth-setup">Google and email sign-in require Clerk setup by the site owner.</p>
+    )}
+
+    <div class="account-actions">
+      <button type="button" class="account-primary" id="website-sign-in" hidden={configured && signedIn} disabled={!configured}>
         Sign in to sync
       </button>
-    )}
+      {configured && (
+        <>
+          <button type="button" id="website-profile" hidden={!signedIn}>Your account</button>
+          <button type="button" id="website-sync-now" hidden>Sync now</button>
+          <button type="button" id="website-sign-out" hidden={!signedIn}>Sign out</button>
+        </>
+      )}
+    </div>
+
+    <section class="account-open-library" aria-labelledby="account-open-library-title">
+      <h3 id="account-open-library-title">Open Library <span>(optional)</span></h3>
+      <p>Keep your reading lists in sync with your Open Library shelves.</p>
+      <div class="account-actions">
+        <button type="button" class="open-library-button" id="open-library-sync-button">Connect Open Library</button>
+        <button type="button" id="website-link-openlibrary" hidden>Link existing Open Library library</button>
+      </div>
+      <p class="account-open-library-status" id="open-library-sync-status" role="status" aria-live="polite" hidden></p>
+    </section>
+
+    <div class="account-footer">
+      <button type="button" id="account-dialog-close">Close</button>
+    </div>
   </div>
-  {!configured && <p id="website-auth-setup">Google and email sign-in require Clerk setup by the site owner.</p>}
-  <p id="cloud-library-status" role="status" aria-live="polite">
-    Saved on this device. {configured ? 'Sign in to use your library on PC and mobile.' : 'Account sign-in is not configured yet.'}
-  </p>
-  {configured && <p>No Open Library account needed. Sign in with Google, a password, or an emailed code.</p>}
-  <div class="sync-controls">
-    <button type="button" id="website-sync-now" hidden>Sync now</button>
-    <button type="button" id="website-link-openlibrary" hidden>Link existing Open Library library</button>
-  </div>
-</section>
+</dialog>
 
 <style>
-  .website-account {
-    border: 1px solid var(--line);
-    border-radius: 10px;
-    padding: 0.7rem;
-    background: var(--fill);
-    min-width: 0;
+  .account-dialog {
+    box-sizing: border-box;
+    width: min(26rem, calc(100vw - 2rem));
+    max-width: none;
+    padding: 1.6rem 1.7rem;
+    border: 1px solid var(--border-dark);
+    border-radius: 14px;
+    background: var(--surface-dark);
+    color: var(--text-dark);
+    font-family: var(--font-sans);
+    box-shadow: 0 20px 48px rgba(0, 0, 0, 0.45);
   }
-  .account-controls, .sync-controls {
+  .account-dialog::backdrop { background: rgba(0, 0, 0, 0.6); }
+  .account-dialog:focus { outline: none; }
+  .account-dialog-body { display: grid; gap: 1.15rem; }
+  h2 {
+    margin: 0;
+    font-family: var(--font-serif);
+    font-size: 1.7rem;
+    font-weight: 400;
+    line-height: 1.1;
+  }
+  h3 {
+    margin: 0;
+    font-size: 0.9rem;
+    font-weight: 600;
+  }
+  h3 span { color: var(--text-dark-muted); font-weight: 400; }
+  p {
+    margin: 0;
+    color: var(--text-dark-muted);
+    font-size: 0.84rem;
+    line-height: 1.6;
+  }
+  p[hidden], button[hidden] { display: none; }
+  .account-card {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.85rem 0.95rem;
+    border: 1px solid var(--border-dark);
+    border-radius: 11px;
+    background: var(--surface-dark-2);
+  }
+  .account-card > div { display: grid; gap: 0.15rem; min-width: 0; }
+  .account-card strong { font-size: 0.92rem; overflow-wrap: anywhere; }
+  .account-card small {
+    color: var(--text-dark-muted);
+    font-size: 0.78rem;
+    line-height: 1.45;
+  }
+  .account-card small[hidden] { display: none; }
+  .account-dot {
+    flex: none;
+    width: 0.55rem;
+    height: 0.55rem;
+    border-radius: 50%;
+    background: var(--text-dark-muted);
+  }
+  .account-dialog[data-signed-in="true"] .account-dot {
+    background: var(--ok);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--ok) 22%, transparent);
+  }
+  .account-actions {
     display: flex;
     flex-wrap: wrap;
+    gap: 0.5rem;
+  }
+  .account-open-library {
+    display: grid;
+    gap: 0.55rem;
+    padding-top: 1.1rem;
+    border-top: 1px solid var(--border-dark);
+  }
+  button {
+    min-height: 2.3rem;
+    padding: 0.4rem 0.8rem;
+    border: 1px solid var(--border-dark);
+    border-radius: 9px;
+    background: transparent;
+    color: var(--text-dark);
+    font: inherit;
+    font-size: 0.84rem;
+    cursor: pointer;
+  }
+  button:hover:not(:disabled) { background: var(--surface-dark-2); }
+  button:disabled { opacity: 0.6; cursor: not-allowed; }
+  button:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+  }
+  .account-primary {
+    border-color: var(--accent);
+    background: var(--accent);
+    color: var(--accent-ink);
+    font-weight: 600;
+  }
+  .account-primary:hover:not(:disabled) { background: var(--accent-strong); }
+  .open-library-button {
+    display: inline-flex;
     align-items: center;
     gap: 0.5rem;
   }
-  .account-controls { font-size: 0.8rem; }
-  p {
-    margin: 0.5rem 0 0;
-    font-size: 0.72rem;
-    line-height: 1.5;
-    color: var(--muted);
+  .open-library-button::before {
+    content: "";
+    width: 0.5rem;
+    height: 0.5rem;
+    border-radius: 50%;
+    background: var(--text-dark-muted);
   }
-  .sync-controls { margin-top: 0.5rem; }
-  button {
-    border: 1px solid var(--line);
-    border-radius: 7px;
-    padding: 0.4rem 0.6rem;
-    background: var(--fill-strong);
-    color: var(--fg);
-    font: inherit;
-    font-size: 0.75rem;
-    cursor: pointer;
+  .open-library-button:global(.is-connected)::before {
+    background: var(--ok);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--ok) 22%, transparent);
   }
-  button[hidden] { display: none; }
-  button:disabled { opacity: 0.6; cursor: not-allowed; }
-  button:focus-visible, :global(.website-account button:focus-visible) {
-    outline: 2px solid var(--page-focus);
-    outline-offset: 3px;
-  }
+  .account-footer { display: flex; justify-content: flex-end; }
   @media (max-width: 700px) {
-    .website-account { flex-basis: 100%; }
+    .account-dialog {
+      width: calc(100vw - 1.5rem);
+      max-height: calc(100dvh - 1.5rem);
+      padding: 1.4rem 1.25rem;
+    }
   }
 </style>

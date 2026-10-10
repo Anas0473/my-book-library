@@ -2,6 +2,9 @@
 import { getCollection } from "astro:content";
 import BookSearch from "../components/BookSearch.astro";
 import WebsiteAccount from "../components/WebsiteAccount.astro";
+import { websiteCloudOwner } from "../lib/website-auth";
+
+const accountSignedIn = Boolean(websiteCloudOwner(Astro.locals));
 
 const allBooks = await getCollection("blog");
 
@@ -202,17 +205,10 @@ const splitAuthors = (author: string) =>
         cursor: progress;
         opacity: 0.7;
       }
-      .open-library-sync-status {
-        display: block;
-        box-sizing: border-box;
-        margin: 0.1rem 0 0;
-        padding: 0 0.6rem 0 1.95rem;
-        color: var(--faint);
-        font-size: 0.72rem;
-        line-height: 1.4;
-      }
-      .open-library-sync-status[hidden] {
-        display: none;
+      .account-button-label {
+        min-width: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
       }
       .theme-picker {
         position: relative;
@@ -1375,9 +1371,6 @@ const splitAuthors = (author: string) =>
         sidebar > .sidebar-section {
           display: none;
         }
-        sidebar > :global(.website-account) {
-          order: 1;
-        }
         header h1 {
           padding: 0;
           font-size: 1.65rem;
@@ -1557,16 +1550,18 @@ const splitAuthors = (author: string) =>
         <header>
           <h1><a href="/?panel=search-db" class="home-link" id="home-link">My Reading <span class="title-accent">List</span></a></h1>
         </header>
-        <WebsiteAccount />
         <div class="sidebar-section">
           <h3>Database</h3>
           <button class="category-btn search-tab active" data-target="search-db"
             ><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7" /><path d="m20 20-3.5-3.5" /></svg>Search books</button
           >
-          <button type="button" class="category-btn open-library-button" id="open-library-sync-button">
-            Connect Open Library
-          </button>
-          <p class="open-library-sync-status" id="open-library-sync-status" role="status" aria-live="polite" hidden></p>
+          <button
+            type="button"
+            class:list={["category-btn", "open-library-button", "account-button", { "is-connected": accountSignedIn }]}
+            id="account-button"
+            data-initial-signed-in={String(accountSignedIn)}
+            aria-haspopup="dialog"
+          ><span class="account-button-label" id="account-button-label">{accountSignedIn ? "Signed in" : "Sign in to sync"}</span></button>
         </div>
         <div class="sidebar-section">
           <h3>My Lists</h3>
@@ -1783,8 +1778,15 @@ const splitAuthors = (author: string) =>
       <button class="mobile-nav-button" data-target="plan-to-read" aria-label="Plan to Read"><span class="category-count">{planToRead.length}</span>Plan</button>
       <button class="mobile-nav-button" data-target="reading"><span class="category-count">{reading.length}</span>Reading</button>
       <button class="mobile-nav-button" data-target="read"><span class="category-count">{read.length}</span>Read</button>
-      <button type="button" class="mobile-nav-button open-library-button" id="mobile-open-library-sync-button">Connect</button>
+      <button
+        type="button"
+        class:list={["mobile-nav-button", "open-library-button", { "is-connected": accountSignedIn }]}
+        id="mobile-account-button"
+        aria-haspopup="dialog"
+      >{accountSignedIn ? "Account" : "Sign in"}</button>
     </nav>
+
+    <WebsiteAccount />
 
     <!-- Avoids "back to top" class/label text that ad blockers (e.g. Brave Shields) hide. -->
     <button type="button" class="shelf-jump-button" aria-label="Jump to start of list" title="Jump to start of list" hidden>↑</button>
@@ -1879,7 +1881,15 @@ const splitAuthors = (author: string) =>
       localStorage.removeItem("my-book-library:openlibrary-last-sync");
       const openLibraryLastSyncResultKey = "my-book-library:openlibrary-last-sync-result";
       const openLibrarySyncButton = document.getElementById("open-library-sync-button") as HTMLButtonElement;
-      const mobileOpenLibrarySyncButton = document.getElementById("mobile-open-library-sync-button") as HTMLButtonElement;
+      const accountDialog = document.getElementById("website-account") as HTMLDialogElement;
+      const accountButton = document.getElementById("account-button") as HTMLButtonElement;
+      const accountButtonLabel = document.getElementById("account-button-label") as HTMLElement;
+      const mobileAccountButton = document.getElementById("mobile-account-button") as HTMLButtonElement;
+      const accountSummary = document.getElementById("account-summary") as HTMLElement;
+      const accountIntro = document.getElementById("account-intro");
+      let websiteUserName: string | null = null;
+      // undefined until Clerk loads; the server-rendered state is used until then.
+      let websiteUserId: string | null | undefined;
       const openLibrarySyncStatus = document.getElementById("open-library-sync-status") as HTMLElement;
       const openLibrarySyncDialog = document.getElementById("open-library-sync-dialog") as HTMLDialogElement;
       const openLibrarySyncForm = document.getElementById("open-library-sync-form") as HTMLFormElement;
@@ -2490,6 +2500,7 @@ const splitAuthors = (author: string) =>
           cloudLibraryStatus.textContent = error instanceof Error ? error.message
             : "Account sync is unavailable. Your device books were kept.";
         }
+        if (accountGeneration === websiteAccountGeneration) updateAccountButton();
       }
 
       function refreshWebsiteAccount() {
@@ -2545,6 +2556,7 @@ const splitAuthors = (author: string) =>
             cloudLibraryStatus.textContent = "Sign-in is still loading. Please try again shortly.";
             return;
           }
+          accountDialog.close();
           clerk.openSignIn({ forceRedirectUrl: "/", signUpForceRedirectUrl: "/" });
         });
         profile.addEventListener("click", () => {
@@ -2553,6 +2565,7 @@ const splitAuthors = (author: string) =>
             cloudLibraryStatus.textContent = "Account controls are still loading. Please try again shortly.";
             return;
           }
+          accountDialog.close();
           clerk.openUserProfile();
         });
         signOut.addEventListener("click", async () => {
@@ -2579,9 +2592,12 @@ const splitAuthors = (author: string) =>
           clerk.addListener(({ user }) => {
             if (!clerk.loaded) return;
             const userId = user?.id || null;
+            websiteUserId = userId;
+            websiteUserName = user?.firstName || user?.username || null;
             signIn.hidden = Boolean(userId);
             profile.hidden = !userId;
             signOut.hidden = !userId;
+            updateAccountButton();
             if (observedUser === undefined) {
               observedUser = userId;
               const cachedOwner = localStorage.getItem("my-book-library:cloud-owner");
@@ -2911,12 +2927,31 @@ const splitAuthors = (author: string) =>
           : "Connect Open Library";
         openLibrarySyncButton.title = username ? "Sync Open Library" : "";
         openLibrarySyncButton.classList.toggle("is-connected", Boolean(username));
-        mobileOpenLibrarySyncButton.classList.toggle("is-connected", Boolean(username));
-        mobileOpenLibrarySyncButton.textContent = username ? "Sync" : "Connect";
-        mobileOpenLibrarySyncButton.setAttribute(
-          "aria-label",
-          username ? "Sync Open Library" : "Connect Open Library",
-        );
+        updateAccountButton();
+      }
+
+      function updateAccountButton() {
+        const signedIn = websiteUserId === undefined
+          ? Boolean(websiteOwner) || accountButton.dataset.initialSignedIn === "true"
+          : Boolean(websiteUserId);
+        const openLibraryOnly = !signedIn && Boolean(cloudReauthenticationRequired ? null : getOpenLibraryPushUser());
+        const connected = signedIn || openLibraryOnly;
+        accountButtonLabel.textContent = signedIn
+          ? (websiteUserName ? `Signed in as ${websiteUserName}` : "Signed in")
+          : openLibraryOnly ? "Open Library connected" : "Sign in to sync";
+        accountButton.title = accountButtonLabel.textContent;
+        accountButton.classList.toggle("is-connected", connected);
+        mobileAccountButton.classList.toggle("is-connected", connected);
+        mobileAccountButton.textContent = connected ? "Account" : "Sign in";
+        accountDialog.dataset.signedIn = String(signedIn);
+        accountSummary.textContent = signedIn
+          ? (websiteUserName ? `Signed in as ${websiteUserName}` : "Signed in")
+          : "Not signed in";
+        if (accountIntro) accountIntro.hidden = signedIn;
+      }
+
+      function openAccountDialog() {
+        if (!accountDialog.open) accountDialog.showModal();
       }
 
       type OpenLibrarySyncOptions = { confirmed?: boolean; quiet?: boolean; sendLocalOnlyBooks?: boolean };
@@ -3145,7 +3180,15 @@ const splitAuthors = (author: string) =>
       }
 
       openLibrarySyncButton.addEventListener("click", () => openOpenLibrarySyncDialog());
-      mobileOpenLibrarySyncButton.addEventListener("click", () => openOpenLibrarySyncDialog());
+      accountButton.addEventListener("click", openAccountDialog);
+      mobileAccountButton.addEventListener("click", openAccountDialog);
+      document.getElementById("account-dialog-close")?.addEventListener("click", () => accountDialog.close());
+      accountDialog.addEventListener("click", (event) => {
+        if (event.target !== accountDialog) return;
+        const rect = accountDialog.getBoundingClientRect();
+        if (event.clientX < rect.left || event.clientX > rect.right
+          || event.clientY < rect.top || event.clientY > rect.bottom) accountDialog.close();
+      });
       openLibraryMethodToggle.addEventListener("click", () => {
         localStorage.setItem(openLibraryLoginMethodKey, usesOpenLibraryKeys() ? "password" : "keys");
         openLibrarySyncMessage.textContent = "";

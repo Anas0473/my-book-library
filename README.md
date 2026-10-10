@@ -166,11 +166,14 @@ STORAGE_URL=<Neon Postgres connection string>
 Only the publishable key may be public. Never put the secret key or database URL
 in client code. Use Clerk development keys locally and production keys for the
 production deployment. Without Clerk keys, guest mode and existing Open Library
-connections remain available; the account panel shows a disabled sign-in button
+connections remain available; the Account & sync dialog shows a disabled sign-in button
 and explains the required Clerk setup. Clerk configuration alone does not enable
 sync: Neon must also be set.
 
-The library account panel is available on desktop and mobile and shows device-only
+The sidebar's account item (the last item on the mobile bottom bar) shows a grey
+dot with "Sign in to sync" or a green dot when signed in. It opens the
+**Account & sync** dialog with sign-in, account, Sync now and sign-out controls,
+plus the optional Open Library connection. The dialog shows device-only
 storage, queued changes, sync progress, and successful cloud saves. Its Sync now
 button works without Open Library. First sign-in imports guest books without
 overwriting existing cloud records or restoring deleted books. Signing out hides
@@ -196,7 +199,7 @@ deleting a Clerk account alone does not delete its separate Neon library.
 
 Existing users may continue using their verified Open Library cloud sessions.
 To migrate, sign in to the website, connect/re-authenticate with Open Library,
-then choose **Link existing Open Library library** in the account panel.
+then choose **Link existing Open Library library** in the Account & sync dialog.
 The server verifies both sessions before claiming that library for the website
 account. The merge includes the old account's queued cloud changes on this
 browser, preserves existing website books and deletion markers, and keeps a
