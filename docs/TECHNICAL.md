@@ -1,0 +1,239 @@
+# My Reading List: technical notes
+
+Detailed behavior and setup notes. For an overview, see the [README](../README.md).
+
+## Reading list controls
+
+Account and sync controls sit at the bottom of the desktop sidebar. Signed-in
+users see their profile picture when available, with a generic avatar otherwise.
+On phones, account controls remain in the bottom navigation. The site uses its
+default dark appearance; the background color picker has been removed.
+The "Extra edition, only on this site" badge is shown only in Open Library-only
+sign-in mode. Website accounts can save multiple editions without that badge;
+those editions remain part of the website's cloud library.
+
+Click an unsaved book's status button to add it to Plan to Read. Click a yellow
+status button to remove the book from My Lists; use the arrow to choose a different
+list. Up to two separate Undo notifications are shown for the latest actions.
+Edition previews scale to the window height and expand while the list menu is open,
+so all list options stay visible without scrolling. On roomy desktop windows,
+edition previews use the same cover size and dialog width as Book details.
+Each individual removal has its own Undo button and expires after six seconds,
+independently of the other notification. Notifications include the book's subtitle
+when available so books with the same title can be distinguished. Adding a removed book again dismisses
+its outdated notification. Batch deletions use one notification to undo the
+entire batch.
+Press Ctrl+Z (Command+Z on Mac) to trigger the latest available Undo notification.
+The same six-second expiry and two-notification limit apply. Typing in an input,
+textarea or editable area keeps the browser's normal text undo; the shortcut does
+not override text editing or add redo.
+
+In Book details or an edition preview, click the cover (or focus it and press Enter)
+to open the full-size cover viewer. Click the viewer or press Escape to return
+to the details.
+
+Search results use the same Book details and edition previews as My Lists.
+Click a result's cover, title, or non-interactive area to view its details.
+Browse editions opens the edition list; selecting an edition shows its details
+and lets you add that specific edition to a list without changing the search result.
+
+Search results are paged to fit the window: wide layouts with 7 or more books
+per row show 2 rows per page, and narrower layouts show 3 rows (always at least
+12 books). Resizing the window recalculates the page size and keeps the first
+book you were viewing on screen.
+
+Before you search, Search books shows trending books from Open Library, with
+tabs for Today, This week and This month. It opens on Today and fills the same
+number of rows as a search results page; Show more trending books adds more rows.
+With "Hide books in my
+lists" turned on, books you've already added are skipped and replaced by the
+next trending ones.
+The discovery area also has a Recommended for you tab. It uses subjects and
+languages from books in Read, Reading and Plan to Read to find related Open
+Library works with editions in those languages, then hides books already in
+your lists. Add more books to those lists to refresh and improve recommendations.
+
+When syncing from Open Library, a logged edition without a cover is shown as the
+work's newest edition that has one. Editions you pick in this app are kept as chosen.
+Sync reads edition records in batches from Open Library's Books API rather than
+its search index, so cover changes appear on the next successful sync even when
+the index is out of date. Failed edition lookups fail the sync without replacing
+your saved books.
+Edition details are fetched in batches of up to 50 to reduce requests and waiting.
+Every sync still refreshes all books, with the same request pacing and failure
+checks; no saved metadata is used to hide a failed lookup. Shelf and edition-detail
+reads allow 20 seconds per attempt and retry up to twice after a timeout, network failure
+or temporary HTTP error. Retries use exponential backoff starting at 1.1 seconds and respect Retry-After
+up to 30 seconds; longer delays fail the sync instead of retrying early.
+Failed reads still stop the sync without replacing saved books, and exhausted
+timeouts show a specific warning. Invalid shelf pages also fail rather than being
+treated as empty shelves. Login and shelf-write requests are not retried by this logic.
+Click outside the Open Library connection dialog, press Escape, or choose Cancel
+to close it without starting a sync.
+Open Library connections use two-way sync only; log in to connect or sync.
+Books previously imported by username stay saved, but no longer sync until you
+log in. Already logged-in accounts keep their connected-account view.
+On touch screens, the keyboard stays closed until you tap a login field.
+The connection dialog separates sync benefits, account-switch guidance and login
+instructions, with grouped fields and descriptive links for Internet Archive keys.
+List cards are inserted and reordered in batches, without moving them when the
+order is unchanged. Sync matching uses indexed candidates with the same edition,
+work and fallback matching rules. Edition sorting computes publication dates once
+per request without changing the order or featured picks.
+
+To sync both ways, log in with your Open Library email and password in that
+dialog. If you signed up for Open Library with Google, you have no password, so
+choose "Signed up with Google?" and paste your Internet Archive access and secret
+keys from https://archive.org/account/s3.php (sign in to archive.org with Google
+first). The password or keys are sent only to Open Library to log in and are never stored.
+The site keeps Open Library's login session in an HTTP-only cookie. While you're
+logged in, adding, moving or deleting a book here also does it on Open Library, and
+changes made on Open Library come here every 15 minutes or when you choose Sync now.
+Saved books are available immediately while Open Library checks for updates in
+the background. Successful syncs update the lists and counts without reloading
+the page or closing the connection dialog; the dialog shows "Up to date" when
+finished, or a warning if the sync was incomplete.
+Right after logging in, and whenever you choose Sync now, books saved only in this
+browser are added to Open Library unless Open Library already has that work. The sync
+dialog shows how many books are waiting. Changes made while offline or logged out
+wait and are sent once you're back online or log in again. Books without an Open
+Library work, such as fallback search results, stay only in this app. Open Library
+keeps one edition per book, so if you add another edition of a book that's already in
+your lists, that extra edition stays only in this app and Open Library is left as it was.
+Removing a synced book from Open Library removes it here on the next successful
+sync, including copies previously marked as removed. Local-only books and extra
+editions stay. Failed or malformed sync responses leave your books untouched;
+incomplete shelves keep their existing books and show a warning.
+
+## Cloud Library
+
+### Website accounts (Clerk)
+
+Website accounts are independent of Open Library. Guests keep their books in
+this browser; signed-in users sync their library across PC and mobile using Neon.
+Open Library is an optional, separate shelf integration.
+
+For signed-in website users, **Import lists from Open Library** opens a separate
+one-time import dialog. Enter an Open Library username to copy its public reading
+log into the current website account; no password or Internet Archive keys are
+required. This does not sign in to Open Library, link accounts, enable ongoing
+sync, or send shelf changes back. Existing books and statuses are preserved,
+and repeated imports skip books already present. Imported copies are marked
+local-only for Open Library and still sync through the website account.
+Private reading logs cannot be imported this way. Successful imports close the
+dialog automatically; partial imports keep it open with a warning.
+The separate **Continue with Open Library** sign-in flow retains two-way sync;
+pre-existing Open Library connections are not disconnected by an import.
+
+Create a Clerk application and enable Google, passwords, and email verification
+codes in its authentication settings. In the Password tab, turn on
+"Sign-up with password" and "Add password to account" so new email users choose
+a password and existing users can add one under "Your account" → Security.
+Email codes remain available as a fallback. Configure your production domain and Google's production
+OAuth credentials in Clerk before deploying. Enable email codes for both sign-up
+verification and sign-in, and disable email verification links in both places.
+Users can read the code on another device and enter it in the browser where
+they started signing in. Verification codes expire; never share them.
+
+Set these environment variables locally in the ignored `.env` file and in the
+appropriate Vercel environment **before building**, then restart/redeploy:
+
+```text
+PUBLIC_CLERK_PUBLISHABLE_KEY=<Clerk publishable key>
+CLERK_SECRET_KEY=<Clerk secret key>
+STORAGE_URL=<Neon Postgres connection string>
+```
+
+Only the publishable key may be public. Never put the secret key or database URL
+in client code. Use Clerk development keys locally and production keys for the
+production deployment. Without Clerk keys, guest mode and existing Open Library
+connections remain available; the account dialog shows disabled sign-in buttons
+and explains the required Clerk setup. Clerk configuration alone does not enable
+sync: Neon must also be set.
+
+The sidebar's account item (the last item on the mobile bottom bar) shows a grey
+dot with "Sign in to sync" or a green dot with "Signed in as …". Signed out, it
+opens a sign-in dialog with **Continue with Google**, **Continue with Open
+Library**, and an email field. Email sign-in and sign-up stay inside the same
+dialog (built with Clerk's custom-flow API): password, email codes, new-device
+verification, "account not found" errors and account creation all appear in
+place. Google sign-in returns through `/sso-callback`.
+Signed in, the dialog offers Manage account, Open Library and sign out. Syncing
+is automatic; the dialog shows device-only storage, queued changes, sync
+progress, and successful cloud saves. First sign-in imports guest books without
+overwriting existing cloud records or restoring deleted books. Signing out hides
+account books and retains the per-account cache/outbox for the next sign-in.
+It also disconnects Open Library on this device to prevent the next website
+account from inheriting that integration. Disconnecting Open Library alone does
+**not** sign out of the website or stop website cloud sync.
+
+### Production Google consent screen
+
+The public privacy policy is at `/privacy`, linked from the library page and
+available without sign-in. Before publishing the Google OAuth app, deploy this
+page and set the Google Auth Platform Branding homepage to
+`https://www.myreadinglist.online` and privacy policy URL to
+`https://www.myreadinglist.online/privacy`. Use `myreadinglist.online` as the
+authorized domain. Then save Branding and publish from Audience.
+
+Keep the policy's contact address and data practices accurate as the service
+changes. Cloud data deletion requests currently require operator handling:
+deleting a Clerk account alone does not delete its separate Neon library.
+
+### Database configuration
+
+Connect a Neon Postgres database to the Vercel project. The server reads
+`STORAGE_URL`, `DATABASE_URL`, or `POSTGRES_URL`; these values must stay private
+and must never use a `PUBLIC_` prefix. The required tables are created on the
+first cloud access. Database access stays on the server.
+
+For legacy Open Library-only cloud access, log in to Open Library again after
+enabling the database. A successful login
+creates a separate HTTP-only cloud session; existing username cookies cannot
+authorize database access. No Open Library password or access keys are stored
+in the database. Logging out revokes the current cloud session.
+
+Cloud storage preserves each selected edition separately, including editions
+that Open Library cannot put on its reading log. Existing browser books are
+imported without replacing cloud records. Upload failures keep a persistent
+per-account outbox, concurrent saves use revision checks, and deletion markers
+prevent stale first-time imports from restoring removed books. Account switching
+keeps a browser backup of the previous library. Cloud updates arrive on login,
+returning to the page, reconnecting, and every minute while visible.
+
+For localhost, privately set the database connection in the ignored `.env` file
+and restart Astro, then sign in with the same website account (or the same Open
+Library account for legacy access). Connecting the
+database only to Vercel Production does not configure localhost or Preview.
+Localhost and Production must use the same database to share their libraries;
+Preview should use a separate database.
+
+## Optional Search Fallback
+
+Press Enter in the search field to search immediately or retry the unchanged
+query, keeping its current filters and returning to the first page.
+
+Search uses Open Library first, then Internet Archive's cataloged books when Open Library is unavailable. No API key is required for the Internet Archive fallback.
+
+Open Library search results are cached for 10 minutes. Before serving a cached
+result, a live search-service check requests just one record's key, with a
+five-second timeout. A failed check never serves the cached results. If
+search fails, a warning is shown and results come
+only from Internet Archive (saved Open Library matches are not mixed in).
+Edition enrichment uses at most three concurrent lookups and caches successful
+matches for 10 minutes. If an edition lookup is rate limited or times out, search
+availability is checked again before declaring an outage. A working search keeps
+its Open Library results and available work covers.
+Books without cover data do not, by themselves, indicate an outage.
+
+Fallback results link to their source and do not support the Open Library edition picker. Internet Archive's catalog is narrower than Open Library, so fallback result totals may differ.
+
+
+## Tests
+
+Run `npm run astro -- check` for Astro/TypeScript diagnostics. Account and cloud
+sync regressions use Node's built-in runner:
+
+```sh
+node --experimental-strip-types --test tests/cloud-library.test.ts tests/website-account.test.ts
+```
