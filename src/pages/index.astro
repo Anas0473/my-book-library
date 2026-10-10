@@ -207,6 +207,8 @@ const splitAuthors = (author: string) =>
       }
       .open-library-button.account-button {
         font-size: 0.88rem;
+        white-space: normal;
+        line-height: 1.25;
       }
       .account-button-label {
         min-width: 0;
@@ -2913,8 +2915,14 @@ const splitAuthors = (author: string) =>
           localStorage.removeItem(openLibraryPushUserKey);
           writePendingOpenLibraryChanges([]);
           updateOpenLibraryAccountView();
-          openLibraryAccountMessage.textContent = "Logged out. Changes here will no longer be sent to Open Library.";
+          openLibraryAccountMessage.textContent = "";
           showOpenLibraryStatus("");
+          openLibrarySyncDialog.close();
+          cloudLibraryStatus.textContent = websiteOwner
+            ? "Logged out of Open Library."
+            : "Logged out of Open Library. Sign in to sync between devices.";
+          updateAccountButton();
+          openAccountDialog();
         } catch {
           openLibraryAccountMessage.textContent = "Could not log out. Try again.";
         } finally {
