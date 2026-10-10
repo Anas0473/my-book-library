@@ -149,6 +149,17 @@ Website accounts are independent of Open Library. Guests keep their books in
 this browser; signed-in users sync their library across PC and mobile using Neon.
 Open Library is an optional, separate shelf integration.
 
+For signed-in website users, **Import lists from Open Library** opens a separate
+one-time import dialog. Enter an Open Library username to copy its public reading
+log into the current website account; no password or Internet Archive keys are
+required. This does not sign in to Open Library, link accounts, enable ongoing
+sync, or send shelf changes back. Existing books and statuses are preserved,
+and repeated imports skip books already present. Imported copies are marked
+local-only for Open Library and still sync through the website account.
+Private reading logs cannot be imported this way. Partial imports show a warning.
+The separate **Continue with Open Library** sign-in flow retains two-way sync;
+pre-existing Open Library connections are not disconnected by an import.
+
 Create a Clerk application and enable Google, passwords, and email verification
 codes in its authentication settings. In the Password tab, turn on
 "Sign-up with password" and "Add password to account" so new email users choose

@@ -301,7 +301,8 @@ const splitAuthors = (author: string) =>
           bottom: 5.5rem;
         }
       }
-      #open-library-sync-dialog {
+      #open-library-sync-dialog,
+      #open-library-import-dialog {
         box-sizing: border-box;
         width: min(30rem, calc(100vw - 2rem));
         max-width: none;
@@ -313,7 +314,8 @@ const splitAuthors = (author: string) =>
         font-family: var(--font-sans);
         box-shadow: 0 20px 48px rgba(0, 0, 0, 0.45);
       }
-      #open-library-sync-dialog:focus {
+      #open-library-sync-dialog:focus,
+      #open-library-import-dialog:focus {
         outline: none;
       }
       .open-library-topbar {
@@ -337,11 +339,13 @@ const splitAuthors = (author: string) =>
       .open-library-sync-back[hidden] { display: none; }
       .open-library-sync-close svg { width: 1rem; height: 1rem; }
       .open-library-sync-close:hover { background: var(--surface-dark-2); color: var(--text-dark); }
-      #open-library-sync-dialog::backdrop {
+      #open-library-sync-dialog::backdrop,
+      #open-library-import-dialog::backdrop {
         background: rgba(0, 0, 0, 0.6);
       }
       @media (max-width: 700px) {
-        #open-library-sync-dialog {
+        #open-library-sync-dialog,
+        #open-library-import-dialog {
           width: calc(100vw - 1.5rem);
           max-height: calc(100dvh - 1.5rem);
           padding: 1.4rem 1.25rem;
@@ -1871,7 +1875,35 @@ const splitAuthors = (author: string) =>
       </form>
     </dialog>
 
+    <dialog id="open-library-import-dialog" aria-labelledby="open-library-import-title">
+      <div class="dialog-topbar open-library-topbar">
+        <button type="button" class="open-library-sync-close" id="open-library-import-back" aria-label="Back">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 12H5M11 6l-6 6 6 6" /></svg>
+        </button>
+        <button type="button" class="open-library-sync-close" id="open-library-import-close" aria-label="Close">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18" /></svg>
+        </button>
+      </div>
+      <form class="open-library-sync-form" id="open-library-import-form">
+        <h2 id="open-library-import-title">Import lists from Open Library</h2>
+        <p>Copy your public Open Library reading lists into your current My Reading List account.</p>
+        <p class="open-library-account-note"><strong>One-time import, not a login or full sync.</strong> Your accounts stay separate. Nothing is sent to Open Library, and future changes there won't update your lists here.</p>
+        <p>Your existing books and reading statuses stay unchanged. Books already here won't be added again.</p>
+        <div class="open-library-field">
+          <label for="open-library-import-username">Open Library username</label>
+          <input id="open-library-import-username" type="text" required pattern="[\w.\-]{1,64}" maxlength="64" autocomplete="off" spellcheck="false" placeholder="Your Open Library username" />
+        </div>
+        <p class="open-library-note">Use the username from openlibrary.org/people/your-username, not your Google email. Your reading log must be public. No password or Internet Archive keys are needed.</p>
+        <p class="open-library-sync-message" id="open-library-import-message" role="status" aria-live="polite"></p>
+        <div class="open-library-sync-actions">
+          <button type="button" id="open-library-import-cancel">Cancel</button>
+          <button type="submit" id="open-library-import-submit">Import lists</button>
+        </div>
+      </form>
+    </dialog>
+
     <script>
+      import { mergeOpenLibraryImport } from "../lib/openlibrary-import";
       import { createCloudLibraryClient } from "../lib/cloud-library-client";
       import { $clerkStore } from "@clerk/astro/client";
       import { createSyncBookIndex } from "../lib/sync-book-index";
@@ -3208,13 +3240,15 @@ const splitAuthors = (author: string) =>
 
       function updateOpenLibrarySyncLabel() {
         const username = cloudReauthenticationRequired ? null : getOpenLibraryPushUser();
-        for (const button of [openLibrarySyncButton, openLibrarySyncButtonSignedIn]) {
+        for (const button of [openLibrarySyncButton]) {
           button.textContent = username
             ? "Open Library connected"
             : button === openLibrarySyncButton ? "Continue with Open Library" : "Connect Open Library";
           button.title = username ? "Sync Open Library" : "";
           button.classList.toggle("is-connected", Boolean(username));
         }
+        openLibrarySyncButtonSignedIn.textContent = "Import lists from Open Library";
+        openLibrarySyncButtonSignedIn.classList.remove("is-connected");
         updateAccountButton();
       }
 
@@ -3494,7 +3528,7 @@ const splitAuthors = (author: string) =>
 
       // Give every text box in the account and Open Library boxes a clear (×) button, like the search boxes.
       document.querySelectorAll<HTMLInputElement>(
-        "#website-account input, #open-library-sync-dialog input",
+        "#website-account input, #open-library-sync-dialog input, #open-library-import-dialog input",
       ).forEach((input) => {
         if (!["text", "email", "password"].includes(input.type)) return;
         // :placeholder-shown hides the × whenever the box is empty, including when code empties it.
@@ -3523,7 +3557,74 @@ const splitAuthors = (author: string) =>
         openLibraryBackButton.hidden = false;
       };
       openLibrarySyncButton.addEventListener("click", openOpenLibraryFromAccount);
-      openLibrarySyncButtonSignedIn.addEventListener("click", openOpenLibraryFromAccount);
+      const importDialog = document.getElementById("open-library-import-dialog") as HTMLDialogElement;
+      const importForm = document.getElementById("open-library-import-form") as HTMLFormElement;
+      const importUsername = document.getElementById("open-library-import-username") as HTMLInputElement;
+      const importMessage = document.getElementById("open-library-import-message") as HTMLElement;
+      const importSubmit = document.getElementById("open-library-import-submit") as HTMLButtonElement;
+      openLibrarySyncButtonSignedIn.addEventListener("click", () => {
+        accountDialog.close();
+        importMessage.textContent = "";
+        importDialog.showModal();
+        if (canAutoFocusTextFields()) importUsername.focus();
+      });
+      document.getElementById("open-library-import-back")?.addEventListener("click", () => {
+        importDialog.close();
+        accountDialog.showModal();
+      });
+      for (const id of ["open-library-import-close", "open-library-import-cancel"]) {
+        document.getElementById(id)?.addEventListener("click", () => importDialog.close());
+      }
+      importDialog.addEventListener("click", (event) => {
+        if (event.target !== importDialog) return;
+        const rect = importDialog.getBoundingClientRect();
+        if (event.clientX < rect.left || event.clientX > rect.right
+          || event.clientY < rect.top || event.clientY > rect.bottom) importDialog.close();
+      });
+      importForm.addEventListener("submit", async (event) => {
+        event.preventDefault();
+        const owner = websiteOwner;
+        const accountGeneration = websiteAccountGeneration;
+        if (!owner || !websiteUserId) {
+          importMessage.textContent = "Sign in to your website account before importing.";
+          return;
+        }
+        const username = importUsername.value.trim();
+        if (!/^[\w.-]{1,64}$/.test(username)) {
+          importMessage.textContent = "Enter a valid Open Library username.";
+          return;
+        }
+        importSubmit.disabled = true;
+        importMessage.textContent = "Importing your public reading lists...";
+        try {
+          const response = await fetch(`/api/openlibrary-reading-log.json?public=1&username=${encodeURIComponent(username)}`, {
+            credentials: "omit",
+            signal: AbortSignal.timeout(180000),
+          });
+          const data = await response.json();
+          if (owner !== websiteOwner || accountGeneration !== websiteAccountGeneration || !websiteUserId) {
+            throw new Error("Your account changed. No books were imported. Please try again.");
+          }
+          if (!response.ok) throw new Error(data.error || "Could not import Open Library lists. Your saved books were kept.");
+          if (data.username !== username || !Array.isArray(data.incompleteShelves)) {
+            throw new Error("Open Library returned an invalid import response. Your saved books were kept.");
+          }
+          const imported = mergeOpenLibraryImport(localBooks, data.books);
+          localBooks = imported.books;
+          saveLocalBooksWithoutPush();
+          if (imported.added) refreshLibraryView();
+          importMessage.textContent = `Imported ${imported.added} new ${imported.added === 1 ? "book" : "books"} into your website account. This import does not connect Open Library.`;
+          if (data.incompleteShelves.length || data.truncated) {
+            importMessage.textContent += " Some shelves were incomplete. You can import again later; existing books will be kept.";
+          }
+        } catch (error) {
+          importMessage.textContent = error instanceof Error
+            ? error.name === "TimeoutError" ? "Open Library took too long. No books were imported. Please try again." : error.message
+            : "Could not import Open Library lists. Your saved books were kept.";
+        } finally {
+          importSubmit.disabled = false;
+        }
+      });
       openLibraryBackButton.addEventListener("click", () => {
         openLibrarySyncDialog.close();
         accountDialog.showModal();

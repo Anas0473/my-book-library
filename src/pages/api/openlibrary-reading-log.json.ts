@@ -35,7 +35,7 @@ export const GET: APIRoute = async ({ url, cookies }) => {
     return jsonResponse({ error: 'Enter a valid Open Library username.' }, 400);
   }
   // A logged-in owner can read their own log even when it is private.
-  const session = getSession(cookies);
+  const session = url.searchParams.get('public') === '1' ? null : getSession(cookies);
   const requestHeaders = session?.username.toLowerCase() === username.toLowerCase()
     ? sessionHeaders(session.session)
     : { 'User-Agent': 'my-book-library/0.0.1' };
