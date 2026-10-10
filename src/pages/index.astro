@@ -395,6 +395,9 @@ const splitAuthors = (author: string) =>
         color: var(--text-dark-muted);
         cursor: pointer;
       }
+      .open-library-sync-back { top: 1.75rem; right: auto; left: 1.4rem; }
+      #open-library-sync-dialog:has(.open-library-sync-back:not([hidden])) #open-library-sync-title { padding-left: 2rem; }
+      .open-library-sync-back[hidden] { display: none; }
       .open-library-sync-close svg { width: 1rem; height: 1rem; }
       .open-library-sync-close:hover { background: var(--surface-dark-2); color: var(--text-dark); }
       #open-library-sync-dialog::backdrop {
@@ -1847,6 +1850,9 @@ const splitAuthors = (author: string) =>
     <button type="button" class="shelf-jump-button" aria-label="Jump to start of list" title="Jump to start of list" hidden>↑</button>
 
     <dialog id="open-library-sync-dialog" aria-labelledby="open-library-sync-title" tabindex="-1">
+      <button type="button" class="open-library-sync-close open-library-sync-back" id="open-library-sync-back" aria-label="Back" hidden>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 12H5M11 6l-6 6 6 6" /></svg>
+      </button>
       <button type="button" class="open-library-sync-close" id="open-library-sync-close" aria-label="Close">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18" /></svg>
       </button>
@@ -2896,7 +2902,7 @@ const splitAuthors = (author: string) =>
             }
           });
         });
-        accountFlow.querySelectorAll<HTMLButtonElement>("[data-account-back]").forEach((button) => {
+        accountDialog.querySelectorAll<HTMLButtonElement>("[data-account-back]").forEach((button) => {
           button.addEventListener("click", () => {
             passwordInput.value = "";
             codeInput.value = "";
@@ -3545,8 +3551,22 @@ const splitAuthors = (author: string) =>
           : "Log in and sync";
       }
 
-      openLibrarySyncButton.addEventListener("click", () => openOpenLibrarySyncDialog());
-      openLibrarySyncButtonSignedIn.addEventListener("click", () => openOpenLibrarySyncDialog());
+      const openLibraryBackButton = document.getElementById("open-library-sync-back") as HTMLButtonElement;
+      // Opened from the account box: swap boxes so the back arrow can return to it.
+      const openOpenLibraryFromAccount = () => {
+        accountDialog.close();
+        openOpenLibrarySyncDialog();
+        openLibraryBackButton.hidden = false;
+      };
+      openLibrarySyncButton.addEventListener("click", openOpenLibraryFromAccount);
+      openLibrarySyncButtonSignedIn.addEventListener("click", openOpenLibraryFromAccount);
+      openLibraryBackButton.addEventListener("click", () => {
+        openLibrarySyncDialog.close();
+        accountDialog.showModal();
+      });
+      openLibrarySyncDialog.addEventListener("close", () => {
+        openLibraryBackButton.hidden = true;
+      });
       accountButton.addEventListener("click", openAccountDialog);
       mobileAccountButton.addEventListener("click", openAccountDialog);
       document.getElementById("account-dialog-close")?.addEventListener("click", () => accountDialog.close());

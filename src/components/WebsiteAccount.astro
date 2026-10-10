@@ -12,6 +12,9 @@ const signedIn = Boolean(websiteCloudOwner(Astro.locals));
   data-signed-in={String(signedIn)}
   aria-labelledby="account-dialog-title"
 >
+  <button type="button" class="account-close account-back when-signed-out" id="account-dialog-back" data-account-back aria-label="Back">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 12H5M11 6l-6 6 6 6" /></svg>
+  </button>
   <button type="button" class="account-close" id="account-dialog-close" aria-label="Close">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18" /></svg>
   </button>
@@ -147,6 +150,8 @@ const signedIn = Boolean(websiteCloudOwner(Astro.locals));
     color: var(--text-dark-muted);
     cursor: pointer;
   }
+  .account-close.account-back { right: auto; left: 0.85rem; }
+  .account-dialog:has(.account-flow[data-step="start"]) .account-back { display: none; }
   .account-close svg { width: 1rem; height: 1rem; }
   .account-close:hover { background: var(--surface-dark-2); color: var(--text-dark); }
   .account-header { display: grid; gap: 0.4rem; text-align: center; }
